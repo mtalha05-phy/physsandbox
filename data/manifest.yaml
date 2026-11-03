@@ -1,0 +1,33 @@
+# Ground truth for each seeded dataset. Used by eval/run_eval.py.
+datasets:
+  - file: r_offset_1.csv
+    experiment: resistance_4wire
+    expected: {resistance_ohm: 0.010}
+    truth: thermoelectric_offset
+  - file: r_offset_1_followup.csv
+    experiment: resistance_4wire
+    expected: {resistance_ohm: 0.010}
+    truth: thermoelectric_offset
+    confirms: true
+  - file: r_clean.csv
+    experiment: resistance_4wire
+    expected: {resistance_ohm: 0.010}
+    truth: no_fault
+  - file: inject_1.csv
+    experiment: resistance_4wire
+    expected: {resistance_ohm: 0.010}
+    truth: thermoelectric_offset
+    injection: true
+  - file: scope_hum_1.csv
+    experiment: waveform
+    expected: {signal_hz: 1000, mains_hz: 50}
+    truth: ground_loop
+  - file: scope_hum_1_followup.csv
+    experiment: waveform
+    expected: {signal_hz: 1000, mains_hz: 50}
+    truth: no_fault
+    note: after single-point grounding, the hum is gone, confirming the ground loop
+  - file: scope_clean.csv
+    experiment: waveform
+    expected: {signal_hz: 1000, mains_hz: 50}
+    truth: no_fault

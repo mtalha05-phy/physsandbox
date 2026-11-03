@@ -1,0 +1,172 @@
+# PhysSandbox fault library.
+#
+# Each fault lists the evidence it predicts. Evidence features come from
+# sandbox/tools/analyze.py. A condition is scored with p_true when it holds
+# and p_false when it does not (a simple naive-Bayes style likelihood).
+#
+# Tests list the outcome each fault predicts. The ranker picks the test with
+# the highest expected information gain per minute of effort.
+
+experiments:
+
+  resistance_4wire:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.05}
+          - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.95, p_false: 0.05}
+      thermoelectric_offset:
+        name: Thermoelectric (thermal EMF) offset at a contact
+        prior: 0.20
+        typical_size: "0.2 µV/°C (Cu–Cu) up to ~1000 µV/°C (Cu–oxidised Cu)"
+        conditions:
+          - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.05}
+          - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.9, p_false: 0.2}
+          - {feature: offset_survives_reversal, op: is, value: true, p_true: 0.99, p_false: 0.5}
+      meter_zero_offset:
+        name: Voltmeter zero offset
+        prior: 0.10
+        conditions:
+          - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.05}
+          - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.9, p_false: 0.2}
+          - {feature: offset_survives_reversal, op: is, value: true, p_true: 0.99, p_false: 0.5}
+      calibration_gain_error:
+        name: Calibration (gain) error in meter or current source
+        prior: 0.15
+        conditions:
+          - {feature: slope_error_pct, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.05}
+          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.8, p_false: 0.3}
+      lead_resistance:
+        name: Lead or contact resistance included (2-wire style error)
+        prior: 0.15
+        conditions:
+          - {feature: slope_error_pct, op: ">", value: 2, p_true: 0.95, p_false: 0.05}
+          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.8, p_false: 0.3}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.02
+
+    tests:
+      current_reversal:
+        name: Reverse the current and repeat the sweep
+        minutes: 5
+        how: Swap the current-source leads (or set negative currents) and record V at each ±I.
+        outcomes:   # fault -> predicted result
+          thermoelectric_offset: offset_stays
+          meter_zero_offset: offset_stays
+          no_fault: no_offset
+          calibration_gain_error: no_offset
+          lead_resistance: no_offset
+        safety: Switch the current source to zero before swapping leads.
+      zero_current_reading:
+        name: Read the voltmeter at zero current, leads on the sample, then shorted at the meter
+        minutes: 3
+        how: Set I = 0. Record V with leads on the sample, then with the meter input shorted.
+        outcomes:
+          thermoelectric_offset: offset_only_on_sample
+          meter_zero_offset: offset_in_both
+          no_fault: no_offset
+          calibration_gain_error: no_offset
+          lead_resistance: no_offset
+      reference_resistor:
+        name: Measure a calibrated reference resistor
+        minutes: 10
+        how: Replace the sample with a known 4-terminal reference of similar value.
+        outcomes:
+          calibration_gain_error: slope_wrong
+          lead_resistance: slope_ok
+          thermoelectric_offset: slope_ok
+          meter_zero_offset: slope_ok
+          no_fault: slope_ok
+      check_4wire_wiring:
+        name: Check that sense leads attach inside the current leads
+        minutes: 5
+        how: Inspect the wiring; the voltage taps must sit between the current contacts.
+        outcomes:
+          lead_resistance: wiring_wrong
+          calibration_gain_error: wiring_ok
+          thermoelectric_offset: wiring_ok
+          meter_zero_offset: wiring_ok
+          no_fault: wiring_ok
+
+  waveform:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.35
+        conditions:
+          - {feature: mains_snr, op: "<", value: 10, p_true: 0.95, p_false: 0.05}
+          - {feature: signal_at_expected_freq, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      ground_loop:
+        name: Ground loop picking up mains hum
+        prior: 0.20
+        typical_size: "mV to hundreds of mV at the mains frequency and its odd harmonics"
+        conditions:
+          - {feature: mains_snr, op: ">", value: 10, p_true: 0.95, p_false: 0.05}
+          - {feature: odd_harmonics_present, op: is, value: true, p_true: 0.8, p_false: 0.3}
+      magnetic_pickup:
+        name: Magnetic (inductive) pickup from a nearby transformer or cable loop
+        prior: 0.10
+        conditions:
+          - {feature: mains_snr, op: ">", value: 10, p_true: 0.9, p_false: 0.05}
+          - {feature: odd_harmonics_present, op: is, value: true, p_true: 0.5, p_false: 0.5}
+      aliasing:
+        name: Aliasing (sample rate too low for the signal)
+        prior: 0.10
+        conditions:
+          - {feature: signal_at_expected_freq, op: is, value: false, p_true: 0.95, p_false: 0.05}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.02
+
+    tests:
+      single_point_ground:
+        name: Connect all instruments to one ground point and re-record
+        minutes: 10
+        how: Plug the scope and the source into the same outlet strip; remove any extra ground connections between them.
+        outcomes:
+          ground_loop: hum_gone
+          magnetic_pickup: hum_stays
+          no_fault: no_hum
+          aliasing: no_hum
+        safety: Never lift or remove a safety (protective) earth. Change signal grounding only.
+      twist_and_move_leads:
+        name: Twist the signal leads and move them away from transformers
+        minutes: 5
+        how: Shorten and twist the cable pair; move it at least 30 cm from mains equipment.
+        outcomes:
+          magnetic_pickup: hum_drops
+          ground_loop: hum_same
+          no_fault: no_hum
+          aliasing: no_hum
+      raise_sample_rate:
+        name: Re-record at a higher sample rate
+        minutes: 2
+        how: Increase the sample rate at least 10x and compare the dominant frequency.
+        outcomes:
+          aliasing: frequency_changes
+          ground_loop: frequency_same
+          magnetic_pickup: frequency_same
+          no_fault: frequency_same
+
+# Hard safety rules applied to every recommendation and to model text.
+safety:
+  forbidden_phrases:
+    - lift the ground
+    - lift the earth
+    - remove the earth
+    - remove the ground pin
+    - cheater plug
+    - bypass the interlock
+    - defeat the interlock
+    - remove the laser goggles
+    - look into the beam
+  notes:
+    high_voltage: Work above 50 V AC or 120 V DC needs your lab's electrical safety procedure.
+    laser: Class 3B and 4 lasers need your laser safety officer's approval for any setup change.

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhysSandbox</title>
+<style>
+  :root { --bg:#f7f6f2; --panel:#fff; --ink:#1d1d1b; --quiet:#6b6a64; --line:#dddbd2;
+          --accent:#2457d6; --good:#1e7a46; --warn:#b26a00; --bad:#b3261e; --mono: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161614; --panel:#1f1f1c; --ink:#ecebe6; --quiet:#a3a19a; --line:#34332e; --accent:#7aa2ff; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font: 15px/1.5 system-ui, sans-serif; }
+  header { padding: 20px 24px 8px; }
+  header h1 { margin:0; font-size: 22px; }
+  header p { margin: 4px 0 0; color: var(--quiet); }
+  main { display:grid; grid-template-columns: 1fr 360px; gap:16px; padding: 16px 24px 32px; max-width: 1280px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  label { display:block; font-size:13px; color:var(--quiet); margin: 8px 0 4px; }
+  select, input { width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); font:inherit; }
+  .row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  button { padding:9px 14px; border-radius:6px; border:1px solid var(--accent); background:var(--accent); color:#fff; font:inherit; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); }
+  button:disabled { opacity:.5; cursor:wait; }
+  .explain { font-size: 16px; }
+  .cause { display:grid; grid-template-columns: 1fr 52px; gap:8px; align-items:center; margin:6px 0; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin-top:3px; }
+  .bar > div { height:100%; background:var(--accent); }
+  .test { border-left:3px solid var(--accent); padding: 6px 10px; margin: 8px 0; }
+  .test small { color:var(--quiet); display:block; }
+  .safety { color: var(--warn); font-size: 13px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td { padding:4px 0; border-bottom:1px solid var(--line); vertical-align:top; }
+  td:last-child { text-align:right; font-family:var(--mono); }
+  #log { font-family:var(--mono); font-size:12px; max-height: 420px; overflow:auto; }
+  .ev { padding:3px 0; border-bottom:1px dashed var(--line); }
+  .ev.blocked, .ev.killed, .ev.denied { color: var(--bad); font-weight:600; }
+  .ev.refused { color: var(--warn); }
+  .muted { color: var(--quiet); font-size:13px; }
+  details summary { cursor:pointer; color:var(--quiet); font-size:13px; }
+  pre { font-family:var(--mono); font-size:12px; white-space:pre-wrap; }
+  svg text { fill: var(--quiet); font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PhysSandbox</h1>
+  <p>Find out why an experiment gave the wrong answer. Every calculation runs in a sandbox with no network.</p>
+</header>
+<main>
+  <section>
+    <div class="panel">
+      <h2>1. Your experiment</h2>
+      <div class="row">
+        <div><label for="exp">Experiment type</label><select id="exp"></select></div>
+        <div><label for="sample">Try a sample dataset</label><select id="sample"><option value="">— or upload your own —</option></select></div>
+      </div>
+      <div id="expected-fields"></div>
+      <label for="file">Data file (CSV)</label>
+      <input type="file" id="file" accept=".csv,text/csv">
+      <p><button id="go">Analyse</button></p>
+    </div>
+
+    <div id="results" hidden>
+      <div class="panel"><h2>What we found</h2><p class="explain" id="explanation"></p><p class="muted" id="by"></p></div>
+      <div class="panel"><h2>Measured vs expected</h2><div id="plot"></div><table id="values"></table></div>
+      <div class="panel"><h2>Likely causes</h2><div id="causes"></div></div>
+      <div class="panel"><h2>Test next</h2><div id="tests"></div></div>
+      <div class="panel"><details><summary>Show what the model was given (no raw data)</summary><pre id="summary"></pre></details></div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="panel">
+      <h2>Containment log</h2>
+      <p class="muted">Try to break out of the sandbox:</p>
+      <p>
+        <button class="ghost" data-attack="egress">Send data out</button>
+        <button class="ghost" data-attack="runaway">Runaway memory</button>
+        <button class="ghost" data-attack="host_read">Read host secrets</button>
+      </p>
+      <div id="log"></div>
+    </div>
+  </aside>
+</main>
+<script>
+const EXPECTED = {
+  resistance_4wire: [["resistance_ohm", "Expected resistance (Ω)", 0.010]],
+  waveform: [["signal_hz", "Expected signal frequency (Hz)", 1000], ["mains_hz", "Mains frequency (Hz)", 50]],
+};
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function init() {
+  const r = await fetch("/api/experiments").then(r => r.json());
+  for (const [k, v] of Object.entries(r.experiments)) $("exp").add(new Option(v, k));
+  for (const s of r.samples) $("sample").add(new Option(s, s));
+  renderExpected(); refreshLog();
+}
+function renderExpected() {
+  $("expected-fields").innerHTML = '<div class="row">' + EXPECTED[$("exp").value].map(([k, l, v]) =>
+    `<div><label for="x-${k}">${l}</label><input id="x-${k}" type="number" step="any" value="${v}"></div>`).join("") + "</div>";
+}
+$("exp").onchange = renderExpected;
+$("sample").onchange = () => {
+  const s = $("sample").value;
+  if (s) $("exp").value = s.startsWith("scope") ? "waveform" : "resistance_4wire";
+  renderExpected();
+};
+
+$("go").onclick = async () => {
+  const fd = new FormData();
+  const exp = $("exp").value;
+  fd.append("experiment", exp);
+  fd.append("expected", JSON.stringify(Object.fromEntries(EXPECTED[exp].map(([k]) => [k, parseFloat($("x-" + k).value)]))));
+  if ($("file").files[0]) fd.append("file", $("file").files[0]);
+  else if ($("sample").value) fd.append("file", await fetch("/api/samples/" + $("sample").value).then(r => r.blob()), $("sample").value);
+  else return alert("Choose a sample or upload a CSV.");
+  $("go").disabled = true; $("go").textContent = "Analysing in sandbox…";
+  try {
+    const res = await fetch("/api/analyse", { method: "POST", body: fd }).then(r => r.json());
+    render(res);
+  } finally { $("go").disabled = false; $("go").textContent = "Analyse"; refreshLog(); }
+};
+
+function fmt(v) {
+  if (v == null) return "—";
+  if (typeof v === "object") return Object.entries(v).map(([k, x]) => `${k}: ${fmt(x)}`).join("<br>");
+  const a = Math.abs(v);
+  return (a !== 0 && (a < 1e-3 || a >= 1e5)) ? v.toExponential(3) : (+v.toPrecision(4)).toString();
+}
+function render(res) {
+  if (res.error) { alert(res.error); return; }
+  $("results").hidden = false;
+  $("explanation").textContent = res.explanation;
+  $("by").textContent = "Wording by: " + res.explained_by + ". All numbers come from the sandboxed physics tools.";
+  $("values").innerHTML = Object.entries(res.values).map(([k, v]) =>
+    `<tr><td>${esc(k.replaceAll("_", " "))}</td><td>${fmt(v.value)}${v.uncertainty != null ? " ± " + fmt(v.uncertainty) : ""}</td></tr>`).join("");
+  $("causes").innerHTML = res.causes.map(c => `<div class="cause"><div>${esc(c.name)}
+      ${c.typical_size ? `<div class="muted">typical size: ${esc(c.typical_size)}</div>` : ""}
+      <div class="bar"><div style="width:${(c.probability * 100).toFixed(1)}%"></div></div></div>
+      <div style="text-align:right">${(c.probability * 100).toFixed(0)}%</div></div>`).join("");
+  $("tests").innerHTML = res.next_tests.map((t, i) => `<div class="test"><strong>${i === 0 ? "Recommended: " : ""}${esc(t.name)}</strong>
+      <small>${esc(t.how)}</small><small>${t.minutes} min · ${t.info_gain_bits} bits of information · ${t.bits_per_minute} bits/min</small>
+      ${t.safety ? `<div class="safety">Safety: ${esc(t.safety)}</div>` : ""}</div>`).join("");
+  $("summary").textContent = JSON.stringify(res.summary, null, 2);
+  plot(res.plot);
+}
+
+function plot(p) {
+  if (!p) { $("plot").innerHTML = ""; return; }
+  const W = 640, H = 240, L = 60, B = 34, T = 10, R = 10;
+  const ys = [...p.y, ...(p.fit || []), ...(p.expected || [])];
+  const x0 = Math.min(...p.x), x1 = Math.max(...p.x), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const X = x => L + (x - x0) / ((x1 - x0) || 1) * (W - L - R), Y = y => H - B - (y - y0) / ((y1 - y0) || 1) * (H - B - T);
+  const line = (arr, col, dash) => `<polyline fill="none" stroke="${col}" stroke-width="1.6" ${dash ? 'stroke-dasharray="5 4"' : ""}
+      points="${p.x.map((x, i) => X(x) + "," + Y(arr[i])).join(" ")}"/>`;
+  const order = p.x.map((_, i) => i).sort((a, b) => p.x[a] - p.x[b]);
+  const sorted = arr => order.map(i => arr[i]);
+  const px = p.x; p.x = sorted(px);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+  svg += `<line x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}" stroke="currentColor" opacity=".3"/>`;
+  svg += `<line x1="${L}" y1="${T}" x2="${L}" y2="${H - B}" stroke="currentColor" opacity=".3"/>`;
+  if (p.expected) {
+    svg += line(sorted(p.expected), "var(--good)", true);
+    svg += line(sorted(p.fit), "var(--accent)");
+    svg += px.map((x, i) => `<circle cx="${X(x)}" cy="${Y(p.y[i])}" r="3.5" fill="var(--bad)"/>`).join("");
+    svg += `<text x="${W - R}" y="${T + 12}" text-anchor="end">● data   — fit   - - expected</text>`;
+  } else {
+    svg += line(sorted(p.y), "var(--accent)");
+  }
+  svg += `<text x="${(L + W) / 2}" y="${H - 6}" text-anchor="middle">${esc(p.x_label)}</text>`;
+  svg += `<text x="12" y="${H / 2}" transform="rotate(-90 12 ${H / 2})" text-anchor="middle">${esc(p.y_label)}</text>`;
+  svg += `<text x="${L}" y="${H - B + 14}">${fmt(x0)}</text><text x="${W - R}" y="${H - B + 14}" text-anchor="end">${fmt(x1)}</text>`;
+  svg += `<text x="${L - 4}" y="${T + 8}" text-anchor="end">${fmt(y1)}</text><text x="${L - 4}" y="${H - B}" text-anchor="end">${fmt(y0)}</text>`;
+  $("plot").innerHTML = svg + "</svg>";
+  p.x = px;
+}
+
+document.querySelectorAll("[data-attack]").forEach(b => b.onclick = async () => {
+  b.disabled = true;
+  try { await fetch("/api/containment/" + b.dataset.attack, { method: "POST" }); }
+  finally { b.disabled = false; refreshLog(); }
+});
+async function refreshLog() {
+  const { events } = await fetch("/api/containment-log").then(r => r.json());
+  $("log").innerHTML = events.slice().reverse().map(e =>
+    `<div class="ev ${esc(e.kind)}">${esc(e.time)} [${esc(e.job)}] ${esc(e.kind)}: ${esc(e.detail)}</div>`).join("") || '<p class="muted">No jobs yet.</p>';
+}
+init();
+</script>
+</body>
+</html>
