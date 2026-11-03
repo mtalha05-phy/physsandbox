@@ -4,189 +4,693 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PhysSandbox</title>
+<meta name="description" content="A glovebox for AI-written science code. Find out why an experiment gave the wrong answer.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='26' height='22' rx='4' fill='%2313202B'/%3E%3Ccircle cx='11' cy='21' r='3.2' fill='%23E6EAED'/%3E%3Ccircle cx='21' cy='21' r='3.2' fill='%23E6EAED'/%3E%3Ccircle cx='16' cy='11' r='2.4' fill='%23E0312B'/%3E%3C/svg%3E">
 <style>
-  :root { --bg:#f7f6f2; --panel:#fff; --ink:#1d1d1b; --quiet:#6b6a64; --line:#dddbd2;
-          --accent:#2457d6; --good:#1e7a46; --warn:#b26a00; --bad:#b3261e; --mono: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#161614; --panel:#1f1f1c; --ink:#ecebe6; --quiet:#a3a19a; --line:#34332e; --accent:#7aa2ff; } }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font: 15px/1.5 system-ui, sans-serif; }
-  header { padding: 20px 24px 8px; }
-  header h1 { margin:0; font-size: 22px; }
-  header p { margin: 4px 0 0; color: var(--quiet); }
-  main { display:grid; grid-template-columns: 1fr 360px; gap:16px; padding: 16px 24px 32px; max-width: 1280px; }
-  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
-  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
-  h2 { font-size: 15px; margin: 0 0 10px; }
-  label { display:block; font-size:13px; color:var(--quiet); margin: 8px 0 4px; }
-  select, input { width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); font:inherit; }
-  .row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  button { padding:9px 14px; border-radius:6px; border:1px solid var(--accent); background:var(--accent); color:#fff; font:inherit; cursor:pointer; }
-  button.ghost { background:transparent; color:var(--accent); }
-  button:disabled { opacity:.5; cursor:wait; }
-  .explain { font-size: 16px; }
-  .cause { display:grid; grid-template-columns: 1fr 52px; gap:8px; align-items:center; margin:6px 0; }
-  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin-top:3px; }
-  .bar > div { height:100%; background:var(--accent); }
-  .test { border-left:3px solid var(--accent); padding: 6px 10px; margin: 8px 0; }
-  .test small { color:var(--quiet); display:block; }
-  .safety { color: var(--warn); font-size: 13px; }
-  table { width:100%; border-collapse:collapse; font-size:13px; }
-  td { padding:4px 0; border-bottom:1px solid var(--line); vertical-align:top; }
-  td:last-child { text-align:right; font-family:var(--mono); }
-  #log { font-family:var(--mono); font-size:12px; max-height: 420px; overflow:auto; }
-  .ev { padding:3px 0; border-bottom:1px dashed var(--line); }
-  .ev.blocked, .ev.killed, .ev.denied { color: var(--bad); font-weight:600; }
-  .ev.refused { color: var(--warn); }
-  .muted { color: var(--quiet); font-size:13px; }
-  details summary { cursor:pointer; color:var(--quiet); font-size:13px; }
-  pre { font-family:var(--mono); font-size:12px; white-space:pre-wrap; }
-  svg text { fill: var(--quiet); font-size: 11px; }
+:root {
+  --page: #E6EAED; --surface: #F8FAFB; --sunk: #EEF2F4;
+  --ink: #13202B; --muted: #566674; --line: #C7D0D7; --line-soft: #DCE3E8;
+  --laser: #E0312B; --cobalt: #2754D6; --interlock: #17805C; --amber: #A86E00;
+  --chamber: #17222C; --chamber-2: #1F2D39; --chamber-ink: #D3DEE7; --chamber-muted: #8497A7; --glass: #2A3B49;
+  --radius-panel: 14px; --radius-ctl: 8px;
+  --shadow: 0 1px 0 rgba(19,32,43,.04), 0 8px 24px -16px rgba(19,32,43,.25);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #0E151B; --surface: #151F28; --sunk: #111A22;
+    --ink: #E2E9EF; --muted: #8D9DAA; --line: #2B3945; --line-soft: #22303B;
+    --laser: #FF5A4E; --cobalt: #7C9BFF; --interlock: #3FBF8F; --amber: #E0A93B;
+    --chamber: #0A1015; --chamber-2: #111A21; --glass: #1C2A35;
+    --shadow: 0 1px 0 rgba(0,0,0,.2), 0 10px 30px -18px rgba(0,0,0,.8);
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 15px/1.55 "Instrument Sans", system-ui, sans-serif; font-feature-settings: "ss01", "tnum";
+  /* faint optical-breadboard hole grid */
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ink) 9%, transparent) 1px, transparent 1.4px);
+  background-size: 25px 25px;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+/* ---------- header ---------- */
+.top { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: end; justify-content: space-between;
+       padding: 28px 32px 20px; max-width: 1440px; margin: 0 auto; }
+.brand { display: flex; gap: 14px; align-items: center; }
+.brand svg { flex: none; }
+.wordmark { font-size: 30px; line-height: 1; font-weight: 700; letter-spacing: -0.035em; margin: 0; }
+.wordmark span { font-weight: 500; color: var(--muted); }
+.tagline { margin: 6px 0 0; color: var(--muted); max-width: 52ch; }
+.status { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+        background: var(--surface); border: 1px solid var(--line); font-size: 13px; white-space: nowrap; }
+.lamp { width: 8px; height: 8px; border-radius: 50%; background: var(--interlock);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--interlock) 22%, transparent); }
+.lamp.warn { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent); }
+.lamp.off { background: var(--muted); box-shadow: none; }
+
+/* ---------- layout ---------- */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 24px;
+          padding: 0 32px 48px; max-width: 1440px; margin: 0 auto; align-items: start; }
+@media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } .glovebox { position: static; } }
+@media (max-width: 560px) { .top, .layout { padding-left: 16px; padding-right: 16px; } }
+
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel);
+        box-shadow: var(--shadow); margin-bottom: 16px; }
+.step > header { display: flex; gap: 14px; align-items: baseline; padding: 18px 22px 0; }
+.step-n { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--ink);
+          display: grid; place-items: center; font-size: 13px; font-weight: 600; transform: translateY(5px); }
+.step.locked { opacity: .55; }
+.step.locked .step-n { border-color: var(--muted); color: var(--muted); }
+.step h2 { font-size: 19px; line-height: 1.25; margin: 0; font-weight: 600; letter-spacing: -0.015em; }
+.step .hint { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.step-body { padding: 16px 22px 22px 62px; }
+@media (max-width: 560px) { .step-body { padding-left: 22px; } }
+
+/* ---------- controls ---------- */
+.seg { display: inline-flex; padding: 3px; background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; gap: 2px; }
+.seg button { border: 0; background: transparent; padding: 7px 14px; border-radius: 7px; cursor: pointer; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
+.fields { display: flex; flex-wrap: wrap; gap: 12px 20px; margin: 16px 0; }
+.field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.field input { width: 170px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-ctl); background: var(--surface); }
+.drop { border: 1.5px dashed var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 12px; background: var(--sunk); transition: border-color .15s, background .15s; }
+.drop.over { border-color: var(--cobalt); background: color-mix(in srgb, var(--cobalt) 6%, var(--sunk)); }
+.drop.followup { border-style: solid; border-color: var(--cobalt); }
+.drop-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 14px; }
+.chip:hover { border-color: var(--ink); }
+.chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+.chip .tag { font-size: 12px; color: var(--laser); margin-left: 6px; }
+.chip[aria-pressed="true"] .tag { color: #FFB3AD; }
+.file-name { font-size: 14px; color: var(--muted); }
+.btn { display: inline-flex; align-items: center; gap: 10px; border: 0; border-radius: 10px; padding: 11px 18px; cursor: pointer;
+       background: var(--ink); color: var(--surface); font-weight: 600; }
+.btn:hover { filter: brightness(1.15); }
+.btn:disabled { opacity: .5; cursor: progress; }
+.btn.secondary { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+.btn.small { padding: 7px 12px; font-size: 14px; border-radius: 8px; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 16px; }
+.followup-note { font-size: 14px; color: var(--cobalt); font-weight: 500; }
+.linkish { background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 0; font-size: 14px; }
+
+/* ---------- verdict ---------- */
+.verdict { font-size: 17px; line-height: 1.5; margin: 0 0 16px; max-width: 70ch; }
+.byline { font-size: 13px; color: var(--muted); margin: -8px 0 16px; }
+.banner { display: flex; gap: 12px; align-items: center; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; font-weight: 600; }
+.banner.confirmed { background: color-mix(in srgb, var(--interlock) 12%, transparent); color: var(--interlock); }
+.banner.clear { background: color-mix(in srgb, var(--cobalt) 10%, transparent); color: var(--cobalt); }
+
+/* ---------- chart ---------- */
+.chart { width: 100%; height: auto; display: block; }
+.chart text { font-size: 11.5px; fill: var(--muted); }
+.chart .axis { stroke: var(--line); }
+.chart .grid { stroke: var(--line-soft); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); margin: 6px 0 12px; }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; }
+.readings { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-top: 12px; }
+.reading { background: var(--sunk); border-radius: 10px; padding: 10px 12px; }
+.reading .k { font-size: 13px; color: var(--muted); }
+.reading .v { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.reading .v small { font-weight: 400; color: var(--muted); font-size: 13px; }
+
+/* ---------- causes ---------- */
+.trail { font-size: 14px; color: var(--muted); margin: -4px 0 14px; }
+.trail b { color: var(--ink); }
+.cause { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 6px 12px; align-items: center; padding: 8px 0; }
+.cause + .cause { border-top: 1px solid var(--line-soft); }
+.cause .name { font-weight: 500; }
+.cause .size { font-size: 13px; color: var(--muted); }
+.cause .pct { text-align: right; font-weight: 600; font-size: 17px; }
+.track { grid-column: 1 / -1; position: relative; height: 10px; background: var(--sunk); border-radius: 5px; }
+.track .fill { position: absolute; inset: 0 auto 0 0; border-radius: 5px; background: var(--muted); transition: width .7s cubic-bezier(.2,.8,.2,1); }
+.cause.top .fill { background: var(--cobalt); }
+.cause.confirmed .fill { background: var(--interlock); }
+.track .ghost { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); opacity: .35; transition: left .7s; }
+@media (prefers-reduced-motion: reduce) { .track .fill, .track .ghost { transition: none; } }
+
+/* ---------- tests ---------- */
+.test-main { border: 1.5px solid var(--cobalt); border-radius: 12px; padding: 16px 18px; }
+.test-main h3 { margin: 0 0 4px; font-size: 17px; }
+.test-main p { margin: 0 0 10px; }
+.metrics { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 14px; color: var(--muted); }
+.metrics b { color: var(--ink); }
+.safety { margin-top: 10px; font-size: 14px; color: var(--amber); }
+.why { font-size: 14px; color: var(--muted); margin: 10px 0 0; }
+.alt { margin-top: 12px; font-size: 14px; color: var(--muted); }
+.alt li { margin: 4px 0; }
+
+/* ---------- agent ---------- */
+textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-ctl); background: var(--surface); resize: vertical; }
+.toggle { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; margin-top: 12px; cursor: pointer; }
+.toggle input { margin-top: 3px; accent-color: var(--laser); }
+.toggle small { display: block; color: var(--muted); }
+.code { margin-top: 16px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+.code-head { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; background: var(--sunk); font-size: 13px; color: var(--muted); }
+.code pre { margin: 0; padding: 10px 0; background: var(--chamber); color: var(--chamber-ink); font-size: 12.5px; line-height: 1.6; overflow-x: auto; }
+.code .ln { display: block; padding: 0 14px 0 0; white-space: pre; }
+.code .ln::before { content: attr(data-n); display: inline-block; width: 36px; padding-right: 12px; text-align: right; color: var(--chamber-muted); opacity: .6; }
+.code .ln.flag { background: color-mix(in srgb, #E0312B 22%, transparent); box-shadow: inset 3px 0 #FF5A4E; }
+.flags { margin: 10px 0 0; padding: 0; list-style: none; font-size: 14px; }
+.flags li { color: var(--laser); }
+.flags li.none { color: var(--interlock); }
+.out { margin-top: 10px; background: var(--sunk); border-radius: 10px; padding: 10px 14px; font-size: 13px; white-space: pre-wrap; }
+.out.err { color: var(--laser); }
+
+/* ---------- glovebox ---------- */
+.glovebox { position: sticky; top: 16px; background: var(--chamber); color: var(--chamber-ink); border-radius: 18px; padding: 20px 20px 16px;
+            box-shadow: 0 30px 60px -30px rgba(10,16,21,.55); }
+.glovebox h2 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.015em; }
+.glovebox .sub { margin: 4px 0 12px; color: var(--chamber-muted); font-size: 14px; }
+.chamber { width: 100%; height: auto; display: block; }
+.chamber .wall { stroke: #4E6476; stroke-width: 3; fill: none; transition: stroke .2s; }
+.chamber .wall-label { fill: var(--chamber-muted); font-size: 11.5px; }
+.chamber .wall.hit { stroke: #FF5A4E; animation: hit 1.6s ease-out 1; }
+.chamber .wall-label.hit { fill: #FF8A80; font-weight: 600; }
+@keyframes hit { 0%, 30% { stroke-width: 7; filter: drop-shadow(0 0 8px #FF5A4E); } 100% { stroke-width: 3; filter: none; } }
+@media (prefers-reduced-motion: reduce) { .chamber .wall.hit { animation: none; } }
+.chamber .job { fill: var(--chamber-ink); font-size: 13px; font-weight: 600; }
+.chamber .job-sub { fill: var(--chamber-muted); font-size: 11.5px; }
+.measured { margin: 12px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 13px; }
+.measured li { display: flex; gap: 8px; align-items: baseline; }
+.measured .ok { color: #4FD1A1; } .measured .bad { color: #FF8A80; } .measured .unk { color: var(--chamber-muted); }
+.measured .k { color: var(--chamber-muted); }
+.gb-section { border-top: 1px solid var(--glass); margin-top: 16px; padding-top: 14px; }
+.gb-section h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.attack-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.attack { border: 1px solid #4E6476; background: transparent; color: var(--chamber-ink); border-radius: 8px; padding: 7px 11px; cursor: pointer; font-size: 13.5px; }
+.attack:hover { border-color: #FF8A80; color: #FFD5D1; }
+.attack:disabled { opacity: .5; cursor: progress; }
+.devmode { margin-top: 10px; font-size: 13px; color: #F2C46D; }
+.log { max-height: 190px; overflow: auto; font-size: 12.5px; line-height: 1.5; }
+.log .ev { padding: 3px 0; display: grid; grid-template-columns: 62px 1fr; gap: 8px; }
+.log .t { color: var(--chamber-muted); font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
+.log .blocked, .log .killed, .log .denied { color: #FF8A80; font-weight: 600; }
+.log .refused { color: #F2C46D; }
+.log .start, .log .end { color: var(--chamber-muted); }
+.log .empty { color: var(--chamber-muted); }
+.receipts { max-height: 230px; overflow: auto; font-size: 13px; }
+.receipt { display: grid; grid-template-columns: 34px 1fr auto; gap: 2px 10px; padding: 7px 0; border-bottom: 1px solid var(--glass); }
+.receipt .seq { color: var(--chamber-muted); }
+.receipt .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.receipt .oc { font-size: 12px; }
+.receipt .oc.clean { color: #4FD1A1; } .receipt .oc.contained { color: #FF8A80; }
+.receipt .h { grid-column: 2 / -1; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--chamber-muted); }
+.verify-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
+.verify-row button { border: 1px solid #4E6476; background: transparent; color: var(--chamber-ink); border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
+.verify-msg { font-size: 13px; color: var(--chamber-muted); }
+.verify-msg.ok { color: #4FD1A1; } .verify-msg.bad { color: #FF8A80; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--surface);
+         padding: 10px 16px; border-radius: 10px; font-size: 14px; box-shadow: var(--shadow); opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
 <body>
-<header>
-  <h1>PhysSandbox</h1>
-  <p>Find out why an experiment gave the wrong answer. Every calculation runs in a sandbox with no network.</p>
-</header>
-<main>
-  <section>
-    <div class="panel">
-      <h2>1. Your experiment</h2>
-      <div class="row">
-        <div><label for="exp">Experiment type</label><select id="exp"></select></div>
-        <div><label for="sample">Try a sample dataset</label><select id="sample"><option value="">— or upload your own —</option></select></div>
-      </div>
-      <div id="expected-fields"></div>
-      <label for="file">Data file (CSV)</label>
-      <input type="file" id="file" accept=".csv,text/csv">
-      <p><button id="go">Analyse</button></p>
+<header class="top">
+  <div class="brand">
+    <svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="5" width="26" height="22" rx="4" fill="currentColor"/><circle cx="11" cy="21" r="3.2" fill="var(--page)"/><circle cx="21" cy="21" r="3.2" fill="var(--page)"/><circle cx="16" cy="11" r="2.4" fill="var(--laser)"/></svg>
+    <div>
+      <h1 class="wordmark">PhysSandbox</h1>
+      <p class="tagline">Find out why your experiment gave the wrong answer. Every calculation, including code an AI writes, runs sealed off from the internet and from this server.</p>
     </div>
+  </div>
+  <div class="status" aria-live="polite">
+    <span class="pill"><span class="lamp" id="lamp-box"></span><span id="pill-box">Checking the sandbox…</span></span>
+    <span class="pill"><span class="lamp off" id="lamp-model"></span><span id="pill-model">Model</span></span>
+    <span class="pill"><span class="lamp off" id="lamp-ledger"></span><span id="pill-ledger">Lab notebook</span></span>
+  </div>
+</header>
 
-    <div id="results" hidden>
-      <div class="panel"><h2>What we found</h2><p class="explain" id="explanation"></p><p class="muted" id="by"></p></div>
-      <div class="panel"><h2>Measured vs expected</h2><div id="plot"></div><table id="values"></table></div>
-      <div class="panel"><h2>Likely causes</h2><div id="causes"></div></div>
-      <div class="panel"><h2>Test next</h2><div id="tests"></div></div>
-      <div class="panel"><details><summary>Show what the model was given (no raw data)</summary><pre id="summary"></pre></details></div>
+<div class="layout">
+<main>
+  <!-- 1 -->
+  <section class="step" id="s1" aria-labelledby="h1">
+    <header><span class="step-n">1</span><div><h2 id="h1">What went wrong?</h2><p class="hint" id="s1-hint">Pick the kind of measurement, say what you expected, and add your data.</p></div></header>
+    <div class="step-body">
+      <div class="seg" role="group" aria-label="Measurement type" id="exp-seg"></div>
+      <div class="fields" id="expected-fields"></div>
+      <div class="drop" id="drop">
+        <div class="drop-row" id="samples" aria-label="Sample datasets"></div>
+        <div class="drop-row">
+          <label class="btn secondary small" for="file">Upload a CSV<input id="file" class="sr" type="file" accept=".csv,text/csv"></label>
+          <span class="file-name" id="file-name">or drop it here</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="go">Analyse in the glovebox</button>
+        <span class="followup-note" id="followup-note" hidden></span>
+        <button class="linkish" id="restart" hidden>Start a new investigation</button>
+      </div>
     </div>
   </section>
 
-  <aside>
-    <div class="panel">
-      <h2>Containment log</h2>
-      <p class="muted">Try to break out of the sandbox:</p>
-      <p>
-        <button class="ghost" data-attack="egress">Send data out</button>
-        <button class="ghost" data-attack="runaway">Runaway memory</button>
-        <button class="ghost" data-attack="host_read">Read host secrets</button>
-      </p>
-      <div id="log"></div>
+  <!-- 2 -->
+  <section class="step locked" id="s2" aria-labelledby="h2">
+    <header><span class="step-n">2</span><div><h2 id="h2">Measured against expected</h2><p class="hint">Fits and uncertainties come from physics code run in the glovebox, never from the model.</p></div></header>
+    <div class="step-body" id="s2-body"></div>
+  </section>
+
+  <!-- 3 -->
+  <section class="step locked" id="s3" aria-labelledby="h3">
+    <header><span class="step-n">3</span><div><h2 id="h3">Likely causes</h2><p class="hint">Each suspect is scored by how well it explains the evidence. The tick shows where it stood before your last test.</p></div></header>
+    <div class="step-body" id="s3-body"></div>
+  </section>
+
+  <!-- 4 -->
+  <section class="step locked" id="s4" aria-labelledby="h4">
+    <header><span class="step-n">4</span><div><h2 id="h4">Test next</h2><p class="hint">The bench test that best separates the leading suspects per minute of your time.</p></div></header>
+    <div class="step-body" id="s4-body"></div>
+  </section>
+
+  <!-- 5 -->
+  <section class="step locked" id="s5" aria-labelledby="h5">
+    <header><span class="step-n">5</span><div><h2 id="h5">Ask the agent</h2><p class="hint">An AI writes Python to answer your question. We assume that code is hostile and run it in the glovebox anyway.</p></div></header>
+    <div class="step-body">
+      <label class="sr" for="question">Your question</label>
+      <textarea id="question" placeholder="For example: fit V = R·I + V0 and report the offset"></textarea>
+      <div class="drop-row" id="agent-chips" style="margin-top:10px"></div>
+      <label class="toggle"><input type="checkbox" id="raw-mode"><span>Let the agent read the raw file<small>Off by default: the agent sees only column names and ranges. Turn it on with the poisoned sample to watch a hidden instruction reach the model, and the glovebox contain what it writes.</small></span></label>
+      <div class="actions"><button class="btn" id="ask">Write and run the code</button></div>
+      <div id="agent-out"></div>
     </div>
-  </aside>
+  </section>
 </main>
+
+<!-- glovebox -->
+<aside class="glovebox" aria-labelledby="gb-title">
+  <h2 id="gb-title">The glovebox</h2>
+  <p class="sub">Each job gets a fresh sealed container that is destroyed when it finishes. The walls below are measured from inside, every time.</p>
+  <svg class="chamber" viewBox="0 0 400 230" role="img" aria-labelledby="chamber-title">
+    <title id="chamber-title">Containment chamber with four walls: network, disk, memory and time</title>
+    <defs>
+      <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".07"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect x="70" y="32" width="260" height="150" rx="16" fill="var(--chamber-2)"/>
+    <rect x="70" y="32" width="260" height="150" rx="16" fill="url(#glass)"/>
+    <line class="wall" id="wall-network" x1="86" y1="32" x2="314" y2="32"/>
+    <line class="wall" id="wall-filesystem" x1="70" y1="48" x2="70" y2="166"/>
+    <line class="wall" id="wall-memory" x1="330" y1="48" x2="330" y2="166"/>
+    <line class="wall" id="wall-time" x1="86" y1="182" x2="314" y2="182"/>
+    <path d="M86 32 A16 16 0 0 0 70 48 M314 32 A16 16 0 0 1 330 48 M70 166 A16 16 0 0 0 86 182 M330 166 A16 16 0 0 1 314 182" stroke="#4E6476" stroke-width="3" fill="none"/>
+    <text class="wall-label" id="wl-network" x="200" y="20" text-anchor="middle">No network</text>
+    <text class="wall-label" id="wl-filesystem" x="60" y="107" text-anchor="end">Read-only</text>
+    <text class="wall-label" x="60" y="122" text-anchor="end">disk</text>
+    <text class="wall-label" id="wl-memory" x="340" y="107">512 MB</text>
+    <text class="wall-label" x="340" y="122">1 CPU</text>
+    <text class="wall-label" id="wl-time" x="200" y="200" text-anchor="middle">30 s limit, runs as nobody</text>
+    <!-- glove ports -->
+    <circle cx="150" cy="140" r="26" fill="var(--chamber)" stroke="#4E6476" stroke-width="2"/>
+    <circle cx="250" cy="140" r="26" fill="var(--chamber)" stroke="#4E6476" stroke-width="2"/>
+    <path d="M140 140 q10 -26 20 0" stroke="#4E6476" stroke-width="2" fill="none" opacity=".7"/>
+    <path d="M240 140 q10 -26 20 0" stroke="#4E6476" stroke-width="2" fill="none" opacity=".7"/>
+    <!-- status lamp + job -->
+    <circle id="job-lamp" cx="96" cy="58" r="6" fill="#4E6476"/>
+    <text class="job" id="job-name" x="200" y="74" text-anchor="middle">Idle</text>
+    <text class="job-sub" id="job-sub" x="200" y="94" text-anchor="middle">Waiting for a job</text>
+    <text class="wall-label" x="200" y="226" text-anchor="middle" opacity=".7">gVisor user-space kernel between the job and this server</text>
+  </svg>
+  <ul class="measured" id="measured" aria-label="Walls measured from inside the last job"></ul>
+  <p class="devmode" id="devmode" hidden>Development mode: jobs run without isolation on this machine.</p>
+
+  <div class="gb-section">
+    <h3>Try to break out</h3>
+    <div class="attack-row">
+      <button class="attack" data-attack="egress">Send the data to the internet</button>
+      <button class="attack" data-attack="runaway">Use all the memory</button>
+      <button class="attack" data-attack="host_read">Read secrets, tamper with tools</button>
+    </div>
+  </div>
+
+  <div class="gb-section">
+    <h3>Containment log</h3>
+    <div class="log" id="log" aria-live="polite"></div>
+  </div>
+
+  <div class="gb-section">
+    <div class="verify-row"><h3 style="margin:0">Lab notebook</h3><button id="verify">Check for tampering</button></div>
+    <p class="verify-msg" id="verify-msg">Every job leaves a receipt that is chained to the one before it.</p>
+    <div class="receipts" id="receipts"></div>
+  </div>
+</aside>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
 <script>
-const EXPECTED = {
-  resistance_4wire: [["resistance_ohm", "Expected resistance (Ω)", 0.010]],
-  waveform: [["signal_hz", "Expected signal frequency (Hz)", 1000], ["mains_hz", "Mains frequency (Hz)", 50]],
-};
 const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const EXPERIMENTS = {
+  resistance_4wire: {
+    label: "Low-resistance measurement",
+    expected: [["resistance_ohm", "Expected resistance (Ω)", 0.010]],
+    samples: [["r_offset_1.csv", "Resistor reads high at low current"], ["r_clean.csv", "Healthy resistor"], ["inject_1.csv", "Same data, poisoned file", "contains a hidden instruction"]],
+    questions: ["Fit V = R·I + V0 and report the offset", "Check the residuals for curvature"],
+  },
+  waveform: {
+    label: "Oscilloscope trace",
+    expected: [["signal_hz", "Signal frequency (Hz)", 1000], ["mains_hz", "Mains frequency (Hz)", 50]],
+    samples: [["scope_hum_1.csv", "Trace with a hum on it"], ["scope_clean.csv", "Clean trace"]],
+    questions: ["List the strongest frequencies in the trace"],
+  },
+};
+const SAMPLE_FOR_TEST = {
+  zero_current_reading: "r_offset_1_zero.csv",
+  current_reversal: "r_offset_1_followup.csv",
+  single_point_ground: "scope_hum_1_followup.csv",
+};
+const LABELS = {
+  resistance_fit_ohm: ["Fitted resistance", "Ω"], offset_V: ["Voltage offset", "V"],
+  apparent_resistance_at_lowest_current_ohm: ["Apparent R at lowest current", "Ω"],
+  expected_resistance_ohm: ["Expected resistance", "Ω"], residual_rms_V: ["Fit residual (rms)", "V"],
+  max_gap_from_expected_V: ["Largest gap from expected", "V"],
+  offset_on_sample_V: ["Offset, leads on sample", "V"], offset_with_meter_shorted_V: ["Offset, meter shorted", "V"],
+  sample_rate_Hz: ["Sample rate", "Hz"], dominant_frequency_Hz: ["Strongest frequency", "Hz"],
+  signal_amplitude_V: ["Signal amplitude", "V"], mains_total_amplitude_V: ["Mains pickup", "V"], noise_floor_V: ["Noise floor", "V"],
+};
+
+const S = { experiment: "resistance_4wire", file: null, fileLabel: "", sample: null, steps: [], pendingTest: null, last: null };
+
+/* ---------- formatting ---------- */
+function si(v, unit = "") {
+  if (v == null || !isFinite(v)) return "—";
+  const a = Math.abs(v);
+  if (a === 0) return `0 ${unit}`.trim();
+  const P = [[1e9,"G"],[1e6,"M"],[1e3,"k"],[1,""],[1e-3,"m"],[1e-6,"µ"],[1e-9,"n"]];
+  if (unit === "Hz" && a >= 1) return `${(+v.toPrecision(4)).toLocaleString()} Hz`;
+  for (const [f, p] of P) if (a >= f) return `${(+(v / f).toPrecision(4))} ${p}${unit}`.trim();
+  return `${v.toExponential(2)} ${unit}`.trim();
+}
+const pct = p => `${Math.round(p * 100)}%`;
+const lc = t => (t || "").charAt(0).toLowerCase() + (t || "").slice(1);
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
+
+/* ---------- step 1 ---------- */
+function renderExperiment() {
+  const E = EXPERIMENTS[S.experiment];
+  $("exp-seg").innerHTML = Object.entries(EXPERIMENTS).map(([k, e]) =>
+    `<button data-exp="${k}" aria-pressed="${k === S.experiment}">${esc(e.label)}</button>`).join("");
+  $("expected-fields").innerHTML = E.expected.map(([k, l, v]) =>
+    `<div class="field"><label for="x-${k}">${esc(l)}</label><input id="x-${k}" type="number" step="any" value="${v}"></div>`).join("");
+  renderSamples();
+  $("agent-chips").innerHTML = E.questions.map(q => `<button class="chip" data-q="${esc(q)}">${esc(q)}</button>`).join("");
+}
+function renderSamples() {
+  const E = EXPERIMENTS[S.experiment];
+  let list = E.samples;
+  if (S.pendingTest && SAMPLE_FOR_TEST[S.pendingTest]) list = [[SAMPLE_FOR_TEST[S.pendingTest], "Sample result of this test"]];
+  else if (S.pendingTest) list = [];
+  $("samples").innerHTML = list.map(([f, l, tag]) =>
+    `<button class="chip" data-sample="${f}" aria-pressed="${S.sample === f}">${esc(l)}${tag ? `<span class="tag">${esc(tag)}</span>` : ""}</button>`).join("")
+    || `<span class="file-name">Upload the CSV you recorded for this test.</span>`;
+}
+$("exp-seg").addEventListener("click", e => {
+  const b = e.target.closest("[data-exp]"); if (!b || S.steps.length) return;
+  S.experiment = b.dataset.exp; S.sample = null; S.file = null; $("file-name").textContent = "or drop it here"; renderExperiment();
+});
+$("samples").addEventListener("click", async e => {
+  const b = e.target.closest("[data-sample]"); if (!b) return;
+  S.sample = b.dataset.sample; S.fileLabel = b.textContent;
+  S.file = await fetch("/api/samples/" + S.sample).then(r => r.blob());
+  $("file-name").textContent = `Using ${S.sample}`; renderSamples();
+});
+function takeFile(f) { if (!f) return; S.file = f; S.sample = null; S.fileLabel = f.name; $("file-name").textContent = f.name; renderSamples(); }
+$("file").addEventListener("change", e => takeFile(e.target.files[0]));
+const drop = $("drop");
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => takeFile(e.dataTransfer.files[0]));
+
+$("go").addEventListener("click", async () => {
+  if (!S.file) return toast("Pick a sample or upload a CSV first.");
+  const E = EXPERIMENTS[S.experiment];
+  const fd = new FormData();
+  fd.append("file", S.file, S.sample || S.fileLabel || "data.csv");
+  fd.append("experiment", S.experiment);
+  fd.append("expected", JSON.stringify(Object.fromEntries(E.expected.map(([k]) => [k, parseFloat($("x-" + k).value)]))));
+  if (S.pendingTest && S.last) fd.append("context", JSON.stringify({ evidence: S.last.evidence, test: S.pendingTest, done: S.last.done }));
+  busy("go", true, "Running in the glovebox…"); jobStart("Physics analysis", "fit, uncertainty, spectrum");
+  try {
+    const r = await fetch("/api/analyse", { method: "POST", body: fd });
+    const res = await r.json();
+    if (!r.ok || res.error) { toast(res.error || res.detail || "The analysis failed."); jobEnd(res); return; }
+    S.steps.push({ file: S.sample || S.fileLabel, test: S.pendingTest, causes: res.causes });
+    S.last = res; S.pendingTest = null; S.sample = null; S.file = null;
+    $("file-name").textContent = "or drop it here";
+    $("drop").classList.remove("followup"); $("followup-note").hidden = true; renderSamples();
+    if (res.status === "investigating") $("s1-hint").textContent = "Run the recommended test, then add its result here.";
+    renderAll(res); jobEnd(res);
+  } catch (e) { toast("Couldn't reach the server. Check your connection and try again."); jobEnd(null); }
+  finally { busy("go", false, "Analyse in the glovebox"); refreshSide(); }
+});
+$("restart").addEventListener("click", () => {
+  Object.assign(S, { steps: [], pendingTest: null, last: null, sample: null, file: null });
+  ["s2", "s3", "s4", "s5"].forEach(id => $(id).classList.add("locked"));
+  ["s2-body", "s3-body", "s4-body", "agent-out"].forEach(id => $(id).innerHTML = "");
+  $("followup-note").hidden = true; $("restart").hidden = true; $("drop").classList.remove("followup");
+  $("s1-hint").textContent = "Pick the kind of measurement, say what you expected, and add your data.";
+  $("file-name").textContent = "or drop it here"; renderExperiment();
+});
+function busy(id, on, label) { const b = $(id); b.disabled = on; b.textContent = label; }
+
+/* ---------- render results ---------- */
+function renderAll(res) {
+  ["s2", "s3", "s4", "s5"].forEach(id => $(id).classList.remove("locked"));
+  $("restart").hidden = false;
+  renderMeasured(res); renderCauses(res); renderTests(res);
+  $("s2").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+}
+
+function renderMeasured(res) {
+  const vals = Object.entries(res.values).filter(([k]) => LABELS[k] && k !== "expected_resistance_ohm");
+  const tiles = vals.map(([k, v]) => {
+    const [label, unit] = LABELS[k];
+    if (typeof v.value === "object") return "";
+    return `<div class="reading"><div class="k">${esc(label)}</div><div class="v">${esc(si(v.value, unit))}${v.uncertainty != null ? ` <small>± ${esc(si(v.uncertainty, unit))}</small>` : ""}</div></div>`;
+  }).join("");
+  const verdictHTML = `<p class="verdict">${esc(res.explanation)}</p><p class="byline">Explanation by ${esc(res.explained_by === "template" ? "built-in wording" : res.explained_by)}. Every number on this page comes from the physics code.</p>`;
+  $("s2-body").innerHTML = verdictHTML + chart(res) + `<div class="readings">${tiles}</div>`;
+}
+
+/* ---------- chart ---------- */
+function niceTicks(lo, hi, n = 5) {
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const span = hi - lo, step0 = Math.pow(10, Math.floor(Math.log10(span / n))), err = span / n / step0;
+  const step = step0 * (err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1);
+  const out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(+v.toPrecision(12)); return out;
+}
+function chart(res) {
+  const p = res.plot; if (!p) return "";
+  const spectrum = res.experiment === "waveform";
+  const W = 720, H = spectrum ? 240 : 300, L = 64, R = 40, T = 14, B = 40;
+  const ys = [...p.y, ...(p.fit || []), ...(p.expected || [])];
+  let x0 = Math.min(...p.x), x1 = Math.max(...p.x), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  if (spectrum) y0 = 0;
+  const pad = (y1 - y0) * 0.08 || 1e-9; y0 -= spectrum ? 0 : pad; y1 += pad;
+  const xt = niceTicks(x0, x1), yt = niceTicks(y0, y1);
+  const X = x => L + (x - x0) / ((x1 - x0) || 1) * (W - L - R), Y = y => T + (1 - (y - y0) / ((y1 - y0) || 1)) * (H - T - B);
+  const order = p.x.map((_, i) => i).sort((a, b) => p.x[a] - p.x[b]);
+  const path = arr => order.map((i, j) => `${j ? "L" : "M"}${X(p.x[i]).toFixed(1)} ${Y(arr[i]).toFixed(1)}`).join(" ");
+  const yUnit = p.y_label.includes("(V)") ? "V" : "";
+  let g = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(p.y_label)} against ${esc(p.x_label)}">`;
+  yt.forEach(v => { if (v < y0 || v > y1) return; g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end">${esc(si(v, yUnit))}</text>`; });
+  xt.forEach(v => { if (v < x0 || v > x1) return; g += `<line class="axis" x1="${X(v)}" x2="${X(v)}" y1="${H - B}" y2="${H - B + 5}"/><text x="${X(v)}" y="${H - B + 18}" text-anchor="middle">${esc(spectrum ? v : si(v, p.x_label.includes("(A)") ? "A" : ""))}</text>`; });
+  g += `<line class="axis" x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}"/>`;
+  g += `<text x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle">${esc(p.x_label)}</text>`;
+  if (spectrum) {
+    const mains = (res.expected && res.expected.mains_hz) || 50;
+    for (let n = 1; n <= 5; n++) { const f = mains * n; if (f > x1) break;
+      g += `<line x1="${X(f)}" x2="${X(f)}" y1="${T}" y2="${H - B}" stroke="var(--laser)" stroke-dasharray="3 4" opacity=".55"/>`;
+      if (n === 1) g += `<text x="${X(f) + 6}" y="${T + 12}" style="fill:var(--laser)">mains ${mains} Hz and harmonics</text>`; }
+    g += `<path d="${path(p.y)}" fill="none" stroke="var(--cobalt)" stroke-width="1.6"/>`;
+  } else {
+    if (p.expected) g += `<path d="${path(p.expected)}" fill="none" stroke="var(--interlock)" stroke-width="2" stroke-dasharray="6 5"/>`;
+    if (p.fit && p.x_label.startsWith("reading")) {
+      // step fit: one level per group, no line joining the groups
+      let start = 0;
+      for (let i = 1; i <= p.x.length; i++) if (i === p.x.length || p.fit[i] !== p.fit[start]) {
+        g += `<line x1="${X(p.x[start])}" x2="${X(p.x[i - 1])}" y1="${Y(p.fit[start])}" y2="${Y(p.fit[start])}" stroke="var(--cobalt)" stroke-width="2"/>`; start = i; }
+    } else if (p.fit) g += `<path d="${path(p.fit)}" fill="none" stroke="var(--cobalt)" stroke-width="2"/>`;
+    const off = res.values && res.values.offset_V;
+    if (off && p.expected && Math.abs(off.value) > 3 * (off.uncertainty || 0)) {
+      const i0 = order[0], xa = X(p.x[i0]) + 10, ya = Y(p.fit[i0]), yb = Y(p.expected[i0]);
+      g += `<line x1="${xa}" x2="${xa}" y1="${ya}" y2="${yb}" stroke="var(--ink)" stroke-width="1.5"/><line x1="${xa - 4}" x2="${xa + 4}" y1="${ya}" y2="${ya}" stroke="var(--ink)" stroke-width="1.5"/><line x1="${xa - 4}" x2="${xa + 4}" y1="${yb}" y2="${yb}" stroke="var(--ink)" stroke-width="1.5"/>`;
+      const ty = T + 26;
+      g += `<line x1="${xa}" x2="${xa}" y1="${ya - 6}" y2="${ty + 24}" stroke="var(--ink)" stroke-width="1" opacity=".5"/>`;
+      g += `<text x="${xa + 8}" y="${ty}" style="fill:var(--ink);font-weight:600;font-size:12.5px">${esc(si(off.value, "V"))} offset between fit and expected</text><text x="${xa + 8}" y="${ty + 16}">The same at every current, so it is not a resistance error</text>`;
+    }
+    p.x.forEach((x, i) => g += `<circle cx="${X(x).toFixed(1)}" cy="${Y(p.y[i]).toFixed(1)}" r="4" fill="var(--laser)"/>`);
+  }
+  g += `</svg>`;
+  const legend = spectrum
+    ? `<div class="legend"><span><i style="border-color:var(--cobalt)"></i>Spectrum of your trace</span><span><i style="border-color:var(--laser);border-top-style:dashed"></i>Mains frequencies</span></div>`
+    : `<div class="legend"><span><i style="border-color:var(--laser);border-top-width:8px;width:8px;border-radius:4px"></i>Your readings</span><span><i style="border-color:var(--cobalt)"></i>Best fit</span><span><i style="border-color:var(--interlock);border-top-style:dashed"></i>What you expected</span></div>`;
+  return legend + g;
+}
+
+/* ---------- causes ---------- */
+function renderCauses(res) {
+  const prev = S.steps.length > 1 ? Object.fromEntries(S.steps[S.steps.length - 2].causes.map(c => [c.id, c.probability])) : null;
+  const top = res.causes[0];
+  const history = S.steps.map(s => s.causes.find(c => c.id === top.id)?.probability ?? 0);
+  let html = "";
+  if (res.status === "confirmed") html += `<div class="banner confirmed">Cause confirmed: ${esc(top.name)}</div>`;
+  if (res.status === "clear") html += `<div class="banner clear">No fault found. Your measurement matches what you expected.</div>`;
+  if (history.length > 1) html += `<p class="trail">${esc(top.name)}: ${history.map((h, i) => i === history.length - 1 ? `<b>${pct(h)}</b>` : pct(h)).join(" then ")} after you ${esc(S.steps.slice(1).map(s => lc(testName(s.test))).join(", then "))}</p>`;
+  html += res.causes.slice(0, 5).map((c, i) => `
+    <div class="cause ${i === 0 ? "top" : ""} ${i === 0 && res.status === "confirmed" ? "confirmed" : ""}">
+      <div><div class="name">${esc(c.name)}</div>${c.typical_size ? `<div class="size">Typical size: ${esc(c.typical_size)}</div>` : ""}</div>
+      <div class="pct">${pct(c.probability)}</div>
+      <div class="track" aria-hidden="true"><div class="fill" style="width:${prev ? (prev[c.id] || 0) * 100 : 0}%" data-w="${c.probability * 100}"></div>${prev ? `<div class="ghost" style="left:calc(${(prev[c.id] || 0) * 100}% - 1px)"></div>` : ""}</div>
+    </div>`).join("");
+  $("s3-body").innerHTML = html;
+  requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll("#s3-body .fill").forEach(f => f.style.width = f.dataset.w + "%")));
+}
+const TEST_NAMES = {};
+function testName(id) { return TEST_NAMES[id] || (id || "").replaceAll("_", " "); }
+
+/* ---------- tests ---------- */
+function renderTests(res) {
+  const body = $("s4-body");
+  if (!res.next_tests.length) {
+    body.innerHTML = res.status === "confirmed"
+      ? `<p class="verdict" style="margin:0">Nothing left to test. Fix the cause and re-run your measurement to check it.</p>`
+      : `<p class="verdict" style="margin:0">No test needed.</p>`;
+    $("s1-hint").textContent = "Start again with a new measurement whenever you like.";
+    return;
+  }
+  res.next_tests.forEach(t => TEST_NAMES[t.id] = t.name);
+  const [t, ...rest] = res.next_tests;
+  const top = res.causes[0], second = res.causes[1];
+  body.innerHTML = `
+    <div class="test-main">
+      <h3>${esc(t.name)}</h3>
+      <p>${esc(t.how)}</p>
+      <div class="metrics"><span>About <b>${t.minutes} min</b></span><span><b>${t.info_gain_bits}</b> bits of information</span><span><b>${t.bits_per_minute}</b> bits per minute</span></div>
+      ${t.safety ? `<div class="safety">Safety: ${esc(t.safety)}</div>` : ""}
+      <p class="why">It separates ${esc(lc(top.name))} from ${esc(lc(second.name))}, which predict different results here.</p>
+      <div class="actions"><button class="btn small" id="ran-test" data-test="${t.id}">I ran this test, add the result</button></div>
+    </div>
+    ${rest.length ? `<div class="alt">Also worth trying:<ul>${rest.map(r => `<li>${esc(r.name)} (${r.minutes} min, ${r.bits_per_minute} bits/min)</li>`).join("")}</ul></div>` : ""}`;
+  $("ran-test").addEventListener("click", () => {
+    S.pendingTest = t.id; S.sample = null; S.file = null;
+    $("drop").classList.add("followup");
+    $("followup-note").hidden = false; $("followup-note").textContent = `Adding the result of: ${t.name.toLowerCase()}`;
+    $("s1-hint").textContent = "Add the data you recorded for the test. Only its outcome is added to the evidence you already have.";
+    $("file-name").textContent = "or drop it here"; renderSamples();
+    $("s1").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+/* ---------- agent ---------- */
+$("agent-chips").addEventListener("click", e => { const b = e.target.closest("[data-q]"); if (b) $("question").value = b.dataset.q; });
+$("ask").addEventListener("click", async () => {
+  const q = $("question").value.trim(); if (!q) return toast("Type a question for the agent first.");
+  const sample = S.steps.length ? S.steps[0].file : null;
+  let blob = S.file;
+  if (!blob && sample && sample.endsWith(".csv")) blob = await fetch("/api/samples/" + sample).then(r => r.blob());
+  if (!blob) return toast("Analyse a dataset first, so the agent has data to work on.");
+  const fd = new FormData();
+  fd.append("file", blob, "data.csv"); fd.append("question", q); fd.append("experiment", S.experiment);
+  fd.append("raw_mode", $("raw-mode").checked ? "true" : "false");
+  busy("ask", true, "Writing and running…"); jobStart("Agent-written code", "untrusted, running sealed");
+  try {
+    const res = await fetch("/api/agent", { method: "POST", body: fd }).then(r => r.json());
+    renderAgent(res); jobEnd(res);
+  } catch { toast("Couldn't reach the server."); jobEnd(null); }
+  finally { busy("ask", false, "Write and run the code"); refreshSide(); }
+});
+function renderAgent(res) {
+  const flagged = new Set((res.flags || []).map(f => f.line));
+  const lines = (res.code || "").replace(/\n$/, "").split("\n").map((l, i) =>
+    `<span class="ln${flagged.has(i + 1) ? " flag" : ""}" data-n="${i + 1}">${esc(l) || " "}</span>`).join("");
+  const contained = (res.containment || []).filter(e => ["blocked", "killed", "denied"].includes(e.kind));
+  $("agent-out").innerHTML = `
+    <div class="code"><div class="code-head"><span>Written by ${esc(res.author)}${res.raw_mode ? ", after reading the raw file" : ", from the column summary only"}</span><span>receipt #${res.receipt?.seq ?? "—"}</span></div><pre>${lines}</pre></div>
+    <ul class="flags">${(res.flags || []).length ? res.flags.map(f => `<li>Line ${f.line}: ${esc(f.issue)}. Ran it anyway: the glovebox is the safeguard, not this scan.</li>`).join("") : `<li class="none">Nothing risky spotted in the code.</li>`}</ul>
+    ${res.output ? `<div class="out mono">${esc(res.output)}</div>` : ""}
+    ${res.error ? `<div class="out err mono">${esc(res.error)}</div>` : ""}
+    ${contained.length ? `<div class="banner confirmed" style="margin-top:12px">Contained: ${esc(contained.map(e => e.detail).join("; "))}</div>` : ""}`;
+}
+
+/* ---------- glovebox ---------- */
+function jobStart(name, sub) {
+  $("job-name").textContent = name; $("job-sub").textContent = sub;
+  $("job-lamp").setAttribute("fill", "#F2C46D");
+  document.querySelectorAll(".wall, .wall-label").forEach(w => w.classList.remove("hit"));
+}
+function jobEnd(res) {
+  const ev = (res && res.containment) || [];
+  const hits = ev.filter(e => e.wall);
+  $("job-lamp").setAttribute("fill", hits.length ? "#FF5A4E" : "#4FD1A1");
+  $("job-sub").textContent = hits.length ? "Contained. Nothing left the box." : "Finished cleanly. Container destroyed.";
+  hits.forEach(e => { $("wall-" + e.wall)?.classList.add("hit"); $("wl-" + e.wall)?.classList.add("hit"); });
+  if (res && res.walls) renderWalls(res.walls);
+}
+function renderWalls(w) {
+  const row = (k, val, good) => `<li><span class="${good === null ? "unk" : good ? "ok" : "bad"}" aria-hidden="true">${good === null ? "•" : good ? "✓" : "✕"}</span><span><span class="k">${esc(k)}</span> ${esc(val)}</span></li>`;
+  const ifaces = (w.interfaces || []).filter(i => i !== "lo");
+  $("measured").innerHTML = [
+    row("Kernel", w.gvisor ? "gVisor (sandboxed)" : "host kernel", !!w.gvisor),
+    row("Network", ifaces.length ? ifaces.join(", ") : "loopback only", !ifaces.length),
+    row("DNS", w.dns, w.dns === "blocked"),
+    row("Outbound", w.egress, w.egress === "blocked"),
+    row("Disk", w.root_fs, w.root_fs === "read-only"),
+    row("Runs as", `uid ${w.uid}`, w.uid !== 0),
+    row("Secrets seen", (w.secrets_visible || []).length ? w.secrets_visible.join(", ") : "none", !(w.secrets_visible || []).length),
+  ].join("");
+}
+document.querySelectorAll("[data-attack]").forEach(b => b.addEventListener("click", async () => {
+  const names = { egress: "Send the data out", runaway: "Use all the memory", host_read: "Read host secrets" };
+  b.disabled = true; jobStart("Break-out attempt", names[b.dataset.attack]);
+  try { const res = await fetch("/api/containment/" + b.dataset.attack, { method: "POST" }).then(r => r.json()); jobEnd(res);
+        const hit = (res.containment || []).find(e => e.wall); if (hit) toast("Contained: " + hit.detail); }
+  catch { toast("Couldn't reach the server."); jobEnd(null); }
+  finally { b.disabled = false; refreshSide(); }
+}));
+
+async function refreshSide() {
+  const [{ events }, led] = await Promise.all([fetch("/api/containment-log").then(r => r.json()), fetch("/api/ledger?limit=12").then(r => r.json())]);
+  $("log").innerHTML = events.slice().reverse().filter(e => e.kind !== "start").slice(0, 30).map(e =>
+    `<div class="ev"><span class="t">${esc(e.time)}</span><span class="${esc(e.kind)}">${esc(e.detail)}</span></div>`).join("") || `<p class="empty">No jobs yet. Run an analysis or try to break out.</p>`;
+  $("receipts").innerHTML = led.receipts.slice().reverse().map(r => {
+    const contained = r.outcome.some(o => ["blocked", "killed", "denied"].includes(o));
+    return `<div class="receipt"><span class="seq">#${r.seq}</span><span class="lab">${esc(r.label)}</span><span class="oc ${contained ? "contained" : "clean"}">${contained ? "contained" : r.outcome.includes("clean") ? "clean" : esc(r.outcome.join(", "))}</span><span class="h">${esc(r.hash.slice(0, 16))} ← ${esc(r.prev.slice(0, 8))}</span></div>`;
+  }).join("") || `<p class="empty" style="color:var(--chamber-muted)">No receipts yet.</p>`;
+  ledgerPill(led.verify);
+}
+function ledgerPill(v) {
+  $("lamp-ledger").className = "lamp" + (v.intact ? "" : " warn");
+  $("pill-ledger").textContent = v.intact ? `Lab notebook: ${v.receipts} receipts, intact` : `Lab notebook: broken at #${v.broken_at}`;
+}
+$("verify").addEventListener("click", async () => {
+  const v = (await fetch("/api/ledger?limit=1").then(r => r.json())).verify;
+  const m = $("verify-msg");
+  m.className = "verify-msg " + (v.intact ? "ok" : "bad");
+  m.textContent = v.intact ? `All ${v.receipts} receipts check out. Latest hash ${v.head.slice(0, 12)}…` : `Tampering detected at receipt #${v.broken_at}.`;
+  ledgerPill(v);
+});
 
 async function init() {
-  const r = await fetch("/api/experiments").then(r => r.json());
-  for (const [k, v] of Object.entries(r.experiments)) $("exp").add(new Option(v, k));
-  for (const s of r.samples) $("sample").add(new Option(s, s));
-  renderExpected(); refreshLog();
-}
-function renderExpected() {
-  $("expected-fields").innerHTML = '<div class="row">' + EXPECTED[$("exp").value].map(([k, l, v]) =>
-    `<div><label for="x-${k}">${l}</label><input id="x-${k}" type="number" step="any" value="${v}"></div>`).join("") + "</div>";
-}
-$("exp").onchange = renderExpected;
-$("sample").onchange = () => {
-  const s = $("sample").value;
-  if (s) $("exp").value = s.startsWith("scope") ? "waveform" : "resistance_4wire";
-  renderExpected();
-};
-
-$("go").onclick = async () => {
-  const fd = new FormData();
-  const exp = $("exp").value;
-  fd.append("experiment", exp);
-  fd.append("expected", JSON.stringify(Object.fromEntries(EXPECTED[exp].map(([k]) => [k, parseFloat($("x-" + k).value)]))));
-  if ($("file").files[0]) fd.append("file", $("file").files[0]);
-  else if ($("sample").value) fd.append("file", await fetch("/api/samples/" + $("sample").value).then(r => r.blob()), $("sample").value);
-  else return alert("Choose a sample or upload a CSV.");
-  $("go").disabled = true; $("go").textContent = "Analysing in sandbox…";
+  renderExperiment();
   try {
-    const res = await fetch("/api/analyse", { method: "POST", body: fd }).then(r => r.json());
-    render(res);
-  } finally { $("go").disabled = false; $("go").textContent = "Analyse"; refreshLog(); }
-};
-
-function fmt(v) {
-  if (v == null) return "—";
-  if (typeof v === "object") return Object.entries(v).map(([k, x]) => `${k}: ${fmt(x)}`).join("<br>");
-  const a = Math.abs(v);
-  return (a !== 0 && (a < 1e-3 || a >= 1e5)) ? v.toExponential(3) : (+v.toPrecision(4)).toString();
-}
-function render(res) {
-  if (res.error) { alert(res.error); return; }
-  $("results").hidden = false;
-  $("explanation").textContent = res.explanation;
-  $("by").textContent = "Wording by: " + res.explained_by + ". All numbers come from the sandboxed physics tools.";
-  $("values").innerHTML = Object.entries(res.values).map(([k, v]) =>
-    `<tr><td>${esc(k.replaceAll("_", " "))}</td><td>${fmt(v.value)}${v.uncertainty != null ? " ± " + fmt(v.uncertainty) : ""}</td></tr>`).join("");
-  $("causes").innerHTML = res.causes.map(c => `<div class="cause"><div>${esc(c.name)}
-      ${c.typical_size ? `<div class="muted">typical size: ${esc(c.typical_size)}</div>` : ""}
-      <div class="bar"><div style="width:${(c.probability * 100).toFixed(1)}%"></div></div></div>
-      <div style="text-align:right">${(c.probability * 100).toFixed(0)}%</div></div>`).join("");
-  $("tests").innerHTML = res.next_tests.map((t, i) => `<div class="test"><strong>${i === 0 ? "Recommended: " : ""}${esc(t.name)}</strong>
-      <small>${esc(t.how)}</small><small>${t.minutes} min · ${t.info_gain_bits} bits of information · ${t.bits_per_minute} bits/min</small>
-      ${t.safety ? `<div class="safety">Safety: ${esc(t.safety)}</div>` : ""}</div>`).join("");
-  $("summary").textContent = JSON.stringify(res.summary, null, 2);
-  plot(res.plot);
-}
-
-function plot(p) {
-  if (!p) { $("plot").innerHTML = ""; return; }
-  const W = 640, H = 240, L = 60, B = 34, T = 10, R = 10;
-  const ys = [...p.y, ...(p.fit || []), ...(p.expected || [])];
-  const x0 = Math.min(...p.x), x1 = Math.max(...p.x), y0 = Math.min(...ys), y1 = Math.max(...ys);
-  const X = x => L + (x - x0) / ((x1 - x0) || 1) * (W - L - R), Y = y => H - B - (y - y0) / ((y1 - y0) || 1) * (H - B - T);
-  const line = (arr, col, dash) => `<polyline fill="none" stroke="${col}" stroke-width="1.6" ${dash ? 'stroke-dasharray="5 4"' : ""}
-      points="${p.x.map((x, i) => X(x) + "," + Y(arr[i])).join(" ")}"/>`;
-  const order = p.x.map((_, i) => i).sort((a, b) => p.x[a] - p.x[b]);
-  const sorted = arr => order.map(i => arr[i]);
-  const px = p.x; p.x = sorted(px);
-  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%">`;
-  svg += `<line x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}" stroke="currentColor" opacity=".3"/>`;
-  svg += `<line x1="${L}" y1="${T}" x2="${L}" y2="${H - B}" stroke="currentColor" opacity=".3"/>`;
-  if (p.expected) {
-    svg += line(sorted(p.expected), "var(--good)", true);
-    svg += line(sorted(p.fit), "var(--accent)");
-    svg += px.map((x, i) => `<circle cx="${X(x)}" cy="${Y(p.y[i])}" r="3.5" fill="var(--bad)"/>`).join("");
-    svg += `<text x="${W - R}" y="${T + 12}" text-anchor="end">● data   — fit   - - expected</text>`;
-  } else {
-    svg += line(sorted(p.y), "var(--accent)");
-  }
-  svg += `<text x="${(L + W) / 2}" y="${H - 6}" text-anchor="middle">${esc(p.x_label)}</text>`;
-  svg += `<text x="12" y="${H / 2}" transform="rotate(-90 12 ${H / 2})" text-anchor="middle">${esc(p.y_label)}</text>`;
-  svg += `<text x="${L}" y="${H - B + 14}">${fmt(x0)}</text><text x="${W - R}" y="${H - B + 14}" text-anchor="end">${fmt(x1)}</text>`;
-  svg += `<text x="${L - 4}" y="${T + 8}" text-anchor="end">${fmt(y1)}</text><text x="${L - 4}" y="${H - B}" text-anchor="end">${fmt(y0)}</text>`;
-  $("plot").innerHTML = svg + "</svg>";
-  p.x = px;
-}
-
-document.querySelectorAll("[data-attack]").forEach(b => b.onclick = async () => {
-  b.disabled = true;
-  try { await fetch("/api/containment/" + b.dataset.attack, { method: "POST" }); }
-  finally { b.disabled = false; refreshLog(); }
-});
-async function refreshLog() {
-  const { events } = await fetch("/api/containment-log").then(r => r.json());
-  $("log").innerHTML = events.slice().reverse().map(e =>
-    `<div class="ev ${esc(e.kind)}">${esc(e.time)} [${esc(e.job)}] ${esc(e.kind)}: ${esc(e.detail)}</div>`).join("") || '<p class="muted">No jobs yet.</p>';
+    const s = await fetch("/api/status").then(r => r.json());
+    const isolated = s.mode === "docker";
+    $("lamp-box").className = "lamp" + (isolated ? "" : " warn");
+    $("pill-box").textContent = isolated ? `Sandbox: ${s.runtime === "runsc" ? "gVisor" : "Docker"}, no network` : "Sandbox: development mode";
+    $("devmode").hidden = isolated;
+    $("lamp-model").className = "lamp" + (s.model ? "" : " off");
+    $("pill-model").textContent = s.model ? `Model: ${s.model} on Vultr` : "Model: built-in templates";
+    ledgerPill(s.ledger);
+  } catch { $("pill-box").textContent = "Can't reach the server"; $("lamp-box").className = "lamp warn"; }
+  refreshSide();
 }
 init();
 </script>

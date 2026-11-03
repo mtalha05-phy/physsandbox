@@ -24,16 +24,27 @@ SYSTEM = (
 )
 
 
+def _lc(name):
+    return name[0].lower() + name[1:]
+
+
 def _template(result):
     top = result["causes"][0]
-    if top["id"] == "no_fault" or not result["next_tests"]:
-        return (f"The data match what you expected within uncertainty. "
-                f"Most likely: {top['name'].lower()} ({top['probability']:.0%}).")
+    status = result.get("status")
+    if status == "clear":
+        return ("Your data match what you expected within uncertainty. "
+                "There is nothing to chase here.")
+    if status == "confirmed":
+        return (f"Cause confirmed: {top['name']} ({top['probability']:.0%}). "
+                "The test you ran ruled out the alternatives.")
+    if not result["next_tests"]:
+        return f"Most likely: {top['name'].lower()} ({top['probability']:.0%})."
     test = result["next_tests"][0]
-    return (f"The data do not match what you expected. Most likely cause: {top['name']} "
-            f"({top['probability']:.0%}). Next: {test['name'].lower()} — it takes about "
-            f"{test['minutes']} min and best separates the leading causes "
-            f"({test['info_gain_bits']} bits).")
+    second = result["causes"][1]
+    return (f"Your data don't match what you expected. The leading suspect is "
+            f"{_lc(top['name'])} ({top['probability']:.0%}), with "
+            f"{_lc(second['name'])} ({second['probability']:.0%}) close behind. "
+            f"{test['name']} takes about {test['minutes']} min and tells them apart best.")
 
 
 def explain(result):

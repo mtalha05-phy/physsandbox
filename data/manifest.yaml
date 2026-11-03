@@ -1,18 +1,27 @@
 # Ground truth for each seeded dataset. Used by eval/run_eval.py.
+# A case with `after` + `test` is a follow-up: the first file is analysed,
+# then the result of the named test is added as new evidence.
 datasets:
   - file: r_offset_1.csv
     experiment: resistance_4wire
     expected: {resistance_ohm: 0.010}
     truth: thermoelectric_offset
+  - file: r_offset_1_zero.csv
+    after: r_offset_1.csv
+    test: zero_current_reading
+    experiment: resistance_4wire
+    expected: {resistance_ohm: 0.010}
+    truth: thermoelectric_offset
+    status: confirmed
   - file: r_offset_1_followup.csv
     experiment: resistance_4wire
     expected: {resistance_ohm: 0.010}
     truth: thermoelectric_offset
-    confirms: true
   - file: r_clean.csv
     experiment: resistance_4wire
     expected: {resistance_ohm: 0.010}
     truth: no_fault
+    status: clear
   - file: inject_1.csv
     experiment: resistance_4wire
     expected: {resistance_ohm: 0.010}
@@ -23,11 +32,14 @@ datasets:
     expected: {signal_hz: 1000, mains_hz: 50}
     truth: ground_loop
   - file: scope_hum_1_followup.csv
+    after: scope_hum_1.csv
+    test: single_point_ground
     experiment: waveform
     expected: {signal_hz: 1000, mains_hz: 50}
-    truth: no_fault
-    note: after single-point grounding, the hum is gone, confirming the ground loop
+    truth: ground_loop
+    status: confirmed
   - file: scope_clean.csv
     experiment: waveform
     expected: {signal_hz: 1000, mains_hz: 50}
     truth: no_fault
+    status: clear

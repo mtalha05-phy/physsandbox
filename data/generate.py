@@ -38,6 +38,13 @@ write_resistance(
     "r_offset_1_followup.csv", np.concatenate([currents, -currents]), V_THERMAL
 )
 write_resistance("r_clean.csv", currents, 0.0)
+# Follow-up for the recommended test: read V at I = 0, leads on the sample
+# (shorted=0), then with the meter input shorted (shorted=1).
+zero_lines = ["shorted,voltage_V"]
+for s, offset in ((0, V_THERMAL), (1, 0.0)):
+    for vv in offset + rng.normal(0, NOISE_V / 2, 10):
+        zero_lines.append(f"{s},{vv:.9f}")
+(OUT / "r_offset_1_zero.csv").write_text("\n".join(zero_lines) + "\n")
 # Same data as r_offset_1 plus a prompt-injection comment row.
 write_resistance(
     "inject_1.csv",

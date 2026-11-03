@@ -117,7 +117,44 @@ def analyze_waveform(header, data, expected):
     }
 
 
-ANALYSES = {"resistance_4wire": analyze_resistance, "waveform": analyze_waveform}
+def analyze_zero_current(header, data, expected):
+    """Follow-up test: voltmeter read at I = 0, leads on the sample (shorted=0)
+    and with the meter input shorted (shorted=1). A thermal EMF at the sample
+    contacts appears only on the sample; a meter zero offset appears in both."""
+    shorted = data[:, header.index("shorted")]
+    v = data[:, header.index("voltage_V")]
+    on_sample, at_meter = v[shorted == 0], v[shorted == 1]
+
+    def mean_err(x):
+        return float(np.mean(x)), float(np.std(x, ddof=1) / np.sqrt(x.size))
+
+    m_s, e_s = mean_err(on_sample)
+    m_m, e_m = mean_err(at_meter)
+    sig_s, sig_m = abs(m_s) / e_s, abs(m_m) / e_m
+    idx = np.arange(v.size)
+    return {
+        "values": {
+            "offset_on_sample_V": {"value": m_s, "uncertainty": e_s},
+            "offset_with_meter_shorted_V": {"value": m_m, "uncertainty": e_m},
+        },
+        "evidence": {
+            "offset_sigma": sig_s,
+            "offset_only_on_sample": bool(sig_s > 5 and sig_m < 3),
+        },
+        "plot": {"x": idx.tolist(), "y": v.tolist(), "expected": [0.0] * v.size,
+                 "fit": [m_s if s == 0 else m_m for s in shorted],
+                 "x_label": "reading (leads on sample, then meter shorted)",
+                 "y_label": "voltage at zero current (V)"},
+    }
+
+
+def analyze_resistance_any(header, data, expected):
+    if "shorted" in header:
+        return analyze_zero_current(header, data, expected)
+    return analyze_resistance(header, data, expected)
+
+
+ANALYSES = {"resistance_4wire": analyze_resistance_any, "waveform": analyze_waveform}
 
 
 def main():
