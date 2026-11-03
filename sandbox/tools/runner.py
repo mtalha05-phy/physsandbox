@@ -34,7 +34,7 @@ def probe():
     except OSError:
         kernel = "unknown"
     p["kernel"] = kernel
-    p["gvisor"] = GVISOR_KERNEL in kernel
+    p["gvisor"] = "gvisor" in kernel.lower() or GVISOR_KERNEL in kernel
     try:
         lines = open("/proc/net/dev").read().splitlines()[2:]
         p["interfaces"] = sorted(l.split(":")[0].strip() for l in lines if ":" in l)
@@ -60,7 +60,11 @@ def probe():
         p["root_fs"] = "read-only"
     p["uid"] = os.getuid()
     secret_words = ("KEY", "TOKEN", "SECRET", "PASSWORD", "VULTR", "AWS")
-    p["secrets_visible"] = sorted(k for k in os.environ if any(w in k.upper() for w in secret_words))
+    # GPG_KEY is set by the python base image: the public ID of the key that
+    # signs Python releases, not a credential.
+    public = {"GPG_KEY"}
+    p["secrets_visible"] = sorted(k for k in os.environ
+                                  if k not in public and any(w in k.upper() for w in secret_words))
     return p
 
 
