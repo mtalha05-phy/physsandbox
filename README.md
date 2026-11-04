@@ -37,6 +37,12 @@ The Helmholtz, laser-alignment, Faraday and Beer-Lambert experiments, and their 
 3. **Containment receipts measured from inside the box.** Every job probes its own walls (kernel, network interfaces, DNS, outbound connections, disk, user, visible secrets) and the host issues a receipt with SHA-256 hashes of the input, code, output and sandbox image.
 4. **A tamper-evident lab notebook.** Receipts are hash-chained: editing or deleting any entry breaks every hash after it, and "Check for tampering" proves the record is intact. That's an audit trail a methods section or a lab safety officer can rely on.
 
+## Try it in 90 seconds
+
+Open the demo and press **Take the 90-second tour**. It walks through a real investigation (resistor reads high → offset found → bench test → cause confirmed), a break-out attempt stopped by the network wall, a poisoned file whose hidden instruction reaches the model and is contained, and the tamper check on the lab notebook. Every step runs live in the sandbox.
+
+Every investigation can be downloaded as a **record** for the lab notebook: each step's data hash, fitted values with uncertainties, causes, the recommended test, the sandbox receipt hash and the walls measured from inside the box.
+
 ## The glovebox (Blast Radius Zero)
 
 Every job, physics or agent code, runs in a fresh container with:
@@ -94,6 +100,7 @@ These are synthetic datasets; we make no claim about accuracy on real lab data y
 git clone https://github.com/mukeshkbj/physsandbox.git && cd physsandbox
 cp .env.example .env    # add your Vultr Inference API key and model
 sudo bash deploy/setup_vultr.sh
+sudo bash deploy/enable_https.sh   # HTTPS via Caddy and an sslip.io name, no domain needed
 ```
 
 **Locally, no isolation (development only):**

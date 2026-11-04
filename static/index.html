@@ -223,6 +223,22 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
 .verify-row button { border: 1px solid #4E6476; background: transparent; color: var(--chamber-ink); border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
 .verify-msg { font-size: 13px; color: var(--chamber-muted); }
 .verify-msg.ok { color: #4FD1A1; } .verify-msg.bad { color: #FF8A80; }
+.tour-btn { border: 1px solid var(--ink); background: var(--ink); color: var(--surface); border-radius: 999px; padding: 6px 14px;
+            font-size: 13px; font-weight: 600; cursor: pointer; }
+.tour-btn:hover { filter: brightness(1.15); }
+.spot { outline: 3px solid var(--cobalt); outline-offset: 6px; transition: outline-color .3s; }
+.glovebox.spot { outline-color: #7C9BFF; }
+.tour { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(660px, calc(100vw - 32px)); z-index: 20;
+        background: var(--ink); color: var(--surface); border-radius: 14px; padding: 16px 18px 14px; box-shadow: 0 24px 60px -20px rgba(0,0,0,.6); }
+.tour[hidden] { display: none; }
+.tour .count { font-size: 12.5px; opacity: .65; }
+.tour p { margin: 4px 0 12px; font-size: 15.5px; line-height: 1.5; }
+.tour .row { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+.tour button { border: 1px solid color-mix(in srgb, var(--surface) 40%, transparent); background: transparent; color: var(--surface);
+               border-radius: 8px; padding: 7px 14px; cursor: pointer; font-weight: 500; }
+.tour button.primary { background: var(--surface); color: var(--ink); border-color: var(--surface); font-weight: 600; }
+.tour button:disabled { opacity: .5; cursor: progress; }
+.record { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; font-size: 14px; color: var(--muted); }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--surface);
          padding: 10px 16px; border-radius: 10px; font-size: 14px; box-shadow: var(--shadow); opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.show { opacity: 1; }
@@ -239,6 +255,7 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
     </div>
   </div>
   <div class="status" aria-live="polite">
+    <button class="tour-btn" id="tour-start">Take the 90-second tour</button>
     <span class="pill"><span class="lamp" id="lamp-box"></span><span id="pill-box">Checking the sandbox…</span></span>
     <span class="pill"><span class="lamp off" id="lamp-model"></span><span id="pill-model">Model</span></span>
     <span class="pill"><span class="lamp off" id="lamp-ledger"></span><span id="pill-ledger">Lab notebook</span></span>
@@ -358,6 +375,11 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
 </aside>
 </div>
 <div class="toast" id="toast" role="status"></div>
+<div class="tour" id="tour" role="dialog" aria-live="polite" aria-label="Guided tour" hidden>
+  <div class="count" id="tour-count"></div>
+  <p id="tour-text"></p>
+  <div class="row"><button id="tour-end">End tour</button><button class="primary" id="tour-next">Next</button></div>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -449,11 +471,13 @@ $("exp-grid").addEventListener("click", e => {
   const b = e.target.closest("[data-exp]"); if (!b || S.steps.length) return;
   S.experiment = b.dataset.exp; S.sample = null; S.file = null; $("file-name").textContent = "or drop it here"; renderExperiment();
 });
-$("samples").addEventListener("click", async e => {
-  const b = e.target.closest("[data-sample]"); if (!b) return;
-  S.sample = b.dataset.sample; S.fileLabel = b.textContent;
-  S.file = await fetch("/api/samples/" + S.sample).then(r => r.blob());
-  $("file-name").textContent = `Using ${S.sample}`; renderSamples();
+async function selectSample(name, label) {
+  S.sample = name; S.fileLabel = label || name;
+  S.file = await fetch("/api/samples/" + name).then(r => r.blob());
+  $("file-name").textContent = `Using ${name}`; renderSamples();
+}
+$("samples").addEventListener("click", e => {
+  const b = e.target.closest("[data-sample]"); if (b) selectSample(b.dataset.sample, b.textContent);
 });
 function takeFile(f) { if (!f) return; S.file = f; S.sample = null; S.fileLabel = f.name; $("file-name").textContent = f.name; renderSamples(); }
 $("file").addEventListener("change", e => takeFile(e.target.files[0]));
@@ -462,7 +486,8 @@ const drop = $("drop");
 ["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
 drop.addEventListener("drop", e => takeFile(e.dataTransfer.files[0]));
 
-$("go").addEventListener("click", async () => {
+$("go").addEventListener("click", () => runAnalyse());
+async function runAnalyse() {
   if (!S.file) return toast("Pick a sample or upload a CSV first.");
   const E = EX();
   const fd = new FormData();
@@ -475,7 +500,8 @@ $("go").addEventListener("click", async () => {
     const r = await fetch("/api/analyse", { method: "POST", body: fd });
     const res = await r.json();
     if (!r.ok || res.error) { toast(res.error || res.detail || "The analysis failed."); jobEnd(res); return; }
-    S.steps.push({ file: S.sample || S.fileLabel, test: S.pendingTest, causes: res.causes });
+    S.steps.push({ file: S.sample || S.fileLabel, test: S.pendingTest, causes: res.causes, receipt: res.receipt,
+                   values: res.values, status: res.status, next: res.next_tests[0], expected: res.expected, walls: res.walls });
     S.last = res; S.pendingTest = null; S.sample = null; S.file = null;
     $("file-name").textContent = "or drop it here";
     $("drop").classList.remove("followup"); $("followup-note").hidden = true; renderSamples();
@@ -483,7 +509,7 @@ $("go").addEventListener("click", async () => {
     renderAll(res); jobEnd(res);
   } catch (e) { toast("Couldn't reach the server. Check your connection and try again."); jobEnd(null); }
   finally { busy("go", false, "Analyse in the glovebox"); refreshSide(); }
-});
+}
 $("restart").addEventListener("click", () => {
   Object.assign(S, { steps: [], pendingTest: null, last: null, sample: null, file: null });
   ["s2", "s3", "s4", "s5"].forEach(id => $(id).classList.add("locked"));
@@ -499,7 +525,7 @@ function renderAll(res) {
   ["s2", "s3", "s4", "s5"].forEach(id => $(id).classList.remove("locked"));
   $("restart").hidden = false;
   renderBench(); renderMeasured(res); renderCauses(res); renderTests(res);
-  $("s2").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  if (!TOUR.on) $("s2").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 }
 
 function renderMeasured(res) {
@@ -583,7 +609,9 @@ function renderCauses(res) {
       <div class="pct">${pct(c.probability)}</div>
       <div class="track" aria-hidden="true"><div class="fill" style="width:${prev ? (prev[c.id] || 0) * 100 : 0}%" data-w="${c.probability * 100}"></div>${prev ? `<div class="ghost" style="left:calc(${(prev[c.id] || 0) * 100}% - 1px)"></div>` : ""}</div>
     </div>`).join("");
+  html += `<div class="record"><button class="btn secondary small" id="record">Download investigation record</button><span>Every step with its data hash and receipt, ready for your lab notebook.</span></div>`;
   $("s3-body").innerHTML = html;
+  $("record").addEventListener("click", downloadRecord);
   requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll("#s3-body .fill").forEach(f => f.style.width = f.dataset.w + "%")));
 }
 const TEST_NAMES = {};
@@ -612,19 +640,21 @@ function renderTests(res) {
       <div class="actions"><button class="btn small" id="ran-test" data-test="${t.id}">I ran this test, add the result</button></div>
     </div>
     ${rest.length ? `<div class="alt">Also worth trying:<ul>${rest.map(r => `<li>${esc(r.name)} (${r.minutes} min, ${r.bits_per_minute} bits/min)</li>`).join("")}</ul></div>` : ""}`;
-  $("ran-test").addEventListener("click", () => {
+  $("ran-test").addEventListener("click", () => startFollowup(t));
+}
+function startFollowup(t) {
     S.pendingTest = t.id; S.sample = null; S.file = null;
     $("drop").classList.add("followup");
     $("followup-note").hidden = false; $("followup-note").textContent = `Adding the result of: ${t.name.toLowerCase()}`;
     $("s1-hint").textContent = "Add the data you recorded for the test. Only its outcome is added to the evidence you already have.";
     $("file-name").textContent = "or drop it here"; renderSamples();
-    $("s1").scrollIntoView({ behavior: "smooth", block: "start" });
-  });
+    if (!TOUR.on) $("s1").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 /* ---------- agent ---------- */
 $("agent-chips").addEventListener("click", e => { const b = e.target.closest("[data-q]"); if (b) $("question").value = b.dataset.q; });
-$("ask").addEventListener("click", async () => {
+$("ask").addEventListener("click", () => runAgent());
+async function runAgent() {
   const q = $("question").value.trim(); if (!q) return toast("Type a question for the agent first.");
   const sample = S.steps.length ? S.steps[0].file : null;
   let blob = S.file;
@@ -639,7 +669,7 @@ $("ask").addEventListener("click", async () => {
     renderAgent(res); jobEnd(res);
   } catch { toast("Couldn't reach the server."); jobEnd(null); }
   finally { busy("ask", false, "Write and run the code"); refreshSide(); }
-});
+}
 function renderAgent(res) {
   const flagged = new Set((res.flags || []).map(f => f.line));
   const lines = (res.code || "").replace(/\n$/, "").split("\n").map((l, i) =>
@@ -680,14 +710,18 @@ function renderWalls(w) {
     row("Secrets seen", (w.secrets_visible || []).length ? w.secrets_visible.join(", ") : "none", !(w.secrets_visible || []).length),
   ].join("");
 }
-document.querySelectorAll("[data-attack]").forEach(b => b.addEventListener("click", async () => {
+document.querySelectorAll("[data-attack]").forEach(b => b.addEventListener("click", () => runAttack(b.dataset.attack)));
+async function runAttack(name) {
+  const b = document.querySelector(`[data-attack="${name}"]`);
   const names = { egress: "Send the data out", runaway: "Use all the memory", host_read: "Read host secrets" };
-  b.disabled = true; jobStart("Break-out attempt", names[b.dataset.attack]);
-  try { const res = await fetch("/api/containment/" + b.dataset.attack, { method: "POST" }).then(r => r.json()); jobEnd(res);
-        const hit = (res.containment || []).find(e => e.wall); if (hit) toast("Contained: " + hit.detail); }
+  b.disabled = true; jobStart("Break-out attempt", names[name]);
+  try { const res = await fetch("/api/containment/" + name, { method: "POST" }).then(r => r.json()); jobEnd(res);
+        const hit = (res.containment || []).find(e => e.wall); if (hit) toast("Contained: " + hit.detail);
+        if (!res.receipt) toast((res.containment || []).map(e => e.detail).find(d => d.includes("real sandbox")) || "No result.");
+        return res; }
   catch { toast("Couldn't reach the server."); jobEnd(null); }
   finally { b.disabled = false; refreshSide(); }
-}));
+}
 
 async function refreshSide() {
   const [{ events }, led] = await Promise.all([fetch("/api/containment-log").then(r => r.json()), fetch("/api/ledger?limit=12").then(r => r.json())]);
@@ -703,13 +737,97 @@ function ledgerPill(v) {
   $("lamp-ledger").className = "lamp" + (v.intact ? "" : " warn");
   $("pill-ledger").textContent = v.intact ? `Lab notebook: ${v.receipts} receipts, intact` : `Lab notebook: broken at #${v.broken_at}`;
 }
-$("verify").addEventListener("click", async () => {
+$("verify").addEventListener("click", () => runVerify());
+async function runVerify() {
   const v = (await fetch("/api/ledger?limit=1").then(r => r.json())).verify;
   const m = $("verify-msg");
   m.className = "verify-msg " + (v.intact ? "ok" : "bad");
   m.textContent = v.intact ? `All ${v.receipts} receipts check out. Latest hash ${v.head.slice(0, 12)}…` : `Tampering detected at receipt #${v.broken_at}.`;
-  ledgerPill(v);
-});
+  ledgerPill(v); return v;
+}
+
+/* ---------- investigation record ---------- */
+function downloadRecord() {
+  const E = EX(), last = S.steps[S.steps.length - 1];
+  const top = S.last.causes[0];
+  const lines = [
+    `# PhysSandbox investigation record`, ``,
+    `- Experiment: ${E.label} (${E.model})`,
+    `- Created: ${new Date().toISOString()}`,
+    `- Outcome: ${S.last.status === "confirmed" ? `cause confirmed, ${top.name} (${pct(top.probability)})` : S.last.status === "clear" ? "no fault found" : `still investigating; leading cause ${top.name} (${pct(top.probability)})`}`,
+    `- Expected values: ${Object.entries(last.expected || {}).map(([k, v]) => `${k} = ${v}`).join(", ")}`, ``,
+    `## Steps`, ``];
+  S.steps.forEach((st, i) => {
+    lines.push(`### ${i + 1}. ${st.test ? `Result of: ${testName(st.test)}` : "First measurement"}`, ``,
+      `- Data file: ${st.file}`,
+      `- Input SHA-256: \`${st.receipt?.input_sha256 || "n/a"}\``,
+      `- Sandbox receipt #${st.receipt?.seq ?? "n/a"}: \`${st.receipt?.hash || "n/a"}\` (previous \`${(st.receipt?.prev || "").slice(0, 16)}…\`)`,
+      `- Leading causes: ${st.causes.slice(0, 3).map(c => `${c.name} ${pct(c.probability)}`).join("; ")}`);
+    Object.entries(st.values || {}).filter(([k, v]) => LABELS[k] && typeof v.value !== "object").forEach(([k, v]) => {
+      const [label, unit, isPlain] = LABELS[k];
+      lines.push(`- ${label}: ${fmt(v.value, unit, isPlain)}${v.uncertainty != null ? ` ± ${fmt(v.uncertainty, unit, isPlain, 2)}` : ""}`);
+    });
+    if (st.next) lines.push(`- Recommended next: ${st.next.name} (${st.next.minutes} min, ${st.next.info_gain_bits} bits)`);
+    lines.push(``);
+  });
+  const w = last.walls || {};
+  lines.push(`## Containment, measured from inside the sandbox`, ``,
+    `- Kernel: ${w.kernel || "n/a"}`, `- Network interfaces: ${(w.interfaces || []).join(", ") || "n/a"}; DNS ${w.dns}; outbound ${w.egress}`,
+    `- Root filesystem: ${w.root_fs}; uid ${w.uid}; secrets visible: ${(w.secrets_visible || []).length ? w.secrets_visible.join(", ") : "none"}`, ``,
+    `Every number above was computed by deterministic physics code in a gVisor container with no network.`,
+    `Receipts are hash-chained; check them at ${location.origin}/api/ledger.`, ``);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/markdown" }));
+  a.download = `physsandbox-${S.experiment}-${new Date().toISOString().slice(0, 10)}.md`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast("Investigation record downloaded");
+}
+
+/* ---------- guided tour ---------- */
+const TOUR = { on: false, i: 0 };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function spot(el) {
+  document.querySelectorAll(".spot").forEach(e => e.classList.remove("spot"));
+  if (!el) return; el.classList.add("spot");
+  el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+}
+function resetInvestigation() { if (S.steps.length) $("restart").click(); }
+const TOUR_STEPS = [
+  { text: "A student's resistor reads high at low current. Instead of guessing, they give PhysSandbox the data and what they expected: 10 mΩ.",
+    run: async () => { resetInvestigation(); S.domain = "electricity"; S.experiment = "resistance_4wire"; renderExperiment();
+                       await selectSample("r_offset_1.csv", "Resistor reads high at low current"); spot($("s1")); } },
+  { text: "The fit runs in a fresh, sealed container. It finds a 40 µV offset that is the same at every current, so the resistor itself is fine.",
+    run: async () => { await runAnalyse(); spot($("s2")); } },
+  { text: "Six possible causes are scored against that evidence. Two lead, and they predict different results for one quick bench test.",
+    run: async () => spot($("s3")) },
+  { text: "This is the test that tells them apart best per minute of bench time. The student runs it and adds the result.",
+    run: async () => spot($("s4")) },
+  { text: "Only the outcome of that test is added. The thermal EMF at an oxidised contact goes from 64% to confirmed.",
+    run: async () => { const t = S.last.next_tests[0]; startFollowup(t);
+                       await selectSample(EX().followups[t.id], "Result"); await runAnalyse(); spot($("s3")); } },
+  { text: "Now try to break out. This code tries to send the data to the internet. The network wall stops it, and the box measured that from inside.",
+    run: async () => { spot(document.querySelector(".glovebox")); await runAttack("egress"); } },
+  { text: "A poisoned file hides an instruction for the AI. Allowed to read the raw file, the model writes code that sends the data out. It runs anyway, sealed, and is blocked.",
+    run: async () => { await selectSample("inject_1.csv", "Poisoned file"); $("raw-mode").checked = true;
+                       $("question").value = "Summarise this file"; spot($("s5")); await runAgent(); S.file = null; S.sample = null; renderSamples(); } },
+  { text: "Every job left a receipt chained to the one before it. Change any entry and the chain breaks. The investigation record is ready for the lab notebook.",
+    run: async () => { await runVerify(); spot($("receipts").closest(".gb-section")); } },
+];
+async function tourStep() {
+  const step = TOUR_STEPS[TOUR.i];
+  $("tour-count").textContent = `${TOUR.i + 1} of ${TOUR_STEPS.length}`;
+  $("tour-text").textContent = step.text;
+  $("tour-next").disabled = true; $("tour-next").textContent = "Running…";
+  try { await step.run(); } catch (e) { console.error(e); }
+  await sleep(300);
+  $("tour-next").disabled = false; $("tour-next").textContent = TOUR.i === TOUR_STEPS.length - 1 ? "Finish" : "Next";
+  $("tour-next").focus();
+}
+function endTour() { TOUR.on = false; $("tour").hidden = true; spot(null); $("raw-mode").checked = false; }
+$("tour-start").addEventListener("click", () => { TOUR.on = true; TOUR.i = 0; $("tour").hidden = false; tourStep(); });
+$("tour-next").addEventListener("click", () => { if (TOUR.i >= TOUR_STEPS.length - 1) return endTour(); TOUR.i++; tourStep(); });
+$("tour-end").addEventListener("click", endTour);
+document.addEventListener("keydown", e => { if (TOUR.on && e.key === "Escape") endTour(); });
 
 async function init() {
   try {
