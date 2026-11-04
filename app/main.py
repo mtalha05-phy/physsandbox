@@ -53,18 +53,20 @@ async def analyse_upload(file: UploadFile = File(...), experiment: str = Form(..
 
 @app.post("/api/agent")
 async def agent_run(file: UploadFile = File(...), question: str = Form(...),
-                    experiment: str = Form("resistance_4wire"), raw_mode: str = Form("false")):
+                    experiment: str = Form("resistance_4wire"), raw_mode: str = Form("false"),
+                    compromised: str = Form("false")):
     raw = await file.read()
     summary = summarise(raw)
     raw_head = None
     if raw_mode == "true":
         raw_head = "\n".join(raw.decode("utf-8", "replace").splitlines()[:12])
-    code, author = agent.write_code(question[:500], experiment, summary, raw_head)
+    code, author = agent.write_code(question[:500], experiment, summary, raw_head,
+                                    compromised=compromised == "true")
     flags = agent.scan(code)
     report, events, receipt = run_job(["code"], raw, code=code, label="agent-written code")
     return {
         "question": question, "code": code, "author": author, "flags": flags,
-        "raw_mode": raw_mode == "true", "summary_sent": summary,
+        "raw_mode": raw_mode == "true", "compromised": compromised == "true", "summary_sent": summary,
         "output": (report or {}).get("stdout", ""), "error": (report or {}).get("error"),
         "containment": events, "receipt": receipt, "walls": (report or {}).get("probe"),
     }

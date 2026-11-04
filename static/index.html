@@ -310,7 +310,8 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
       <label class="sr" for="question">Your question</label>
       <textarea id="question" placeholder="For example: fit V = R·I + V0 and report the offset"></textarea>
       <div class="drop-row" id="agent-chips" style="margin-top:10px"></div>
-      <label class="toggle"><input type="checkbox" id="raw-mode"><span>Let the agent read the raw file<small>Off by default: the agent sees only column names and ranges. Turn it on with the poisoned sample to watch a hidden instruction reach the model, and the glovebox contain what it writes.</small></span></label>
+      <label class="toggle"><input type="checkbox" id="raw-mode"><span>Let the agent read the raw file<small>Off by default: the agent sees only column names and ranges. Turn it on with the poisoned sample and the hidden instruction reaches the model.</small></span></label>
+      <label class="toggle"><input type="checkbox" id="compromised"><span>Red team: simulate a compromised model<small>A good model may ignore the hidden instruction. We don't rely on that: this writes the code a fooled model would, and the glovebox still has to hold.</small></span></label>
       <div class="actions"><button class="btn" id="ask">Write and run the code</button></div>
       <div id="agent-out"></div>
     </div>
@@ -663,6 +664,7 @@ async function runAgent() {
   const fd = new FormData();
   fd.append("file", blob, "data.csv"); fd.append("question", q); fd.append("experiment", S.experiment);
   fd.append("raw_mode", $("raw-mode").checked ? "true" : "false");
+  fd.append("compromised", $("compromised").checked ? "true" : "false");
   busy("ask", true, "Writing and running…"); jobStart("Agent-written code", "untrusted, running sealed");
   try {
     const res = await fetch("/api/agent", { method: "POST", body: fd }).then(r => r.json());
@@ -676,7 +678,7 @@ function renderAgent(res) {
     `<span class="ln${flagged.has(i + 1) ? " flag" : ""}" data-n="${i + 1}">${esc(l) || " "}</span>`).join("");
   const contained = (res.containment || []).filter(e => ["blocked", "killed", "denied"].includes(e.kind));
   $("agent-out").innerHTML = `
-    <div class="code"><div class="code-head"><span>Written by ${esc(res.author)}${res.raw_mode ? ", after reading the raw file" : ", from the column summary only"}</span><span>receipt #${res.receipt?.seq ?? "—"}</span></div><pre>${lines}</pre></div>
+    <div class="code"><div class="code-head"><span>Written by ${esc(res.author)}${res.compromised ? "" : res.raw_mode ? ", after reading the raw file" : ", from the column summary only"}</span><span>receipt #${res.receipt?.seq ?? "—"}</span></div><pre>${lines}</pre></div>
     <ul class="flags">${(res.flags || []).length ? res.flags.map(f => `<li>Line ${f.line}: ${esc(f.issue)}. Ran it anyway: the glovebox is the safeguard, not this scan.</li>`).join("") : `<li class="none">Nothing risky spotted in the code.</li>`}</ul>
     ${res.output ? `<div class="out mono">${esc(res.output)}</div>` : ""}
     ${res.error ? `<div class="out err mono">${esc(res.error)}</div>` : ""}
@@ -807,8 +809,8 @@ const TOUR_STEPS = [
                        await selectSample(EX().followups[t.id], "Result"); await runAnalyse(); spot($("s3")); } },
   { text: "Now try to break out. This code tries to send the data to the internet. The network wall stops it, and the box measured that from inside.",
     run: async () => { spot(document.querySelector(".glovebox")); await runAttack("egress"); } },
-  { text: "A poisoned file hides an instruction for the AI. Allowed to read the raw file, the model writes code that sends the data out. It runs anyway, sealed, and is blocked.",
-    run: async () => { await selectSample("inject_1.csv", "Poisoned file"); $("raw-mode").checked = true;
+  { text: "A poisoned file hides an instruction for the AI. Suppose the model is fooled and writes code that sends the data out. We run it anyway, sealed, and the network wall blocks it.",
+    run: async () => { await selectSample("inject_1.csv", "Poisoned file"); $("raw-mode").checked = true; $("compromised").checked = true;
                        $("question").value = "Summarise this file"; spot($("s5")); await runAgent(); S.file = null; S.sample = null; renderSamples(); } },
   { text: "Every job left a receipt chained to the one before it. Change any entry and the chain breaks. The investigation record is ready for the lab notebook.",
     run: async () => { await runVerify(); spot($("receipts").closest(".gb-section")); } },
@@ -823,7 +825,7 @@ async function tourStep() {
   $("tour-next").disabled = false; $("tour-next").textContent = TOUR.i === TOUR_STEPS.length - 1 ? "Finish" : "Next";
   $("tour-next").focus();
 }
-function endTour() { TOUR.on = false; $("tour").hidden = true; spot(null); $("raw-mode").checked = false; }
+function endTour() { TOUR.on = false; $("tour").hidden = true; spot(null); $("raw-mode").checked = false; $("compromised").checked = false; }
 $("tour-start").addEventListener("click", () => { TOUR.on = true; TOUR.i = 0; $("tour").hidden = false; tourStep(); });
 $("tour-next").addEventListener("click", () => { if (TOUR.i >= TOUR_STEPS.length - 1) return endTour(); TOUR.i++; tourStep(); });
 $("tour-end").addEventListener("click", endTour);

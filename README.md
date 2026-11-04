@@ -56,7 +56,7 @@ Every job, physics or agent code, runs in a fresh container with:
 | Identity | uid 65534 (nobody), all capabilities dropped, `no-new-privileges` |
 | Secrets | no host environment passed in; API keys stay outside |
 
-The model never sees raw rows by default, only column names and ranges. Turn on "Let the agent read the raw file" with the poisoned sample to watch a hidden instruction reach the model, the model write code that tries to send your data out, and the glovebox block it. The wall that stopped it lights up red.
+The model never sees raw rows by default, only column names and ranges. Turn on "Let the agent read the raw file" with the poisoned sample and the hidden instruction reaches the model. In our tests `deepseek-v4.1-flash` on Vultr ignored it and wrote clean code. We don't rely on that: the **red team** switch writes the code a fooled model would (read the file, send it to an outside server), and the glovebox runs it anyway. The network wall blocks it and lights up red.
 
 **Try to break out** buttons run real attacks inside the box: send data to the internet (blocked), use all the memory (killed at 512 MB), read secrets and tamper with the tools (nothing to read, read-only disk).
 

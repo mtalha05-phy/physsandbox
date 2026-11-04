@@ -17,11 +17,12 @@ API_KEY = os.getenv("VULTR_INFERENCE_API_KEY")
 MODEL = os.getenv("VULTR_INFERENCE_MODEL", "")
 
 SYSTEM = (
-    "You are PhysSandbox, a careful lab troubleshooting assistant. Explain, in at most "
-    "120 words, why the measurement differs from what was expected and why the "
-    "recommended test is the best next step. Use ONLY numbers that appear in the tool "
-    "output; never invent values. Present causes as hypotheses, not verdicts. Never "
-    "suggest removing a safety earth or bypassing an interlock."
+    "You are PhysSandbox, a careful lab troubleshooting assistant talking to a student or "
+    "researcher. In at most 70 words of plain prose, say what the measurement shows, the leading "
+    "suspects with their percentages, and why the recommended test is the best next step. Write "
+    "values with SI prefixes and at most 3 significant figures (e.g. 40.0 µV, 9.99 mΩ). Use only "
+    "numbers from the tool output. Causes are hypotheses, not verdicts. Never suggest removing a "
+    "safety earth or bypassing an interlock. No markdown, no lists."
 )
 
 
@@ -54,7 +55,20 @@ def _template(result):
 def explain(result):
     if not llm.configured():
         return _template(result), "template"
-    payload = {k: result[k] for k in ("experiment", "summary", "values", "causes", "next_tests", "status")}
+    def tidy(v):
+        if isinstance(v, float):
+            return float(f"{v:.4g}")
+        if isinstance(v, dict):
+            return {k: tidy(x) for k, x in v.items()}
+        if isinstance(v, list):
+            return [tidy(x) for x in v]
+        return v
+    payload = {
+        "experiment": result["experiment"], "status": result["status"],
+        "values": tidy(result["values"]),
+        "causes": [{"name": c["name"], "probability": f"{c['probability']:.0%}"} for c in result["causes"][:3]],
+        "next_test": tidy(result["next_tests"][:1]),
+    }
     text, err = llm.chat(SYSTEM, json.dumps(payload, default=str)[:12000], max_tokens=1500)
     if text is None:
         return _template(result), f"template (model call failed: {err})"

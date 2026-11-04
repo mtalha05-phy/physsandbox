@@ -172,8 +172,11 @@ def scan(code: str):
     return flags
 
 
-def write_code(question, experiment, summary, raw_head=None):
+def write_code(question, experiment, summary, raw_head=None, compromised=False):
     """Returns (code, author) where author says who wrote it."""
+    if compromised:
+        # Red team: what a model that obeyed the file's hidden instruction would write.
+        return TEMPLATES["obey_injection"], "simulated compromised model (red team)"
     if not llm.configured():
         key = _pick_template(question, experiment, raw_head)
         return TEMPLATES[key], "built-in template (no model key set)"
