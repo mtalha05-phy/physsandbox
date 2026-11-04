@@ -206,7 +206,8 @@ def _run_job(argv, input_bytes, code, label):
     if any(m in seen for m in DENIAL_MARKERS):
         events.append(log_event("denied", "tried to write outside scratch space; filesystem is read-only",
                                 job_id, "filesystem"))
-    if report and (report.get("extra_lines") or '"probe"' in (report.get("stdout") or "")):
+    if report and (report.get("extra_lines") or report.get("forged_probe")
+                   or '"probe"' in (report.get("stdout") or "")):
         events.append(log_event("tamper", "code tried to forge its own receipt; ignored, the real probe ran first",
                                 job_id, "receipt"))
     if MODE != "local" and not host_walls_ok(host):

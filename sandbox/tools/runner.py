@@ -120,6 +120,7 @@ def main():
     started = time.time()
     # Line 1: the walls, measured before any untrusted code is in the box.
     print(json.dumps({"probe": probe()}), flush=True)
+    forged = False
     if kind == "analyze":
         # Our own physics code reading the uploaded file.
         payload, stdout, error = run_target(kind, args)
@@ -142,16 +143,19 @@ def main():
             except (ValueError, IndexError):
                 payload, stdout = None, proc.stdout[-6000:]
                 error = (proc.stderr.strip().splitlines() or [f"child exited with code {proc.returncode}"])[-1]
+            # The child has no business printing a probe: that is a forgery attempt.
+            forged = '"probe"' in proc.stdout
             if proc.returncode < 0 or proc.returncode == 137:
                 error = error or f"killed (signal {-proc.returncode if proc.returncode < 0 else 9})"
         except subprocess.TimeoutExpired:
-            payload, stdout, error = None, "", "timed out"
+            payload, stdout, error, forged = None, "", "timed out", False
         rss = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
     # Line 2: what the job produced (untrusted for agent code: it is the code's own output).
     print(json.dumps({
         "result": payload,
         "stdout": stdout,
         "error": error,
+        "forged_probe": forged,
         "usage": {"seconds": round(time.time() - started, 3), "max_rss_mb": round(rss / 1024, 1)},
     }, default=float))
 
