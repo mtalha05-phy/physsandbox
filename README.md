@@ -107,6 +107,7 @@ Browser ──upload──▶ FastAPI app (Vultr VM)
 - **57/57 correct top cause**, run inside the real gVisor sandbox on the Vultr VM.
 - **No false alarms**: all fourteen healthy datasets come back "no fault found", with no test suggested.
 - **Every follow-up confirms**: in each experiment the recommended test lifts the leading cause from 52–75% to above 90%.
+- **Not tuned to one lucky dataset**: with every dataset regenerated from ten other random seeds, all 570 extra cases still get the right top cause (627/627 including the default seed).
 - **Prompt injection changes nothing**: the poisoned file gets the same diagnosis as its clean twin.
 
 The likelihoods in `faults/faults.yaml` are hand-set from bench experience, not calibrated on data, so the percentages show how strongly the evidence points within that model, not measured frequencies. To check the rules aren't tuned to one lucky dataset, we regenerated every dataset with ten other random seeds (results below the table).
