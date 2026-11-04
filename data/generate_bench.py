@@ -94,4 +94,74 @@ write("rc_cap_tolerance.csv", ["time_s", "voltage_V"], tr, rc(5, 0.068) + rng.no
 # follow-up: same circuit measured with a x10 (10 MΩ) probe: loading almost disappears
 write("rc_probe_loading_x10.csv", ["time_s", "voltage_V"], tr, rc(5 * 10 / 11, 0.1 * 10 / 11) + rng.normal(0, 0.01, tr.size), fmt="{:.4f}")
 
+# =============================================================================
+# Second bench extension. A separate generator keeps the files above unchanged.
+rng = np.random.default_rng(2027)
+
+# --- Simple pendulum: g = 9.81 m/s², T timed over 10 swings -------------------
+Lp = np.linspace(0.2, 1.2, 11)
+per = lambda L, amp_deg=5, timer=1.0: timer * 2 * np.pi * np.sqrt(L / 9.81) * (1 + np.radians(amp_deg) ** 2 / 16)
+hdr = ["length_m", "period_s"]
+write("pendulum_clean.csv", hdr, Lp, per(Lp) + rng.normal(0, 0.003, Lp.size), fmt="{:.4f}")
+# released from 30° instead of a few degrees: every period ~1.7% long, g reads ~3% low
+write("pendulum_large_amp.csv", hdr, Lp, per(Lp, 30) + rng.normal(0, 0.003, Lp.size), fmt="{:.4f}")
+# length measured to the top of the bob, not its centre (bob radius 2 cm)
+write("pendulum_length_offset.csv", hdr, Lp, per(Lp + 0.02) + rng.normal(0, 0.003, Lp.size), fmt="{:.4f}")
+# follow-up: repeated from 5°
+write("pendulum_large_amp_small.csv", hdr, Lp, per(Lp, 5) + rng.normal(0, 0.003, Lp.size), fmt="{:.4f}")
+
+# --- Hooke's law: k = 25 N/m, 50 g hanger ---------------------------------------
+mk = np.linspace(0.05, 0.5, 10)
+ext = lambda m, c=0.0: m * 9.81 / 25 + c * (m * 9.81) ** 2
+hdr = ["mass_kg", "extension_m"]
+write("hooke_clean.csv", hdr, mk, ext(mk + 0.05) + rng.normal(0, 0.0005, mk.size) - ext(0.05), fmt="{:.5f}")
+# the 50 g hanger is on the spring but left out of the masses (zero read without it)
+write("hooke_hanger.csv", hdr, mk, ext(mk + 0.05) + rng.normal(0, 0.0005, mk.size), fmt="{:.5f}")
+# loaded past the elastic limit: the spring stretches more at high loads
+write("hooke_overstretched.csv", hdr, mk, ext(mk, 0.002) + rng.normal(0, 0.0005, mk.size), fmt="{:.5f}")
+# follow-up: hanger weighed (50 g) and added to every load
+write("hooke_hanger_included.csv", hdr, mk + 0.05, ext(mk + 0.05) + rng.normal(0, 0.0005, mk.size), fmt="{:.5f}")
+
+# --- Diode I-V: n = 1.9, I_s = 2 nA, 300 K, 0.6 Ω bulk resistance -------------
+Id = np.geomspace(1e-6, 50e-3, 20)
+vd = lambda I, rs=0.6: 1.9 * 0.025852 * np.log(I / 2e-9) + I * rs
+hdr = ["voltage_V", "current_A"]
+write("diode_clean.csv", hdr, vd(Id) + rng.normal(0, 5e-4, Id.size), Id)
+# voltmeter across diode + ammeter: the ammeter's 10 Ω burden adds I·10 Ω
+write("diode_burden.csv", hdr, vd(Id, 0.6 + 10) + rng.normal(0, 5e-4, Id.size), Id)
+# diode in backwards: only nanoamps of leakage flow
+Vr = np.linspace(0.1, 0.9, 20)
+write("diode_reversed.csv", hdr, Vr, 2e-9 + rng.normal(0, 2e-10, Vr.size))
+# follow-up: voltmeter moved to the diode's own leads
+write("diode_burden_rewired.csv", hdr, vd(Id) + rng.normal(0, 5e-4, Id.size), Id)
+
+# --- Diffraction grating: 600 lines/mm, 532 nm green laser ----------------------
+mo = np.array([-3, -2, -1, 0, 1, 2, 3], dtype=float)
+ang = lambda lam, lpmm=600, d0=0.0: np.degrees(np.arcsin(mo * lam * 1e-9 * lpmm * 1e3)) + d0
+hdr = ["order_m", "angle_deg"]
+write("grating_clean.csv", hdr, mo, ang(532) + rng.normal(0, 0.05, mo.size), fmt="{:.3f}")
+# the grating in the holder is a 500 lines/mm one, not the 600 assumed
+write("grating_wrong_spec.csv", hdr, mo, ang(532, 500) + rng.normal(0, 0.05, mo.size), fmt="{:.3f}")
+# spectrometer vernier zero misread by 0.8°
+write("grating_zero_offset.csv", hdr, mo, ang(532, 600, 0.8) + rng.normal(0, 0.05, mo.size), fmt="{:.3f}")
+# follow-up: same grating with a HeNe laser of known wavelength (632.8 nm)
+lines = ["order_m,angle_deg,reference_nm"] + [f"{m:.6g},{a:.3f},632.8" for m, a in
+                                             zip(mo, ang(632.8, 500) + rng.normal(0, 0.05, mo.size))]
+(OUT / "grating_wrong_spec_ref.csv").write_text("\n".join(lines) + "\n")
+
+# --- Hall effect: B = 0.3 T, t = 1 mm, n = 1e21 /m³ -> 1.87 V/A ----------------
+Ih = np.linspace(1e-3, 10e-3, 10)
+kh = 0.3 / (1e21 * 1.602176634e-19 * 1e-3)
+hdr = ["current_A", "hall_voltage_V"]
+write("hall_clean.csv", hdr, Ih, kh * Ih + rng.normal(0, 2e-5, Ih.size))
+# Hall contacts not exactly opposite: an IR drop of -20% of the Hall voltage rides on top
+write("hall_misaligned.csv", hdr, Ih, 0.8 * kh * Ih + rng.normal(0, 2e-5, Ih.size))
+# thermoelectric voltage at the contacts: 0.5 mV at zero current
+write("hall_thermal.csv", hdr, Ih, kh * Ih + 5e-4 + rng.normal(0, 2e-5, Ih.size))
+# follow-up: field forward, then reversed; the Hall part flips, the misalignment part doesn't
+rev = np.r_[np.zeros(10), np.ones(10)]
+Ir = np.r_[Ih, Ih]
+Vr2 = np.where(rev == 0, kh, -kh) * Ir - 0.2 * kh * Ir + rng.normal(0, 2e-5, Ir.size)
+write("hall_misaligned_reversed.csv", ["current_A", "hall_voltage_V", "field_reversed"], Ir, Vr2, rev)
+
 print(f"Wrote bench datasets to {OUT}")

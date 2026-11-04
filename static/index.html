@@ -208,7 +208,9 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
 .log { max-height: 190px; overflow: auto; font-size: 12.5px; line-height: 1.5; }
 .log .ev { padding: 3px 0; display: grid; grid-template-columns: 62px 1fr; gap: 8px; }
 .log .t { color: var(--chamber-muted); font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
-.log .blocked, .log .killed, .log .denied { color: #FF8A80; font-weight: 600; }
+.attempts { margin: 12px 0 0; padding-left: 20px; font-size: 14px; color: var(--ink-2, #3A4955); }
+.attempts li { margin: 4px 0; }
+.log .blocked, .log .killed, .log .denied, .log .tamper, .log .alert { color: #FF8A80; font-weight: 600; }
 .log .refused { color: #F2C46D; }
 .log .start, .log .end { color: var(--chamber-muted); }
 .log .empty { color: var(--chamber-muted); }
@@ -360,6 +362,7 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
       <button class="attack" data-attack="egress">Send the data to the internet</button>
       <button class="attack" data-attack="runaway">Use all the memory</button>
       <button class="attack" data-attack="host_read">Read secrets, tamper with tools</button>
+      <button class="attack" data-attack="forge_receipt">Forge its own receipt</button>
     </div>
   </div>
 
@@ -406,6 +409,13 @@ const LABELS = {
   reading_crossed: ["Reading, polarisers crossed", "", 1], reading_beam_blocked: ["Reading, beam blocked", "", 1],
   settles_at_C: ["Settles at", "°C", 1], room_temperature_C: ["Room temperature", "°C", 1], cooling_time_constant_s: ["Time constant τ", "s", 1], ice_point_reading_C: ["Ice-point reading", "°C", 1],
   final_voltage_V: ["Final voltage", "V"], time_constant_s: ["Time constant τ", "s"], expected_time_constant_s: ["Expected τ", "s"],
+  g_fit_m_s2: ["g, fitted", "m/s²", 1], g_expected_m_s2: ["g, expected", "m/s²", 1], length_offset_m: ["Length offset", "m", 1],
+  spring_constant_N_per_m: ["Spring constant k", "N/m", 1], expected_spring_constant_N_per_m: ["Expected k", "N/m", 1], force_at_zero_extension_N: ["Force at zero extension", "N", 1],
+  ideality_factor: ["Ideality factor n", "", 1], series_resistance_ohm: ["Series resistance", "Ω"], max_series_resistance_ohm: ["Largest normal series R", "Ω"], max_current_A: ["Largest current", "A"],
+  wavelength_fit_nm: ["Wavelength, fitted", "nm", 1], wavelength_expected_nm: ["Wavelength, expected", "nm", 1], angle_zero_offset_deg: ["Angle zero offset", "°", 1],
+  reference_line_measured_nm: ["Reference line, measured", "nm", 1], reference_line_true_nm: ["Reference line, true", "nm", 1],
+  carrier_density_per_m3: ["Carrier density", "/m³", 1], expected_carrier_density_per_m3: ["Expected carrier density", "/m³", 1], hall_voltage_at_zero_current_V: ["Hall voltage at zero current", "V"],
+  hall_slope_V_per_A: ["Hall part of slope", "V/A", 1], misalignment_slope_V_per_A: ["Misalignment part of slope", "V/A", 1],
 };
 const SI_UNITS = new Set(["V", "A", "Ω", "Hz", "s", "F"]);
 function plain(v, unit = "", prec = 4) {
@@ -668,6 +678,7 @@ async function runAgent() {
   busy("ask", true, "Writing and running…"); jobStart("Agent-written code", "untrusted, running sealed");
   try {
     const res = await fetch("/api/agent", { method: "POST", body: fd }).then(r => r.json());
+    if (res.detail) { toast(res.detail); jobEnd(null); return; }
     renderAgent(res); jobEnd(res);
   } catch { toast("Couldn't reach the server."); jobEnd(null); }
   finally { busy("ask", false, "Write and run the code"); refreshSide(); }
@@ -676,9 +687,10 @@ function renderAgent(res) {
   const flagged = new Set((res.flags || []).map(f => f.line));
   const lines = (res.code || "").replace(/\n$/, "").split("\n").map((l, i) =>
     `<span class="ln${flagged.has(i + 1) ? " flag" : ""}" data-n="${i + 1}">${esc(l) || " "}</span>`).join("");
-  const contained = (res.containment || []).filter(e => ["blocked", "killed", "denied"].includes(e.kind));
+  const contained = (res.containment || []).filter(e => ["blocked", "killed", "denied", "tamper"].includes(e.kind));
   $("agent-out").innerHTML = `
     <div class="code"><div class="code-head"><span>Written by ${esc(res.author)}${res.compromised ? "" : res.raw_mode ? ", after reading the raw file" : ", from the column summary only"}</span><span>receipt #${res.receipt?.seq ?? "—"}</span></div><pre>${lines}</pre></div>
+    ${(res.attempts || []).length > 1 ? `<ol class="attempts">${res.attempts.map(a => `<li><b>Attempt ${a.n}</b> · receipt #${a.receipt ?? "—"} · ${a.error ? `failed in the box: <span class="mono">${esc(a.error.slice(0, 90))}</span>${a.n < res.attempts.length ? " → error sent back to the model" : ""}` : "ran cleanly"}</li>`).join("")}</ol>` : ""}
     <ul class="flags">${(res.flags || []).length ? res.flags.map(f => `<li>Line ${f.line}: ${esc(f.issue)}. Ran it anyway: the glovebox is the safeguard, not this scan.</li>`).join("") : `<li class="none">Nothing risky spotted in the code.</li>`}</ul>
     ${res.output ? `<div class="out mono">${esc(res.output)}</div>` : ""}
     ${res.error ? `<div class="out err mono">${esc(res.error)}</div>` : ""}
@@ -697,9 +709,9 @@ function jobEnd(res) {
   $("job-lamp").setAttribute("fill", hits.length ? "#FF5A4E" : "#4FD1A1");
   $("job-sub").textContent = hits.length ? "Contained. Nothing left the box." : "Finished cleanly. Container destroyed.";
   hits.forEach(e => { $("wall-" + e.wall)?.classList.add("hit"); $("wl-" + e.wall)?.classList.add("hit"); });
-  if (res && res.walls) renderWalls(res.walls);
+  if (res && res.walls) renderWalls(res.walls, res.receipt?.walls_host_verified);
 }
-function renderWalls(w) {
+function renderWalls(w, h) {
   const row = (k, val, good) => `<li><span class="${good === null ? "unk" : good ? "ok" : "bad"}" aria-hidden="true">${good === null ? "•" : good ? "✓" : "✕"}</span><span><span class="k">${esc(k)}</span> ${esc(val)}</span></li>`;
   const ifaces = (w.interfaces || []).filter(i => i !== "lo");
   $("measured").innerHTML = [
@@ -710,14 +722,19 @@ function renderWalls(w) {
     row("Disk", w.root_fs, w.root_fs === "read-only"),
     row("Runs as", `uid ${w.uid}`, w.uid !== 0),
     row("Secrets seen", (w.secrets_visible || []).length ? w.secrets_visible.join(", ") : "none", !(w.secrets_visible || []).length),
+    h ? row("Host check", h.runtime === "runsc" && h.network === "none" && h.read_only_root && h.memory_mb === 512
+      ? `docker inspect agrees (${h.runtime}, network ${h.network}, ${h.memory_mb} MB)` : "docker inspect disagrees",
+      h.runtime === "runsc" && h.network === "none" && !!h.read_only_root && h.memory_mb === 512) : "",
   ].join("");
 }
 document.querySelectorAll("[data-attack]").forEach(b => b.addEventListener("click", () => runAttack(b.dataset.attack)));
 async function runAttack(name) {
   const b = document.querySelector(`[data-attack="${name}"]`);
-  const names = { egress: "Send the data out", runaway: "Use all the memory", host_read: "Read host secrets" };
+  const names = { egress: "Send the data out", runaway: "Use all the memory", host_read: "Read host secrets", forge_receipt: "Forge its own receipt" };
   b.disabled = true; jobStart("Break-out attempt", names[name]);
-  try { const res = await fetch("/api/containment/" + name, { method: "POST" }).then(r => r.json()); jobEnd(res);
+  try { const res = await fetch("/api/containment/" + name, { method: "POST" }).then(r => r.json());
+        if (res.detail) { toast(res.detail); jobEnd(null); return res; }
+        jobEnd(res);
         const hit = (res.containment || []).find(e => e.wall); if (hit) toast("Contained: " + hit.detail);
         if (!res.receipt) toast((res.containment || []).map(e => e.detail).find(d => d.includes("real sandbox")) || "No result.");
         return res; }
@@ -730,7 +747,7 @@ async function refreshSide() {
   $("log").innerHTML = events.slice().reverse().filter(e => e.kind !== "start").slice(0, 30).map(e =>
     `<div class="ev"><span class="t">${esc(e.time)}</span><span class="${esc(e.kind)}">${esc(e.detail)}</span></div>`).join("") || `<p class="empty">No jobs yet. Run an analysis or try to break out.</p>`;
   $("receipts").innerHTML = led.receipts.slice().reverse().map(r => {
-    const contained = r.outcome.some(o => ["blocked", "killed", "denied"].includes(o));
+    const contained = r.outcome.some(o => ["blocked", "killed", "denied", "tamper"].includes(o));
     return `<div class="receipt"><span class="seq">#${r.seq}</span><span class="lab">${esc(r.label)}</span><span class="oc ${contained ? "contained" : "clean"}">${contained ? "contained" : r.outcome.includes("clean") ? "clean" : esc(r.outcome.join(", "))}</span><span class="h">${esc(r.hash.slice(0, 16))} ← ${esc(r.prev.slice(0, 8))}</span></div>`;
   }).join("") || `<p class="empty" style="color:var(--chamber-muted)">No receipts yet.</p>`;
   ledgerPill(led.verify);
@@ -744,7 +761,7 @@ async function runVerify() {
   const v = (await fetch("/api/ledger?limit=1").then(r => r.json())).verify;
   const m = $("verify-msg");
   m.className = "verify-msg " + (v.intact ? "ok" : "bad");
-  m.textContent = v.intact ? `All ${v.receipts} receipts check out. Latest hash ${v.head.slice(0, 12)}…` : `Tampering detected at receipt #${v.broken_at}.`;
+  m.textContent = v.intact ? `All ${v.receipts} receipts check out${v.signed ? `, ${v.signed} signed with the notebook key` : ""}. Latest hash ${v.head.slice(0, 12)}…` : `Tampering detected at receipt #${v.broken_at}.`;
   ledgerPill(v); return v;
 }
 
@@ -775,7 +792,9 @@ function downloadRecord() {
   const w = last.walls || {};
   lines.push(`## Containment, measured from inside the sandbox`, ``,
     `- Kernel: ${w.kernel || "n/a"}`, `- Network interfaces: ${(w.interfaces || []).join(", ") || "n/a"}; DNS ${w.dns}; outbound ${w.egress}`,
-    `- Root filesystem: ${w.root_fs}; uid ${w.uid}; secrets visible: ${(w.secrets_visible || []).length ? w.secrets_visible.join(", ") : "none"}`, ``,
+    `- Root filesystem: ${w.root_fs}; uid ${w.uid}; secrets visible: ${(w.secrets_visible || []).length ? w.secrets_visible.join(", ") : "none"}`,
+    ...(last.receipt?.walls_host_verified ? [`- Checked by the host with docker inspect: runtime ${last.receipt.walls_host_verified.runtime}, network ${last.receipt.walls_host_verified.network}, read-only root ${last.receipt.walls_host_verified.read_only_root}, memory ${last.receipt.walls_host_verified.memory_mb} MB, user ${last.receipt.walls_host_verified.user}`] : []),
+    ...(last.receipt?.mac ? [`- Receipt signature (HMAC-SHA256): \`${last.receipt.mac}\``] : []), ``,
     `Every number above was computed by deterministic physics code in a gVisor container with no network.`,
     `Receipts are hash-chained; check them at ${location.origin}/api/ledger.`, ``);
   const a = document.createElement("a");

@@ -7,14 +7,9 @@ number that is not in the tool output. If no API key is set, a template
 explanation is used so the app still works offline.
 """
 import json
-import os
 
 from . import llm
 from .safety import check_text
-
-BASE_URL = os.getenv("VULTR_INFERENCE_BASE_URL", "https://api.vultrinference.com/v1")
-API_KEY = os.getenv("VULTR_INFERENCE_API_KEY")
-MODEL = os.getenv("VULTR_INFERENCE_MODEL", "")
 
 SYSTEM = (
     "You are PhysSandbox, a careful lab troubleshooting assistant talking to a student or "

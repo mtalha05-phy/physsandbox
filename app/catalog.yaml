@@ -7,6 +7,7 @@ domains:
   - {id: magnetism, label: Magnetism}
   - {id: optics, label: Optics}
   - {id: heat, label: Heat}
+  - {id: mechanics, label: Mechanics}
 
 experiments:
   resistance_4wire:
@@ -125,3 +126,68 @@ experiments:
       - [cooling_clean.csv, "Healthy cooling curve"]
     followups: {ice_point_check: cooling_cjc_ice_point.csv}
     questions: ["Fit the cooling curve and report tau and the final temperature"]
+
+  diode:
+    label: Diode I–V curve
+    domain: electricity
+    blurb: Forward current against voltage for a silicon diode
+    model: "V = nV_T ln(I/I_s) + I·R_s"
+    expected: [[temperature_K, "Temperature (K)", 300], [max_series_ohm, "Largest normal series R (Ω)", 1.0]]
+    samples:
+      - [diode_burden.csv, "Curve bends over at high current"]
+      - [diode_reversed.csv, "Almost no current flows"]
+      - [diode_clean.csv, "Healthy diode"]
+    followups: {voltmeter_on_diode: diode_burden_rewired.csv}
+    questions: ["Fit the Shockley equation and report n and the series resistance"]
+
+  hall:
+    label: Hall effect
+    domain: magnetism
+    blurb: Hall voltage against sample current in a fixed field
+    model: "V_H = IB / (n e t)"
+    expected: [[field_T, "Field (T)", 0.3], [thickness_m, "Sample thickness (m)", 0.001], [carrier_density_per_m3, "Expected carrier density (/m³)", 1.0e+21]]
+    samples:
+      - [hall_misaligned.csv, "Carrier density 25% high"]
+      - [hall_thermal.csv, "Voltage at zero current"]
+      - [hall_clean.csv, "Healthy sample"]
+    followups: {reverse_field: hall_misaligned_reversed.csv}
+    questions: ["Fit V_H against I and work out the carrier density"]
+
+  grating:
+    label: Diffraction grating
+    domain: optics
+    blurb: Diffraction angles of a laser through a grating, orders −3 to +3
+    model: "d sin θ = mλ"
+    expected: [[lines_per_mm, "Grating (lines/mm)", 600], [wavelength_nm, "Laser wavelength (nm)", 532]]
+    samples:
+      - [grating_wrong_spec.csv, "Wavelength comes out 17% short"]
+      - [grating_zero_offset.csv, "Orders lopsided left to right"]
+      - [grating_clean.csv, "Healthy measurement"]
+    followups: {reference_line_check: grating_wrong_spec_ref.csv}
+    questions: ["Fit the grating equation and report the wavelength"]
+
+  pendulum:
+    label: Simple pendulum
+    domain: mechanics
+    blurb: Period against length, to measure g
+    model: "T = 2π√(L/g)"
+    expected: [[g_m_s2, "Expected g (m/s²)", 9.81]]
+    samples:
+      - [pendulum_large_amp.csv, "g comes out 3% low"]
+      - [pendulum_length_offset.csv, "T² line misses the origin"]
+      - [pendulum_clean.csv, "Healthy measurement"]
+    followups: {small_amplitude_repeat: pendulum_large_amp_small.csv}
+    questions: ["Fit T² against L and report g"]
+
+  hooke:
+    label: Hooke's law spring
+    domain: mechanics
+    blurb: Extension against hanging mass, to measure the spring constant
+    model: "mg = k·x"
+    expected: [[spring_constant_N_per_m, "Expected spring constant (N/m)", 25.0]]
+    samples:
+      - [hooke_hanger.csv, "Force line misses the origin"]
+      - [hooke_overstretched.csv, "Line bends at high loads"]
+      - [hooke_clean.csv, "Healthy spring"]
+    followups: {include_hanger_repeat: hooke_hanger_included.csv}
+    questions: ["Fit the load against extension and report k"]

@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
 from functools import lru_cache
@@ -49,6 +50,12 @@ NETWORK_MARKERS = ("Network is unreachable", "Temporary failure in name resoluti
 DENIAL_MARKERS = ("Permission denied", "PermissionError", "Read-only file system")
 
 
+# At most this many sandboxes at once, so a burst of visitors cannot exhaust
+# the VM (each container may use 512 MB).
+MAX_JOBS = int(os.getenv("SANDBOX_MAX_JOBS", "2"))
+_slots = threading.BoundedSemaphore(MAX_JOBS)
+
+
 def log_event(kind, detail, job_id, wall=None):
     event = {"time": time.strftime("%H:%M:%S"), "job": job_id, "kind": kind,
              "detail": detail, "wall": wall}
@@ -76,8 +83,10 @@ def image_digest():
 
 
 def _docker_cmd(name, workdir, argv):
+    # No --rm: the host inspects the stopped container (real config and exit
+    # state) before removing it, so the receipt never relies on the job's word.
     return [
-        "docker", "run", "--rm", "--name", name,
+        "docker", "run", "--name", name,
         f"--runtime={RUNTIME}",
         "--network", "none",
         "--read-only", "--tmpfs", "/tmp:rw,size=64m,noexec",
@@ -91,6 +100,35 @@ def _docker_cmd(name, workdir, argv):
     ]
 
 
+def _inspect(name):
+    """What Docker itself says about the container: the walls it really had
+    and how it ended. Measured by the host, so the job cannot forge it."""
+    try:
+        out = subprocess.run(["docker", "inspect", name], capture_output=True, text=True, timeout=10)
+        info = json.loads(out.stdout)[0]
+    except (OSError, subprocess.TimeoutExpired, ValueError, IndexError):
+        return None
+    hc, st = info.get("HostConfig", {}), info.get("State", {})
+    return {
+        "runtime": hc.get("Runtime"),
+        "network": hc.get("NetworkMode"),
+        "read_only_root": hc.get("ReadonlyRootfs"),
+        "memory_mb": (hc.get("Memory") or 0) // (1024 * 1024),
+        "pids_limit": hc.get("PidsLimit"),
+        "cap_drop": hc.get("CapDrop"),
+        "no_new_privileges": "no-new-privileges" in (hc.get("SecurityOpt") or []),
+        "user": info.get("Config", {}).get("User"),
+        "exit_code": st.get("ExitCode"),
+        "oom_killed": st.get("OOMKilled"),
+    }
+
+
+def host_walls_ok(h):
+    return bool(h) and h["runtime"] == "runsc" and h["network"] == "none" and h["read_only_root"] \
+        and h["memory_mb"] == 512 and h["cap_drop"] == ["ALL"] and h["no_new_privileges"] \
+        and h["user"] == "65534:65534"
+
+
 def _local_cmd(workdir, argv):
     env = {"PS_JOB_DIR": str(workdir), "PATH": os.environ.get("PATH", "")}
     return [sys.executable, str(ROOT / "sandbox" / "tools" / "runner.py"), *argv], env
@@ -101,6 +139,11 @@ def run_job(argv, input_bytes=b"", code=None, label="analysis"):
 
     Returns (report, events, receipt). report is the runner's JSON or None.
     """
+    with _slots:
+        return _run_job(argv, input_bytes, code, label)
+
+
+def _run_job(argv, input_bytes, code, label):
     job_id = uuid.uuid4().hex[:8]
     events = [log_event("start", f"{label}: new container ({WALLS['runtime']})", job_id)]
     workdir = Path(tempfile.mkdtemp(prefix="ps-"))
@@ -124,31 +167,51 @@ def run_job(argv, input_bytes=b"", code=None, label="analysis"):
 
     started = time.time()
     timed_out = False
+    name = f"ps-{job_id}"
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_S, env=env)
         out, err, code_rc = proc.stdout, proc.stderr, proc.returncode
     except subprocess.TimeoutExpired:
-        subprocess.run(["docker", "kill", f"ps-{job_id}"], capture_output=True)
+        subprocess.run(["docker", "kill", name], capture_output=True)
         out, err, code_rc, timed_out = "", "", -1, True
     elapsed = round(time.time() - started, 2)
+    host = None
+    if MODE != "local":
+        host = _inspect(name)
+        subprocess.run(["docker", "rm", "-f", name], capture_output=True)
 
+    # Line 1 = probe (written before untrusted code existed); last line = result.
+    lines = [l for l in out.strip().splitlines() if l.strip()]
     report = None
     try:
-        report = json.loads(out.strip().splitlines()[-1]) if out.strip() else None
+        first = json.loads(lines[0]) if lines else {}
+        last = json.loads(lines[-1]) if len(lines) > 1 else {}
+        report = {**last, "probe": first.get("probe")} if first.get("probe") else None
+        if report is not None and len(lines) > 2:
+            report["extra_lines"] = len(lines) - 2
     except (ValueError, IndexError):
         report = None
-    seen = " ".join(filter(None, [out, err, (report or {}).get("stdout"), (report or {}).get("error")]))
+    seen = " ".join(filter(None, [err, (report or {}).get("stdout"), (report or {}).get("error")]))
 
+    # Kills come from Docker's own record, not from the job's output.
     if timed_out:
         events.append(log_event("killed", f"stopped at the {TIMEOUT_S} s time limit", job_id, "time"))
-    if code_rc == 137 or "out of memory" in err.lower():
+    oom = (host or {}).get("oom_killed") or code_rc == 137 or "killed (signal 9)" in seen \
+        or "MemoryError" in seen
+    if oom:
         events.append(log_event("killed", "stopped at the 512 MB memory limit", job_id, "memory"))
+    # What the code tried (it reports this itself; the walls above are what stopped it).
     if any(m in seen for m in NETWORK_MARKERS):
         events.append(log_event("blocked", "tried to reach the internet; there is no network", job_id, "network"))
     if any(m in seen for m in DENIAL_MARKERS):
         events.append(log_event("denied", "tried to write outside scratch space; filesystem is read-only",
                                 job_id, "filesystem"))
-    if report and report.get("error") and not any(e["kind"] in ("blocked", "denied") for e in events):
+    if report and (report.get("extra_lines") or '"probe"' in (report.get("stdout") or "")):
+        events.append(log_event("tamper", "code tried to forge its own receipt; ignored, the real probe ran first",
+                                job_id, "receipt"))
+    if MODE != "local" and not host_walls_ok(host):
+        events.append(log_event("alert", "host check failed: container did not have the expected walls", job_id))
+    if report and report.get("error") and not any(e["kind"] in ("blocked", "denied", "killed") for e in events):
         events.append(log_event("error", report["error"][:200], job_id))
     events.append(log_event("end", f"container destroyed after {elapsed} s", job_id))
     shutil.rmtree(workdir, ignore_errors=True)
@@ -161,6 +224,7 @@ def run_job(argv, input_bytes=b"", code=None, label="analysis"):
         "image": image_digest(),
         "walls_configured": WALLS,
         "walls_measured": probe,
+        "walls_host_verified": host,
         "input_sha256": ledger.sha256(input_bytes),
         "code_sha256": ledger.sha256(code) if code is not None else None,
         "output_sha256": ledger.sha256(out),

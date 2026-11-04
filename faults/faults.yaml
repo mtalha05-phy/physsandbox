@@ -683,6 +683,329 @@ experiments:
           capacitor_tolerance: supply_ok
           no_fault: supply_ok
 
+  pendulum:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: g_error_pct, op: abs_lt, value: 1.5, p_true: 0.95, p_false: 0.01}
+          - {feature: length_offset_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+      large_amplitude:
+        name: Too large a release angle
+        prior: 0.18
+        typical_size: "From 30° every period is about 1.7% long, so g comes out about 3% low"
+        conditions:
+          - {feature: g_error_pct, op: "<", value: -1.5, p_true: 0.95, p_false: 0.03}
+          - {feature: length_offset_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: g_fixed_at_small_amplitude, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      timer_scale:
+        name: Timer running fast or slow
+        prior: 0.15
+        conditions:
+          - {feature: g_error_pct, op: abs_gt, value: 1.5, p_true: 0.95, p_false: 0.03}
+          - {feature: length_offset_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: g_fixed_at_small_amplitude, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      length_to_wrong_point:
+        name: Length measured to the top of the bob, not its centre
+        prior: 0.20
+        typical_size: "A 2 cm bob radius shows up as a 2 cm intercept on the T² against L plot"
+        conditions:
+          - {feature: length_offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: g_error_pct, op: abs_lt, value: 1.5, p_true: 0.9, p_false: 0.1}
+      miscounted_swings:
+        name: Miscounted swings
+        prior: 0.07
+        conditions:
+          - {feature: g_error_pct, op: abs_gt, value: 8, p_true: 0.95, p_false: 0.01}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      small_amplitude_repeat:
+        name: Repeat three lengths released from 5° or less
+        minutes: 4
+        how: Pull the bob aside by no more than a tenth of the string length and time 10 swings at three lengths.
+        outcomes:
+          large_amplitude: g_matches
+          timer_scale: g_still_off
+          length_to_wrong_point: g_matches
+          no_fault: g_matches
+          miscounted_swings: g_still_off
+      timer_check:
+        name: Check the timer against a phone clock over five minutes
+        minutes: 6
+        how: Start both together, stop both after five minutes and compare.
+        outcomes:
+          timer_scale: timer_off
+          large_amplitude: timer_ok
+          length_to_wrong_point: timer_ok
+          no_fault: timer_ok
+          miscounted_swings: timer_ok
+      measure_bob:
+        name: Measure the bob's diameter with callipers
+        minutes: 2
+        how: Add the bob's radius to every length, then refit.
+        outcomes:
+          length_to_wrong_point: offset_explained
+          large_amplitude: offset_not_present
+          timer_scale: offset_not_present
+          no_fault: offset_not_present
+          miscounted_swings: offset_not_present
+
+  hooke:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: k_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: zero_force_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+      hanger_mass_omitted:
+        name: Hanger's mass left out of the loads
+        prior: 0.20
+        typical_size: "A 50 g hanger shows up as about −0.49 N of force at zero extension"
+        conditions:
+          - {feature: zero_force_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: offset_gone_with_hanger, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      ruler_zero_offset:
+        name: Ruler zero read in the wrong place
+        prior: 0.18
+        conditions:
+          - {feature: zero_force_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: offset_gone_with_hanger, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      past_elastic_limit:
+        name: Spring loaded past its elastic limit
+        prior: 0.12
+        conditions:
+          - {feature: curvature_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+      wrong_spring:
+        name: A spring with a different constant than expected
+        prior: 0.10
+        conditions:
+          - {feature: k_error_pct, op: abs_gt, value: 10, p_true: 0.95, p_false: 0.02}
+          - {feature: zero_force_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.1}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      include_hanger_repeat:
+        name: Weigh the hanger and add its mass to every load
+        minutes: 2
+        how: Put the empty hanger on a balance, add its mass to each load and refit.
+        outcomes:
+          hanger_mass_omitted: offset_gone
+          ruler_zero_offset: offset_stays
+          no_fault: offset_gone
+          past_elastic_limit: curve_remains
+          wrong_spring: offset_gone
+      rezero_with_hanger:
+        name: Read the pointer with only the hanger attached and call that zero
+        minutes: 3
+        how: Remove all masses, let the hanger settle and read the pointer at eye level.
+        outcomes:
+          ruler_zero_offset: zero_was_misread
+          hanger_mass_omitted: zero_ok
+          no_fault: zero_ok
+          past_elastic_limit: zero_ok
+          wrong_spring: zero_ok
+      unload_check:
+        name: Unload the spring and check it returns to its original length
+        minutes: 2
+        how: Remove every mass and read the pointer again.
+        outcomes:
+          past_elastic_limit: stays_stretched
+          hanger_mass_omitted: returns
+          ruler_zero_offset: returns
+          no_fault: returns
+          wrong_spring: returns
+
+  diode:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: rs_excess_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: no_forward_current, op: is, value: false, p_true: 0.99, p_false: 0.01}
+      meter_burden:
+        name: Voltmeter across diode and ammeter (ammeter burden voltage)
+        prior: 0.20
+        typical_size: "A 10 Ω ammeter burden adds 0.5 V at 50 mA, which looks like series resistance"
+        conditions:
+          - {feature: rs_excess_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: droop_gone_after_rewire, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      bulk_series_resistance:
+        name: High series resistance in the diode itself (damaged or wrong part)
+        prior: 0.15
+        conditions:
+          - {feature: rs_excess_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: droop_gone_after_rewire, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      reversed_diode:
+        name: Diode connected the wrong way round
+        prior: 0.10
+        conditions:
+          - {feature: no_forward_current, op: is, value: true, p_true: 0.98, p_false: 0.001}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      voltmeter_on_diode:
+        name: Move the voltmeter leads onto the diode's own legs
+        minutes: 2
+        how: Connect the voltmeter directly across the diode, with the ammeter outside that loop, and repeat.
+        outcomes:
+          meter_burden: droop_gone
+          bulk_series_resistance: droop_stays
+          no_fault: droop_gone
+          reversed_diode: no_current
+      swap_known_good_diode:
+        name: Repeat with a known-good diode of the same type
+        minutes: 6
+        how: Swap in a diode from a fresh pack and repeat the sweep.
+        outcomes:
+          bulk_series_resistance: droop_gone
+          meter_burden: droop_stays
+          no_fault: droop_gone
+          reversed_diode: no_current
+      check_band:
+        name: Check the cathode band faces the negative side
+        minutes: 1
+        how: The striped end of the diode is the cathode; it goes towards the supply's negative terminal.
+        outcomes:
+          reversed_diode: band_wrong
+          meter_burden: band_ok
+          bulk_series_resistance: band_ok
+          no_fault: band_ok
+
+  grating:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: wavelength_error_pct, op: abs_lt, value: 1, p_true: 0.95, p_false: 0.01}
+          - {feature: angle_zero_sigma, op: "<", value: 5, p_true: 0.95, p_false: 0.01}
+      angle_zero_offset:
+        name: Spectrometer angle zero misread
+        prior: 0.20
+        typical_size: "Orders on one side read high and on the other low by the same angle"
+        conditions:
+          - {feature: angle_zero_sigma, op: ">", value: 6, p_true: 0.95, p_false: 0.02}
+          - {feature: wavelength_error_pct, op: abs_lt, value: 1, p_true: 0.9, p_false: 0.1}
+      grating_density_wrong:
+        name: A grating with a different line density than assumed
+        prior: 0.17
+        typical_size: "A 500 lines/mm grating read as 600 lines/mm makes every wavelength 17% short"
+        conditions:
+          - {feature: wavelength_error_pct, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.02}
+          - {feature: angle_zero_sigma, op: "<", value: 5, p_true: 0.9, p_false: 0.2}
+          - {feature: grating_confirmed_wrong, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      laser_not_stated_wavelength:
+        name: A laser wavelength different from its label
+        prior: 0.15
+        conditions:
+          - {feature: wavelength_error_pct, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.02}
+          - {feature: angle_zero_sigma, op: "<", value: 5, p_true: 0.9, p_false: 0.2}
+          - {feature: grating_confirmed_wrong, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      reference_line_check:
+        name: Repeat with a source of known wavelength (HeNe 632.8 nm)
+        minutes: 4
+        how: Swap in a helium-neon laser or a sodium lamp and measure orders −3 to +3 with the same grating.
+        outcomes:
+          grating_density_wrong: reference_off
+          laser_not_stated_wavelength: reference_ok
+          angle_zero_offset: reference_ok
+          no_fault: reference_ok
+        safety: Laser changes need your laser safety officer's procedure; never view the beam directly.
+      rezero_vernier:
+        name: Re-zero the spectrometer on the straight-through beam
+        minutes: 2
+        how: Set the telescope on the zeroth order and read the vernier; that is your zero.
+        outcomes:
+          angle_zero_offset: offset_gone
+          grating_density_wrong: offset_unchanged
+          laser_not_stated_wavelength: offset_unchanged
+          no_fault: offset_unchanged
+
+  hall:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: density_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: zero_offset_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+      contact_misalignment:
+        name: Hall contacts not exactly opposite each other
+        prior: 0.20
+        typical_size: "A small offset between contacts adds an IR drop proportional to current, which looks like extra Hall voltage"
+        conditions:
+          - {feature: density_error_pct, op: abs_gt, value: 10, p_true: 0.95, p_false: 0.03}
+          - {feature: zero_offset_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: misalignment_found, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      field_lower_than_set:
+        name: Magnetic field lower than the value you set
+        prior: 0.16
+        conditions:
+          - {feature: density_error_pct, op: ">", value: 10, p_true: 0.95, p_false: 0.02}
+          - {feature: zero_offset_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: misalignment_found, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      thermoelectric_contact_offset:
+        name: Thermoelectric voltage at the contacts
+        prior: 0.15
+        conditions:
+          - {feature: zero_offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: density_error_pct, op: abs_lt, value: 5, p_true: 0.9, p_false: 0.1}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      reverse_field:
+        name: Repeat with the magnetic field reversed
+        minutes: 3
+        how: Reverse the magnet current (or turn the sample over) and repeat the current sweep. The Hall voltage flips; a misalignment voltage does not.
+        outcomes:
+          contact_misalignment: asymmetric
+          field_lower_than_set: symmetric
+          no_fault: symmetric
+          thermoelectric_contact_offset: offset_stays
+      gaussmeter_check:
+        name: Measure the field in the gap with a gaussmeter
+        minutes: 4
+        how: Put the gaussmeter probe where the sample sits, at the same magnet current.
+        outcomes:
+          field_lower_than_set: field_low
+          contact_misalignment: field_ok
+          no_fault: field_ok
+          thermoelectric_contact_offset: field_ok
+      reverse_current_zero:
+        name: Read the Hall voltage with zero sample current, then reverse the current
+        minutes: 2
+        how: A voltage that stays at zero current, and does not flip with current, is thermoelectric.
+        outcomes:
+          thermoelectric_contact_offset: offset_at_zero_current
+          contact_misalignment: no_offset
+          field_lower_than_set: no_offset
+          no_fault: no_offset
+
 
 # Hard safety rules applied to every recommendation and to model text.
 safety:

@@ -1,8 +1,12 @@
 """PhysSandbox web app (FastAPI)."""
 import json
+import os
+import time
+from collections import defaultdict, deque
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -15,7 +19,41 @@ ROOT = Path(__file__).parent.parent
 app = FastAPI(title="PhysSandbox")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
-ATTACKS = {"egress", "runaway", "host_read"}
+MAX_UPLOAD = 1_000_000          # bytes
+# Per-visitor limits on the public demo: (requests, seconds). The model calls
+# cost inference credit, so they get the tightest limits.
+LIMITS = {"/api/agent": (8, 300), "/api/model-check": (4, 60), "/api/analyse": (40, 300),
+          "/api/containment": (20, 300)}
+_hits = defaultdict(deque)
+
+
+@app.middleware("http")
+async def guard(request: Request, call_next):
+    path = request.url.path
+    rule = next((v for k, v in LIMITS.items() if path.startswith(k)), None)
+    if rule and os.getenv("RATE_LIMIT", "on") != "off":
+        ip = (request.headers.get("x-forwarded-for") or request.client.host or "?").split(",")[0].strip()
+        n, window = rule
+        q, now = _hits[(ip, path.split("/")[2])], time.time()
+        while q and q[0] < now - window:
+            q.popleft()
+        if len(q) >= n:
+            return JSONResponse({"detail": "Too many requests from you just now. Try again in a minute."},
+                                status_code=429)
+        q.append(now)
+    if int(request.headers.get("content-length") or 0) > MAX_UPLOAD + 10_000:
+        return JSONResponse({"detail": "File too large: the demo accepts up to 1 MB."}, status_code=413)
+    return await call_next(request)
+
+
+async def _read(file):
+    raw = await file.read(MAX_UPLOAD + 1)
+    if len(raw) > MAX_UPLOAD:
+        raise HTTPException(413, "File too large: the demo accepts up to 1 MB.")
+    return raw
+
+
+ATTACKS = {"egress", "runaway", "host_read", "forge_receipt"}
 SAMPLES = sorted(p.name for p in (ROOT / "data" / "seeded").glob("*.csv"))
 
 
@@ -44,7 +82,7 @@ def sample(name: str):
 @app.post("/api/analyse")
 async def analyse_upload(file: UploadFile = File(...), experiment: str = Form(...),
                          expected: str = Form("{}"), context: str = Form("")):
-    raw = await file.read()
+    raw = await _read(file)
     try:
         return analyse(raw, experiment, json.loads(expected), json.loads(context) if context else None)
     except ValueError as e:
@@ -55,20 +93,37 @@ async def analyse_upload(file: UploadFile = File(...), experiment: str = Form(..
 async def agent_run(file: UploadFile = File(...), question: str = Form(...),
                     experiment: str = Form("resistance_4wire"), raw_mode: str = Form("false"),
                     compromised: str = Form("false")):
-    raw = await file.read()
+    raw = await _read(file)
     summary = summarise(raw)
     raw_head = None
     if raw_mode == "true":
         raw_head = "\n".join(raw.decode("utf-8", "replace").splitlines()[:12])
-    code, author = agent.write_code(question[:500], experiment, summary, raw_head,
-                                    compromised=compromised == "true")
-    flags = agent.scan(code)
-    report, events, receipt = run_job(["code"], raw, code=code, label="agent-written code")
+    question = question[:500]
+    is_red = compromised == "true"
+    code, author = agent.write_code(question, experiment, summary, raw_head, compromised=is_red)
+    attempts = []
+    # The agent loop: write, run sealed, read the sandbox's error, repair.
+    for n in range(1, agent.MAX_ATTEMPTS + 1):
+        flags = agent.scan(code)
+        report, events, receipt = run_job(["code"], raw, code=code, label=f"agent-written code (attempt {n})")
+        out, err = (report or {}).get("stdout", ""), (report or {}).get("error")
+        contained = any(e["kind"] in ("blocked", "killed", "denied", "tamper") for e in events)
+        attempts.append({"n": n, "code": code, "flags": flags, "output": out, "error": err,
+                         "containment": events, "receipt": receipt, "walls": (report or {}).get("probe")})
+        if not err or contained or is_red or n == agent.MAX_ATTEMPTS:
+            break
+        fixed = agent.fix_code(question, experiment, summary, code, err, out)
+        if not fixed or fixed == code:
+            break
+        code = fixed
+    last = attempts[-1]
     return {
-        "question": question, "code": code, "author": author, "flags": flags,
-        "raw_mode": raw_mode == "true", "compromised": compromised == "true", "summary_sent": summary,
-        "output": (report or {}).get("stdout", ""), "error": (report or {}).get("error"),
-        "containment": events, "receipt": receipt, "walls": (report or {}).get("probe"),
+        "question": question, "code": last["code"], "author": author, "flags": last["flags"],
+        "raw_mode": raw_mode == "true", "compromised": is_red, "summary_sent": summary,
+        "output": last["output"], "error": last["error"], "attempts": [
+            {"n": a["n"], "error": a["error"], "receipt": (a["receipt"] or {}).get("seq")} for a in attempts],
+        "containment": [e for a in attempts for e in a["containment"]],
+        "receipt": last["receipt"], "walls": last["walls"],
     }
 
 

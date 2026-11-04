@@ -4,7 +4,14 @@
    identity, secrets) so the host can issue a containment receipt based on
    what the job could actually see, not on what we configured.
 2. Runs the job: a physics tool, agent-written code, or an attack demo.
-3. Prints one JSON object on stdout.
+3. Prints two JSON lines on stdout.
+
+Trust boundary: the probe is measured and written (line 1) BEFORE any
+untrusted code exists in the box. Agent code and attack demos then run in a
+separate child process whose output is captured through a pipe, so they can
+shape their own stdout but never the probe. The host additionally checks the
+container's real configuration and exit state with `docker inspect`, so the
+receipt never rests on what the job says about itself.
 
 Usage:
   python /tools/runner.py analyze <experiment> <expected-json>
@@ -18,6 +25,7 @@ import os
 import resource
 import runpy
 import socket
+import subprocess
 import sys
 import time
 import traceback
@@ -98,19 +106,53 @@ def run_target(kind, args):
     return payload, text[-6000:], error
 
 
+def child():
+    """Runs untrusted work (agent code, attack demos) in its own process."""
+    kind, args = sys.argv[2], sys.argv[3:]
+    payload, stdout, error = run_target(kind, args)
+    print(json.dumps({"result": payload, "stdout": stdout, "error": error}, default=float))
+
+
 def main():
+    if sys.argv[1] == "_child":
+        return child()
     kind, args = sys.argv[1], sys.argv[2:]
     started = time.time()
-    walls = probe()
-    payload, stdout, error = run_target(kind, args)
-    usage = resource.getrusage(resource.RUSAGE_SELF)
+    # Line 1: the walls, measured before any untrusted code is in the box.
+    print(json.dumps({"probe": probe()}), flush=True)
+    if kind == "analyze":
+        # Our own physics code reading the uploaded file.
+        payload, stdout, error = run_target(kind, args)
+        rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    else:
+        try:
+            # Not dumpable: the child (same uid) cannot open /proc/<runner>/fd/1
+            # to write into the runner's own report.
+            import ctypes
+            ctypes.CDLL(None).prctl(4, 0, 0, 0, 0)  # PR_SET_DUMPABLE = 4
+        except (OSError, AttributeError):
+            pass
+        try:
+            proc = subprocess.run([sys.executable, "-I", os.path.abspath(__file__), "_child", kind, *args],
+                                  capture_output=True, text=True, timeout=25, stdin=subprocess.DEVNULL)
+            lines = proc.stdout.strip().splitlines()
+            try:
+                rep = json.loads(lines[-1])
+                payload, stdout, error = rep.get("result"), rep.get("stdout", ""), rep.get("error")
+            except (ValueError, IndexError):
+                payload, stdout = None, proc.stdout[-6000:]
+                error = (proc.stderr.strip().splitlines() or [f"child exited with code {proc.returncode}"])[-1]
+            if proc.returncode < 0 or proc.returncode == 137:
+                error = error or f"killed (signal {-proc.returncode if proc.returncode < 0 else 9})"
+        except subprocess.TimeoutExpired:
+            payload, stdout, error = None, "", "timed out"
+        rss = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+    # Line 2: what the job produced (untrusted for agent code: it is the code's own output).
     print(json.dumps({
-        "probe": walls,
         "result": payload,
         "stdout": stdout,
         "error": error,
-        "usage": {"seconds": round(time.time() - started, 3),
-                  "max_rss_mb": round(usage.ru_maxrss / 1024, 1)},
+        "usage": {"seconds": round(time.time() - started, 3), "max_rss_mb": round(rss / 1024, 1)},
     }, default=float))
 
 

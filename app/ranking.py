@@ -82,6 +82,17 @@ OUTCOMES = {
     # RC charging
     "x10_probe_repeat": lambda new, prior: {
         "loading_reduced_with_x10": new.get("final_ratio", 0) > prior.get("final_ratio", 1) + 0.2},
+    # pendulum
+    "small_amplitude_repeat": lambda new, prior: {"g_fixed_at_small_amplitude": abs(new.get("g_error_pct", 99)) < 1},
+    # Hooke's law
+    "include_hanger_repeat": lambda new, prior: {"offset_gone_with_hanger": new.get("zero_force_sigma", 99) < 3},
+    # diode
+    "voltmeter_on_diode": lambda new, prior: {"droop_gone_after_rewire": new.get("rs_excess_sigma", 99) < 3},
+    # diffraction grating
+    "reference_line_check": lambda new, prior: {
+        "grating_confirmed_wrong": abs(new.get("reference_error_pct", 0)) > 2},
+    # Hall effect
+    "reverse_field": lambda new, prior: {"misalignment_found": new.get("misalignment_fraction", 0) > 0.05},
 }
 
 

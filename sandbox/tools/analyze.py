@@ -30,6 +30,11 @@ COLUMNS = {
     "malus": (["angle_deg", "intensity"], ["beam_blocked", "intensity"]),
     "cooling": (["time_s", "temperature_C"],),
     "rc_charging": (["time_s", "voltage_V"],),
+    "pendulum": (["length_m", "period_s"],),
+    "hooke": (["mass_kg", "extension_m"],),
+    "diode": (["voltage_V", "current_A"],),
+    "grating": (["order_m", "angle_deg"],),
+    "hall": (["current_A", "hall_voltage_V"],),
 }
 
 

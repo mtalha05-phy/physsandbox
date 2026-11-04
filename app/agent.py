@@ -11,13 +11,12 @@ the uploaded file, so an instruction hidden in the data can reach it.
 """
 import ast
 
-from . import llm
-import os
 import re
 
-BASE_URL = os.getenv("VULTR_INFERENCE_BASE_URL", "https://api.vultrinference.com/v1")
-API_KEY = os.getenv("VULTR_INFERENCE_API_KEY")
-MODEL = os.getenv("VULTR_INFERENCE_MODEL", "")
+from . import llm
+
+MODEL = llm.MODEL
+MAX_ATTEMPTS = 3
 
 RISKY_IMPORTS = {"socket", "urllib", "http", "requests", "subprocess", "ctypes",
                  "shutil", "pty", "ftplib", "smtplib", "paramiko", "multiprocessing"}
@@ -187,5 +186,23 @@ def write_code(question, experiment, summary, raw_head=None, compromised=False):
     if text is None:
         key = _pick_template(question, experiment, raw_head)
         return TEMPLATES[key], f"built-in template (model call failed: {err})"
+    return _extract(text), llm.MODEL
+
+
+def _extract(text):
     m = re.search(r"```(?:python)?\s*(.*?)```", text, re.S)
-    return (m.group(1) if m else text).strip() + "\n", llm.MODEL
+    return (m.group(1) if m else text).strip() + "\n"
+
+
+def fix_code(question, experiment, summary, code, error, output=""):
+    """One repair step: show the model its code and the sandbox's error.
+    Returns new code, or None if the model is unavailable."""
+    if not llm.configured():
+        return None
+    user = (f"Experiment: {experiment}\nFile summary: {summary}\nQuestion: {question}\n\n"
+            f"Your previous script:\n```python\n{code}```\n"
+            f"It failed inside the sandbox with:\n{error[:800]}\n"
+            + (f"Output before the failure:\n{output[:800]}\n" if output else "")
+            + "Fix the script. The sandbox has no network and a read-only disk; do not try to change that.")
+    text, _ = llm.chat(SYSTEM, user, max_tokens=3000, temperature=0.1, timeout=90)
+    return _extract(text) if text else None

@@ -15,6 +15,11 @@ team's earlier prototype, so those files work unchanged):
   malus           angle_deg, intensity                (follow-up: beam_blocked, intensity)
   cooling         time_s, temperature_C               (follow-up: ice-point readings)
   rc_charging     time_s, voltage_V                   (follow-up: a scan with a x10 probe)
+  pendulum        length_m, period_s                  (follow-up: a repeat at small amplitude)
+  hooke           mass_kg, extension_m                (follow-up: loads including the hanger)
+  diode           voltage_V, current_A                (follow-up: voltmeter moved to the diode)
+  grating         order_m, angle_deg                  (follow-up: + reference_nm, a known line)
+  hall            current_A, hall_voltage_V           (follow-up: + field_reversed)
 """
 import numpy as np
 from scipy.optimize import curve_fit
@@ -326,6 +331,175 @@ def rc_charging(header, data, expected):
     }
 
 
+# --- Simple pendulum: T = 2π√(L/g)(1 + θ₀²/16) -------------------------------------
+def pendulum(header, data, expected):
+    L = col(header, data, "length_m")
+    T = col(header, data, "period_s")
+    g_exp = float(expected.get("g_m_s2", 9.81))
+    # T² = (4π²/g) L + c: the slope gives g, the intercept a length offset.
+    a, b, ea, eb = linfit(L, T ** 2)
+    g = 4 * np.pi ** 2 / a
+    eg = g * ea / a
+    length_offset = b / a
+    xs = dense(L)
+    return {
+        "values": {
+            "g_fit_m_s2": {"value": g, "uncertainty": eg},
+            "g_expected_m_s2": {"value": g_exp},
+            "length_offset_m": {"value": length_offset, "uncertainty": abs(eb / a)},
+        },
+        "evidence": {
+            "g_error_pct": 100 * (g / g_exp - 1),
+            "g_error_sigma": sig(g - g_exp, eg),
+            "length_offset_sigma": sig(b, eb),
+        },
+        "plot": {"x": L.tolist(), "y": (T ** 2).tolist(), "x_label": "pendulum length L (m)",
+                 "y_label": "period squared T² (s²)", "unit": "s²", "x_unit": "m",
+                 "lines": [{"role": "fit", "x": xs.tolist(), "y": (a * xs + b).tolist()},
+                           {"role": "expected", "x": xs.tolist(), "y": (4 * np.pi ** 2 / g_exp * xs).tolist()}]},
+    }
+
+
+# --- Hooke's law spring: m g = k (x - x₀) -------------------------------------------
+def hooke(header, data, expected):
+    m = col(header, data, "mass_kg")
+    x = col(header, data, "extension_m")
+    k_exp = float(expected.get("spring_constant_N_per_m", 25.0))
+    F = m * 9.81
+    a, b, ea, eb = linfit(x, F)
+    curv = np.polyfit(x, F, 2, cov=True)
+    c2, ec2 = float(curv[0][0]), float(np.sqrt(curv[1][0, 0]))
+    xs = dense(np.append(x, 0))
+    return {
+        "values": {
+            "spring_constant_N_per_m": {"value": a, "uncertainty": ea},
+            "expected_spring_constant_N_per_m": {"value": k_exp},
+            "force_at_zero_extension_N": {"value": b, "uncertainty": eb},
+        },
+        "evidence": {
+            "k_error_pct": 100 * (a / k_exp - 1),
+            "zero_force_sigma": sig(b, eb),
+            "curvature_sigma": sig(c2, ec2),
+        },
+        "plot": {"x": x.tolist(), "y": F.tolist(), "x_label": "extension x (m)", "y_label": "load m·g (N)",
+                 "unit": "N", "x_unit": "m",
+                 "lines": [{"role": "fit", "x": xs.tolist(), "y": (a * xs + b).tolist()},
+                           {"role": "expected", "x": xs.tolist(), "y": (k_exp * xs).tolist()}]},
+    }
+
+
+# --- Diode I-V: V = n V_T ln(I/I_s) + I R_s ------------------------------------------
+def diode(header, data, expected):
+    V = col(header, data, "voltage_V")
+    I = col(header, data, "current_A")
+    T = float(expected.get("temperature_K", 300.0))
+    rs_max = float(expected.get("max_series_ohm", 1.0))
+    if np.max(I) < 1e-6:
+        return {
+            "values": {"max_current_A": {"value": float(np.max(I))}},
+            "evidence": {"no_forward_current": True, "rs_excess_sigma": 0.0, "ideality": 0.0},
+            "plot": {"x": V.tolist(), "y": I.tolist(), "x_label": "applied voltage (V)",
+                     "y_label": "current (A)", "unit": "A", "x_unit": "V", "lines": []},
+        }
+    vt = 1.380649e-23 * T / 1.602176634e-19
+    keep = I > 0
+    V, I = V[keep], I[keep]
+    f = lambda i, n, lnis, rs: n * vt * (np.log(i) - lnis) + i * rs
+    (n, lnis, rs), (en, _, ers) = fit(f, I, V, [1.8, np.log(1e-9), 0.1],
+                                      bounds=([0.5, -60, 0], [4, 0, 1e3]))
+    ii = np.geomspace(I.min(), I.max(), 160)
+    return {
+        "values": {
+            "ideality_factor": {"value": n, "uncertainty": en},
+            "series_resistance_ohm": {"value": rs, "uncertainty": ers},
+            "max_series_resistance_ohm": {"value": rs_max},
+        },
+        "evidence": {
+            "no_forward_current": False,
+            "ideality": n,
+            "rs_excess_sigma": sig(max(rs - rs_max, 0), ers),
+        },
+        "plot": {"x": V.tolist(), "y": I.tolist(), "x_label": "voltage across the diode (V)",
+                 "y_label": "current (A)", "unit": "A", "x_unit": "V",
+                 "lines": [{"role": "fit", "x": f(ii, n, lnis, rs).tolist(), "y": ii.tolist()},
+                           {"role": "expected", "x": f(ii, n, lnis, 0).tolist(), "y": ii.tolist()}]},
+    }
+
+
+# --- Diffraction grating: d sin θ = m λ ------------------------------------------------
+def grating(header, data, expected):
+    m = col(header, data, "order_m")
+    th = col(header, data, "angle_deg")
+    d = 1e-3 / float(expected.get("lines_per_mm", 600))
+    lam_exp = float(expected.get("wavelength_nm", 532.0))
+    ref = "reference_nm" in header
+    if ref:
+        lam_exp = float(col(header, data, "reference_nm")[0])
+    f = lambda m, lam, d0: np.degrees(np.arcsin(np.clip(m * lam * 1e-9 / d, -1, 1))) + d0
+    (lam, d0), (elam, ed0) = fit(f, m, th, [lam_exp, 0.0])
+    ms = np.linspace(m.min(), m.max(), 160)
+    ev = {"wavelength_error_pct": 100 * (lam / lam_exp - 1), "angle_zero_sigma": sig(d0, ed0)}
+    if ref:
+        ev = {"reference_error_pct": ev["wavelength_error_pct"]}
+    return {
+        "values": {
+            ("reference_line_measured_nm" if ref else "wavelength_fit_nm"): {"value": lam, "uncertainty": elam},
+            ("reference_line_true_nm" if ref else "wavelength_expected_nm"): {"value": lam_exp},
+            "angle_zero_offset_deg": {"value": d0, "uncertainty": ed0},
+        },
+        "evidence": ev,
+        "plot": {"x": m.tolist(), "y": th.tolist(), "x_label": "diffraction order m",
+                 "y_label": "diffraction angle (degrees)", "unit": "°", "x_unit": "",
+                 "connect": False,
+                 "lines": [{"role": "fit", "x": ms.tolist(), "y": f(ms, lam, d0).tolist()},
+                           {"role": "expected", "x": ms.tolist(), "y": f(ms, lam_exp, 0).tolist()}]},
+    }
+
+
+# --- Hall effect: V_H = I B / (n e t) ---------------------------------------------------
+def hall(header, data, expected):
+    I = col(header, data, "current_A")
+    V = col(header, data, "hall_voltage_V")
+    B = float(expected.get("field_T", 0.3))
+    t = float(expected.get("thickness_m", 1e-3))
+    n_exp = float(expected.get("carrier_density_per_m3", 1e21))
+    e = 1.602176634e-19
+    if "field_reversed" in header:
+        r = col(header, data, "field_reversed")
+        sp, bp, esp, _ = linfit(I[r == 0], V[r == 0])
+        sn, bn, esn, _ = linfit(I[r == 1], V[r == 1])
+        hall_part, mis_part = (sp - sn) / 2, (sp + sn) / 2
+        n = B / (hall_part * e * t)
+        xs = dense(I)
+        return {
+            "values": {
+                "hall_slope_V_per_A": {"value": hall_part, "uncertainty": float(np.hypot(esp, esn) / 2)},
+                "misalignment_slope_V_per_A": {"value": mis_part, "uncertainty": float(np.hypot(esp, esn) / 2)},
+                "carrier_density_per_m3": {"value": n},
+            },
+            "evidence": {"misalignment_fraction": abs(mis_part / hall_part)},
+            "plot": {"x": I.tolist(), "y": V.tolist(), "x_label": "sample current (A), field forward then reversed",
+                     "y_label": "Hall voltage (V)", "unit": "V", "x_unit": "A", "connect": False,
+                     "lines": [{"role": "fit", "x": xs.tolist(), "y": (sp * xs + bp).tolist()},
+                               {"role": "fit", "x": xs.tolist(), "y": (sn * xs + bn).tolist()}]},
+        }
+    a, b, ea, eb = linfit(I, V)
+    n = B / (a * e * t)
+    xs = dense(np.append(I, 0))
+    return {
+        "values": {
+            "carrier_density_per_m3": {"value": n, "uncertainty": abs(n * ea / a)},
+            "expected_carrier_density_per_m3": {"value": n_exp},
+            "hall_voltage_at_zero_current_V": {"value": b, "uncertainty": eb},
+        },
+        "evidence": {"density_error_pct": 100 * (n / n_exp - 1), "zero_offset_sigma": sig(b, eb)},
+        "plot": {"x": I.tolist(), "y": V.tolist(), "x_label": "sample current (A)", "y_label": "Hall voltage (V)",
+                 "unit": "V", "x_unit": "A",
+                 "lines": [{"role": "fit", "x": xs.tolist(), "y": (a * xs + b).tolist()},
+                           {"role": "expected", "x": xs.tolist(), "y": (B / (n_exp * e * t) * xs).tolist()}]},
+    }
+
+
 ANALYSES = {
     "helmholtz": helmholtz,
     "laser_alignment": laser_alignment,
@@ -334,4 +508,9 @@ ANALYSES = {
     "malus": malus,
     "cooling": cooling,
     "rc_charging": rc_charging,
+    "pendulum": pendulum,
+    "hooke": hooke,
+    "diode": diode,
+    "grating": grating,
+    "hall": hall,
 }

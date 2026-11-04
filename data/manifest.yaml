@@ -159,3 +159,83 @@ datasets:
     experiment: resistance_4wire
     truth: self_heating
     note: contributed by mtalha05-phy
+  - file: pendulum_large_amp.csv
+    experiment: pendulum
+    truth: large_amplitude
+  - file: pendulum_large_amp_small.csv
+    after: pendulum_large_amp.csv
+    test: small_amplitude_repeat
+    experiment: pendulum
+    truth: large_amplitude
+    status: confirmed
+  - file: pendulum_length_offset.csv
+    experiment: pendulum
+    truth: length_to_wrong_point
+  - file: pendulum_clean.csv
+    experiment: pendulum
+    truth: no_fault
+    status: clear
+  - file: hooke_hanger.csv
+    experiment: hooke
+    truth: hanger_mass_omitted
+  - file: hooke_hanger_included.csv
+    after: hooke_hanger.csv
+    test: include_hanger_repeat
+    experiment: hooke
+    truth: hanger_mass_omitted
+    status: confirmed
+  - file: hooke_overstretched.csv
+    experiment: hooke
+    truth: past_elastic_limit
+  - file: hooke_clean.csv
+    experiment: hooke
+    truth: no_fault
+    status: clear
+  - file: diode_burden.csv
+    experiment: diode
+    truth: meter_burden
+  - file: diode_burden_rewired.csv
+    after: diode_burden.csv
+    test: voltmeter_on_diode
+    experiment: diode
+    truth: meter_burden
+    status: confirmed
+  - file: diode_reversed.csv
+    experiment: diode
+    truth: reversed_diode
+  - file: diode_clean.csv
+    experiment: diode
+    truth: no_fault
+    status: clear
+  - file: grating_wrong_spec.csv
+    experiment: grating
+    truth: grating_density_wrong
+  - file: grating_wrong_spec_ref.csv
+    after: grating_wrong_spec.csv
+    test: reference_line_check
+    experiment: grating
+    truth: grating_density_wrong
+    status: confirmed
+  - file: grating_zero_offset.csv
+    experiment: grating
+    truth: angle_zero_offset
+  - file: grating_clean.csv
+    experiment: grating
+    truth: no_fault
+    status: clear
+  - file: hall_misaligned.csv
+    experiment: hall
+    truth: contact_misalignment
+  - file: hall_misaligned_reversed.csv
+    after: hall_misaligned.csv
+    test: reverse_field
+    experiment: hall
+    truth: contact_misalignment
+    status: confirmed
+  - file: hall_thermal.csv
+    experiment: hall
+    truth: thermoelectric_contact_offset
+  - file: hall_clean.csv
+    experiment: hall
+    truth: no_fault
+    status: clear
