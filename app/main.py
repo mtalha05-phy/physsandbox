@@ -32,7 +32,12 @@ async def guard(request: Request, call_next):
     path = request.url.path
     rule = next((v for k, v in LIMITS.items() if path.startswith(k)), None)
     if rule and os.getenv("RATE_LIMIT", "on") != "off":
-        ip = (request.headers.get("x-forwarded-for") or request.client.host or "?").split(",")[0].strip()
+        ip = request.client.host if request.client else "?"
+        if ip in ("127.0.0.1", "::1"):
+            # Behind Caddy: it sets X-Forwarded-For, and the app only listens on loopback.
+            ip = (request.headers.get("x-forwarded-for") or ip).split(",")[-1].strip()
+        if len(_hits) > 5000:
+            _hits.clear()
         n, window = rule
         q, now = _hits[(ip, path.split("/")[2])], time.time()
         while q and q[0] < now - window:
@@ -46,8 +51,8 @@ async def guard(request: Request, call_next):
     return await call_next(request)
 
 
-async def _read(file):
-    raw = await file.read(MAX_UPLOAD + 1)
+def _read(file):
+    raw = file.file.read(MAX_UPLOAD + 1)
     if len(raw) > MAX_UPLOAD:
         raise HTTPException(413, "File too large: the demo accepts up to 1 MB.")
     return raw
@@ -80,9 +85,9 @@ def sample(name: str):
 
 
 @app.post("/api/analyse")
-async def analyse_upload(file: UploadFile = File(...), experiment: str = Form(...),
+def analyse_upload(file: UploadFile = File(...), experiment: str = Form(...),
                          expected: str = Form("{}"), context: str = Form("")):
-    raw = await _read(file)
+    raw = _read(file)
     try:
         return analyse(raw, experiment, json.loads(expected), json.loads(context) if context else None)
     except ValueError as e:
@@ -90,10 +95,10 @@ async def analyse_upload(file: UploadFile = File(...), experiment: str = Form(..
 
 
 @app.post("/api/agent")
-async def agent_run(file: UploadFile = File(...), question: str = Form(...),
+def agent_run(file: UploadFile = File(...), question: str = Form(...),
                     experiment: str = Form("resistance_4wire"), raw_mode: str = Form("false"),
                     compromised: str = Form("false")):
-    raw = await _read(file)
+    raw = _read(file)
     summary = summarise(raw)
     raw_head = None
     if raw_mode == "true":
@@ -128,7 +133,7 @@ async def agent_run(file: UploadFile = File(...), question: str = Form(...),
 
 
 @app.post("/api/containment/{attack}")
-async def containment_demo(attack: str):
+def containment_demo(attack: str):
     if attack not in ATTACKS:
         raise HTTPException(404)
     sample_bytes = (ROOT / "data" / "seeded" / "inject_1.csv").read_bytes()
@@ -144,7 +149,15 @@ def containment_log():
 
 @app.get("/api/ledger")
 def ledger_entries(limit: int = 20):
+    limit = max(1, min(int(limit), 100))
     return {"receipts": ledger.entries()[-limit:], "verify": ledger.verify()}
+
+
+@app.get("/api/ledger/tamper-demo")
+def ledger_tamper_demo():
+    """Edits a copy of the notebook as an attacker without the key would, and
+    shows the check failing. The real notebook is untouched."""
+    return ledger.tamper_demo()
 
 
 @app.get("/api/model-check")

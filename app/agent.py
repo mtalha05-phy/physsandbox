@@ -137,8 +137,6 @@ TEMPLATES.update(FIT_TEMPLATES)
 
 def _pick_template(question, experiment, raw_head):
     q = question.lower()
-    if raw_head and "ignore all previous instructions" in raw_head.lower():
-        return "obey_injection"
     if experiment in FIT_TEMPLATES:
         return experiment
     if any(w in q for w in ("spectrum", "frequen", "hum", "fft", "noise")) or experiment == "waveform":

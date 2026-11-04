@@ -135,7 +135,7 @@ def analyze_zero_current(header, data, expected):
         "values": {"offset_on_sample_V": {"value": ms, "uncertainty": es},
                    "offset_with_meter_shorted_V": {"value": mm, "uncertainty": em}},
         "evidence": {"offset_sigma": experiments.sig(ms, es),
-                     "offset_only_on_sample": bool(experiments.sig(ms, es) > 5 and experiments.sig(mm, em) < 3)},
+                     "offset_only_on_sample": bool(experiments.sig(ms, es) > 5 and abs(mm) < 0.2 * abs(ms))},
         "plot": plot,
     }
 

@@ -15,15 +15,15 @@ experiments:
         name: No fault found
         prior: 0.30
         conditions:
-          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.05}
-          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
+          - {feature: offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.95, p_false: 0.01}
       thermoelectric_offset:
         name: Thermoelectric (thermal EMF) offset at a contact
         prior: 0.20
         typical_size: "0.2 µV/°C (Cu–Cu) up to ~1000 µV/°C (Cu–oxidised Cu)"
         conditions:
-          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.05}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
           - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.05}
           - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.9, p_false: 0.2}
           - {feature: offset_survives_reversal, op: is, value: true, p_true: 0.99, p_false: 0.5}
@@ -32,7 +32,7 @@ experiments:
         name: Voltmeter zero offset
         prior: 0.10
         conditions:
-          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.05}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
           - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.05}
           - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.9, p_false: 0.2}
           - {feature: offset_survives_reversal, op: is, value: true, p_true: 0.99, p_false: 0.5}
@@ -41,16 +41,16 @@ experiments:
         name: Calibration (gain) error in meter or current source
         prior: 0.15
         conditions:
-          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.05}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
           - {feature: slope_error_pct, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.05}
-          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.8, p_false: 0.1}
+          - {feature: offset_sigma, op: "<", value: 4, p_true: 0.8, p_false: 0.1}
       lead_resistance:
         name: Lead or contact resistance included (2-wire style error)
         prior: 0.15
         conditions:
-          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.05}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
           - {feature: slope_error_pct, op: ">", value: 2, p_true: 0.95, p_false: 0.05}
-          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.8, p_false: 0.1}
+          - {feature: offset_sigma, op: "<", value: 4, p_true: 0.8, p_false: 0.1}
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
@@ -189,7 +189,7 @@ experiments:
         name: No fault found
         prior: 0.30
         conditions:
-          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: gain_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
       ambient_field:
         name: Earth's field or nearby steel adding to the coil field
@@ -212,14 +212,14 @@ experiments:
         prior: 0.15
         conditions:
           - {feature: gain_error_pct, op: abs_gt, value: 3, p_true: 0.95, p_false: 0.02}
-          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.2}
+          - {feature: offset_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.2}
       coil_geometry:
         name: Coil spacing or radius not at the Helmholtz condition
         prior: 0.12
         typical_size: "Spacing off by 10% of R changes the centre field by a few per cent"
         conditions:
           - {feature: gain_error_pct, op: abs_gt, value: 3, p_true: 0.9, p_false: 0.02}
-          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.2}
+          - {feature: offset_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.2}
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
@@ -337,7 +337,7 @@ experiments:
         name: No fault found
         prior: 0.30
         conditions:
-          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: gain_ratio, op: abs_dev1_lt, value: 0.05, p_true: 0.95, p_false: 0.01}
       amplifier_offset:
         name: Amplifier input offset voltage
@@ -417,7 +417,7 @@ experiments:
         name: No fault found
         prior: 0.30
         conditions:
-          - {feature: background_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: background_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: alpha_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
       stray_light:
         name: Room light leaking into the detector
@@ -438,13 +438,13 @@ experiments:
         prior: 0.14
         conditions:
           - {feature: alpha_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
-          - {feature: background_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.3}
+          - {feature: background_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.3}
       path_length_error:
         name: Cuvette path length different from assumed
         prior: 0.10
         conditions:
           - {feature: alpha_error_pct, op: abs_gt, value: 5, p_true: 0.9, p_false: 0.02}
-          - {feature: background_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.3}
+          - {feature: background_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.3}
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
@@ -488,7 +488,7 @@ experiments:
         name: No fault found
         prior: 0.30
         conditions:
-          - {feature: extinction_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: extinction_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: angle_offset_deg, op: abs_lt, value: 2, p_true: 0.95, p_false: 0.01}
       room_light:
         name: Room light reaching the detector
@@ -510,7 +510,7 @@ experiments:
         prior: 0.18
         conditions:
           - {feature: angle_offset_deg, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.02}
-          - {feature: extinction_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.3}
+          - {feature: extinction_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.3}
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
@@ -552,7 +552,7 @@ experiments:
         name: No fault found
         prior: 0.30
         conditions:
-          - {feature: asymptote_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: asymptote_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: tau_ratio, op: abs_dev1_lt, value: 0.3, p_true: 0.95, p_false: 0.01}
       cjc_offset:
         name: Thermocouple cold-junction compensation error
@@ -574,7 +574,7 @@ experiments:
         prior: 0.14
         conditions:
           - {feature: tau_ratio, op: abs_dev1_gt, value: 0.3, p_true: 0.95, p_false: 0.05}
-          - {feature: asymptote_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.3}
+          - {feature: asymptote_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.3}
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
@@ -690,21 +690,21 @@ experiments:
         prior: 0.30
         conditions:
           - {feature: g_error_pct, op: abs_lt, value: 1.5, p_true: 0.95, p_false: 0.01}
-          - {feature: length_offset_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: length_offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
       large_amplitude:
         name: Too large a release angle
         prior: 0.18
         typical_size: "From 30° every period is about 1.7% long, so g comes out about 3% low"
         conditions:
           - {feature: g_error_pct, op: "<", value: -1.5, p_true: 0.95, p_false: 0.03}
-          - {feature: length_offset_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: length_offset_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: g_fixed_at_small_amplitude, op: is, value: true, p_true: 0.95, p_false: 0.05}
       timer_scale:
         name: Timer running fast or slow
         prior: 0.15
         conditions:
           - {feature: g_error_pct, op: abs_gt, value: 1.5, p_true: 0.95, p_false: 0.03}
-          - {feature: length_offset_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: length_offset_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: g_fixed_at_small_amplitude, op: is, value: true, p_true: 0.05, p_false: 0.95}
       length_to_wrong_point:
         name: Length measured to the top of the bob, not its centre
@@ -762,21 +762,21 @@ experiments:
         prior: 0.30
         conditions:
           - {feature: k_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
-          - {feature: zero_force_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: zero_force_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
       hanger_mass_omitted:
         name: Hanger's mass left out of the loads
         prior: 0.20
         typical_size: "A 50 g hanger shows up as about −0.49 N of force at zero extension"
         conditions:
           - {feature: zero_force_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
-          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: offset_gone_with_hanger, op: is, value: true, p_true: 0.95, p_false: 0.05}
       ruler_zero_offset:
         name: Ruler zero read in the wrong place
         prior: 0.18
         conditions:
           - {feature: zero_force_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
-          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: offset_gone_with_hanger, op: is, value: true, p_true: 0.05, p_false: 0.95}
       past_elastic_limit:
         name: Spring loaded past its elastic limit
@@ -788,8 +788,8 @@ experiments:
         prior: 0.10
         conditions:
           - {feature: k_error_pct, op: abs_gt, value: 10, p_true: 0.95, p_false: 0.02}
-          - {feature: zero_force_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
-          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.1}
+          - {feature: zero_force_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
@@ -833,7 +833,7 @@ experiments:
         name: No fault found
         prior: 0.30
         conditions:
-          - {feature: rs_excess_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: rs_excess_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: no_forward_current, op: is, value: false, p_true: 0.99, p_false: 0.01}
       meter_burden:
         name: Voltmeter across diode and ammeter (ammeter burden voltage)
@@ -950,21 +950,21 @@ experiments:
         prior: 0.30
         conditions:
           - {feature: density_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
-          - {feature: zero_offset_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: zero_offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
       contact_misalignment:
         name: Hall contacts not exactly opposite each other
         prior: 0.20
         typical_size: "A small offset between contacts adds an IR drop proportional to current, which looks like extra Hall voltage"
         conditions:
           - {feature: density_error_pct, op: abs_gt, value: 10, p_true: 0.95, p_false: 0.03}
-          - {feature: zero_offset_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: zero_offset_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: misalignment_found, op: is, value: true, p_true: 0.95, p_false: 0.05}
       field_lower_than_set:
         name: Magnetic field lower than the value you set
         prior: 0.16
         conditions:
           - {feature: density_error_pct, op: ">", value: 10, p_true: 0.95, p_false: 0.02}
-          - {feature: zero_offset_sigma, op: "<", value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: zero_offset_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: misalignment_found, op: is, value: true, p_true: 0.05, p_false: 0.95}
       thermoelectric_contact_offset:
         name: Thermoelectric voltage at the contacts

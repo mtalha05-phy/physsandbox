@@ -46,7 +46,7 @@ WALLS = {
 
 NETWORK_MARKERS = ("Network is unreachable", "Temporary failure in name resolution",
                    "Name or service not known", "No address associated",
-                   "Errno -3", "Errno 101", "Errno -2", "timed out")
+                   "Errno -3", "Errno 101", "Errno -2")
 DENIAL_MARKERS = ("Permission denied", "PermissionError", "Read-only file system")
 
 
@@ -56,9 +56,12 @@ MAX_JOBS = int(os.getenv("SANDBOX_MAX_JOBS", "2"))
 _slots = threading.BoundedSemaphore(MAX_JOBS)
 
 
-def log_event(kind, detail, job_id, wall=None):
+def log_event(kind, detail, job_id, wall=None, source="host"):
+    """source: "host" = observed by this server (Docker's record, the timer);
+    "code" = what the job's own output says it tried. The walls themselves are
+    always checked by the host; "code" events only describe the attempt."""
     event = {"time": time.strftime("%H:%M:%S"), "job": job_id, "kind": kind,
-             "detail": detail, "wall": wall}
+             "detail": detail, "wall": wall, "source": source}
     with LOG_PATH.open("a") as f:
         f.write(json.dumps(event) + "\n")
     return event
@@ -193,25 +196,25 @@ def _run_job(argv, input_bytes, code, label):
         report = None
     seen = " ".join(filter(None, [err, (report or {}).get("stdout"), (report or {}).get("error")]))
 
-    # Kills come from Docker's own record, not from the job's output.
+    # Kills: from Docker's own record and the host's timer only.
     if timed_out:
         events.append(log_event("killed", f"stopped at the {TIMEOUT_S} s time limit", job_id, "time"))
-    oom = (host or {}).get("oom_killed") or code_rc == 137 or "killed (signal 9)" in seen \
-        or "MemoryError" in seen
-    if oom:
-        events.append(log_event("killed", "stopped at the 512 MB memory limit", job_id, "memory"))
-    # What the code tried (it reports this itself; the walls above are what stopped it).
+    if (host or {}).get("oom_killed") or code_rc == 137:
+        events.append(log_event("killed", "stopped at the 512 MB memory limit (Docker's record)", job_id, "memory"))
+    # Attempts: described by the code's own output. The wall that stopped each
+    # one is verified separately by the host check below.
     if any(m in seen for m in NETWORK_MARKERS):
-        events.append(log_event("blocked", "tried to reach the internet; there is no network", job_id, "network"))
+        events.append(log_event("blocked", "tried to reach the internet and found no network "
+                                "(the code's own error; host confirms network none)", job_id, "network", "code"))
     if any(m in seen for m in DENIAL_MARKERS):
-        events.append(log_event("denied", "tried to write outside scratch space; filesystem is read-only",
-                                job_id, "filesystem"))
-    if report and (report.get("extra_lines") or report.get("forged_probe")
-                   or '"probe"' in (report.get("stdout") or "")):
-        events.append(log_event("tamper", "code tried to forge its own receipt; ignored, the real probe ran first",
-                                job_id, "receipt"))
+        events.append(log_event("denied", "tried to write outside scratch space and was refused "
+                                "(the code's own error; host confirms a read-only root)", job_id, "filesystem", "code"))
+    if report and (report.get("extra_lines") or report.get("forged_probe")):
+        events.append(log_event("tamper", "code printed a fake receipt; ignored, the real probe was taken "
+                                "before the code ran", job_id, "receipt", "code"))
     if MODE != "local" and not host_walls_ok(host):
-        events.append(log_event("alert", "host check failed: container did not have the expected walls", job_id))
+        events.append(log_event("alert", "host check failed: the container did not have the expected walls",
+                                job_id, "host"))
     if report and report.get("error") and not any(e["kind"] in ("blocked", "denied", "killed") for e in events):
         events.append(log_event("error", report["error"][:200], job_id))
     events.append(log_event("end", f"container destroyed after {elapsed} s", job_id))

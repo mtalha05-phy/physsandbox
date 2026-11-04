@@ -7,7 +7,8 @@
 3. Prints two JSON lines on stdout.
 
 Trust boundary: the probe is measured and written (line 1) BEFORE any
-untrusted code exists in the box. Agent code and attack demos then run in a
+untrusted code runs (agent code is already mounted read-only at /job, but
+nothing has executed it yet). Agent code and attack demos then run in a
 separate child process whose output is captured through a pipe, so they can
 shape their own stdout but never the probe. The host additionally checks the
 container's real configuration and exit state with `docker inspect`, so the
@@ -106,6 +107,17 @@ def run_target(kind, args):
     return payload, text[-6000:], error
 
 
+def _has_probe(text):
+    for line in text.splitlines():
+        try:
+            j = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(j, dict) and "probe" in j:
+            return True
+    return False
+
+
 def child():
     """Runs untrusted work (agent code, attack demos) in its own process."""
     kind, args = sys.argv[2], sys.argv[3:]
@@ -144,7 +156,7 @@ def main():
                 payload, stdout = None, proc.stdout[-6000:]
                 error = (proc.stderr.strip().splitlines() or [f"child exited with code {proc.returncode}"])[-1]
             # The child has no business printing a probe: that is a forgery attempt.
-            forged = '"probe"' in proc.stdout
+            forged = _has_probe(proc.stdout)
             if proc.returncode < 0 or proc.returncode == 137:
                 error = error or f"killed (signal {-proc.returncode if proc.returncode < 0 else 9})"
         except subprocess.TimeoutExpired:

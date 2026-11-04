@@ -74,7 +74,7 @@ OUTCOMES = {
     # Faraday induction
     "short_amplifier_input": _copy("offset_with_input_shorted"),
     # Beer-Lambert
-    "enclosure_rescan": lambda new, prior: {"background_gone_enclosed": new.get("background_sigma", 99) < 3},
+    "enclosure_rescan": lambda new, prior: {"background_gone_enclosed": new.get("background_sigma", 99) < 4},
     # Malus's law
     "block_beam_reading": _copy("light_with_beam_blocked"),
     # cooling
@@ -85,9 +85,9 @@ OUTCOMES = {
     # pendulum
     "small_amplitude_repeat": lambda new, prior: {"g_fixed_at_small_amplitude": abs(new.get("g_error_pct", 99)) < 1},
     # Hooke's law
-    "include_hanger_repeat": lambda new, prior: {"offset_gone_with_hanger": new.get("zero_force_sigma", 99) < 3},
+    "include_hanger_repeat": lambda new, prior: {"offset_gone_with_hanger": new.get("zero_force_sigma", 99) < 4},
     # diode
-    "voltmeter_on_diode": lambda new, prior: {"droop_gone_after_rewire": new.get("rs_excess_sigma", 99) < 3},
+    "voltmeter_on_diode": lambda new, prior: {"droop_gone_after_rewire": new.get("rs_excess_sigma", 99) < 4},
     # diffraction grating
     "reference_line_check": lambda new, prior: {
         "grating_confirmed_wrong": abs(new.get("reference_error_pct", 0)) > 2},

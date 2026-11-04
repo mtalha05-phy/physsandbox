@@ -86,7 +86,7 @@ def helmholtz(header, data, expected):
         return {
             "values": {"field_in_open_uT": {"value": mo, "uncertainty": eo},
                        "field_in_shield_uT": {"value": ms, "uncertainty": es}},
-            "evidence": {"offset_gone_in_shield": bool(sig(mo, eo) > 5 and sig(ms, es) < 3)},
+            "evidence": {"offset_gone_in_shield": bool(sig(mo, eo) > 5 and abs(ms) < 0.2 * abs(mo))},
             "plot": plot,
         }
     i = col(header, data, "current_A")

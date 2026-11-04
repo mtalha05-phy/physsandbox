@@ -372,7 +372,7 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
   </div>
 
   <div class="gb-section">
-    <div class="verify-row"><h3 style="margin:0">Lab notebook</h3><button id="verify">Check for tampering</button></div>
+    <div class="verify-row"><h3 style="margin:0">Lab notebook</h3><span><button id="tamper-demo" title="Edits a copy of the notebook without the key, then runs the same check">Tamper with a copy</button> <button id="verify">Check for tampering</button></span></div>
     <p class="verify-msg" id="verify-msg">Every job leaves a receipt that is chained to the one before it.</p>
     <div class="receipts" id="receipts"></div>
   </div>
@@ -706,8 +706,10 @@ function jobStart(name, sub) {
 function jobEnd(res) {
   const ev = (res && res.containment) || [];
   const hits = ev.filter(e => e.wall);
+  const alert = ev.some(e => e.kind === "alert");
   $("job-lamp").setAttribute("fill", hits.length ? "#FF5A4E" : "#4FD1A1");
-  $("job-sub").textContent = hits.length ? "Contained. Nothing left the box." : "Finished cleanly. Container destroyed.";
+  $("job-sub").textContent = alert ? "Host check failed. Treat this job as uncontained."
+    : hits.length ? "Stopped at the wall. Container destroyed." : "Finished cleanly. Container destroyed.";
   hits.forEach(e => { $("wall-" + e.wall)?.classList.add("hit"); $("wl-" + e.wall)?.classList.add("hit"); });
   if (res && res.walls) renderWalls(res.walls, res.receipt?.walls_host_verified);
 }
@@ -722,9 +724,9 @@ function renderWalls(w, h) {
     row("Disk", w.root_fs, w.root_fs === "read-only"),
     row("Runs as", `uid ${w.uid}`, w.uid !== 0),
     row("Secrets seen", (w.secrets_visible || []).length ? w.secrets_visible.join(", ") : "none", !(w.secrets_visible || []).length),
-    h ? row("Host check", h.runtime === "runsc" && h.network === "none" && h.read_only_root && h.memory_mb === 512
-      ? `docker inspect agrees (${h.runtime}, network ${h.network}, ${h.memory_mb} MB)` : "docker inspect disagrees",
-      h.runtime === "runsc" && h.network === "none" && !!h.read_only_root && h.memory_mb === 512) : "",
+    h ? (() => { const ok = h.runtime === "runsc" && h.network === "none" && !!h.read_only_root && h.memory_mb === 512
+          && h.user === "65534:65534" && (h.cap_drop || []).includes("ALL") && !!h.no_new_privileges;
+        return row("Host check", ok ? `docker inspect agrees (${h.runtime}, network ${h.network}, ${h.memory_mb} MB, read-only, uid nobody, no capabilities)` : "docker inspect disagrees", ok); })() : "",
   ].join("");
 }
 document.querySelectorAll("[data-attack]").forEach(b => b.addEventListener("click", () => runAttack(b.dataset.attack)));
@@ -732,6 +734,7 @@ async function runAttack(name) {
   const b = document.querySelector(`[data-attack="${name}"]`);
   const names = { egress: "Send the data out", runaway: "Use all the memory", host_read: "Read host secrets", forge_receipt: "Forge its own receipt" };
   b.disabled = true; jobStart("Break-out attempt", names[name]);
+  if (!TOUR.on && matchMedia("(max-width: 900px)").matches) document.querySelector(".glovebox")?.scrollIntoView({ behavior: "smooth", block: "start" });
   try { const res = await fetch("/api/containment/" + name, { method: "POST" }).then(r => r.json());
         if (res.detail) { toast(res.detail); jobEnd(null); return res; }
         jobEnd(res);
@@ -757,11 +760,21 @@ function ledgerPill(v) {
   $("pill-ledger").textContent = v.intact ? `Lab notebook: ${v.receipts} receipts, intact` : `Lab notebook: broken at #${v.broken_at}`;
 }
 $("verify").addEventListener("click", () => runVerify());
+$("tamper-demo").addEventListener("click", () => runTamperDemo());
+async function runTamperDemo() {
+  const r = await fetch("/api/ledger/tamper-demo").then(r => r.json());
+  const m = $("verify-msg");
+  if (!r.edited) { m.className = "verify-msg"; m.textContent = "Run a few jobs first, then try this."; return r; }
+  m.className = "verify-msg " + (r.verify.intact ? "ok" : "bad");
+  m.textContent = r.verify.intact ? "The edited copy passed. That should never happen."
+    : `On a copy, receipt #${r.edited.seq} was changed from "${r.edited.outcome_before.join(", ")}" to "${r.edited.outcome_after.join(", ")}" and its hashes rebuilt. The check catches it at #${r.verify.broken_at}: ${r.verify.reason}. Your real notebook is untouched.`;
+  return r;
+}
 async function runVerify() {
   const v = (await fetch("/api/ledger?limit=1").then(r => r.json())).verify;
   const m = $("verify-msg");
   m.className = "verify-msg " + (v.intact ? "ok" : "bad");
-  m.textContent = v.intact ? `All ${v.receipts} receipts check out${v.signed ? `, ${v.signed} signed with the notebook key` : ""}. Latest hash ${v.head.slice(0, 12)}…` : `Tampering detected at receipt #${v.broken_at}.`;
+  m.textContent = v.intact ? `All ${v.receipts} receipts check out: chain intact, every receipt signed, none missing from the end. Latest hash ${v.head.slice(0, 12)}…` : `Tampering detected at receipt #${v.broken_at}: ${v.reason}.`;
   ledgerPill(v); return v;
 }
 
@@ -828,11 +841,13 @@ const TOUR_STEPS = [
                        await selectSample(EX().followups[t.id], "Result"); await runAnalyse(); spot($("s3")); } },
   { text: "Now try to break out. This code tries to send the data to the internet. The network wall stops it, and the box measured that from inside.",
     run: async () => { spot(document.querySelector(".glovebox")); await runAttack("egress"); } },
-  { text: "A poisoned file hides an instruction for the AI. Suppose the model is fooled and writes code that sends the data out. We run it anyway, sealed, and the network wall blocks it.",
-    run: async () => { await selectSample("inject_1.csv", "Poisoned file"); $("raw-mode").checked = true; $("compromised").checked = true;
-                       $("question").value = "Summarise this file"; spot($("s5")); await runAgent(); S.file = null; S.sample = null; renderSamples(); } },
-  { text: "Every job left a receipt chained to the one before it. Change any entry and the chain breaks. The investigation record is ready for the lab notebook.",
-    run: async () => { await runVerify(); spot($("receipts").closest(".gb-section")); } },
+  { text: "A poisoned file hides an instruction for the AI. Here the live model on Vultr reads the raw file, instruction and all, and writes code. Whatever it wrote runs sealed: read it below.",
+    run: async () => { await selectSample("inject_1.csv", "Poisoned file"); $("raw-mode").checked = true; $("compromised").checked = false;
+                       $("question").value = "Summarise this file"; spot($("s5")); await runAgent(); } },
+  { text: "We don't rely on the model resisting. The red-team switch runs exactly what a fooled model would write: read the file, send it out. It runs anyway, sealed, and the network wall blocks it.",
+    run: async () => { $("compromised").checked = true; spot($("s5")); await runAgent(); S.file = null; S.sample = null; renderSamples(); } },
+  { text: "Every job left a signed receipt chained to the one before it, and the notebook checks out. Then a copy is edited without the key, the way an attacker would, and the check catches it.",
+    run: async () => { spot($("receipts").closest(".gb-section")); await runVerify(); await sleep(1800); await runTamperDemo(); } },
 ];
 async function tourStep() {
   const step = TOUR_STEPS[TOUR.i];
