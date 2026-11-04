@@ -43,3 +43,119 @@ datasets:
     expected: {signal_hz: 1000, mains_hz: 50}
     truth: no_fault
     status: clear
+  - file: helmholtz_ambient.csv
+    experiment: helmholtz
+    truth: ambient_field
+  - file: helmholtz_ambient_shield.csv
+    after: helmholtz_ambient.csv
+    test: zero_gauss_chamber
+    experiment: helmholtz
+    truth: ambient_field
+    status: confirmed
+  - file: helmholtz_gain.csv
+    experiment: helmholtz
+    truth: probe_gain_error
+  - file: helmholtz_clean.csv
+    experiment: helmholtz
+    truth: no_fault
+    status: clear
+  - file: laser_misaligned.csv
+    experiment: laser_alignment
+    truth: misalignment
+  - file: laser_misaligned_rescan.csv
+    after: laser_misaligned.csv
+    test: repeat_scan_after_warmup
+    experiment: laser_alignment
+    truth: misalignment
+    status: confirmed
+  - file: laser_low_power.csv
+    experiment: laser_alignment
+    truth: low_power
+  - file: laser_clean.csv
+    experiment: laser_alignment
+    truth: no_fault
+    status: clear
+  - file: faraday_offset.csv
+    experiment: faraday
+    truth: amplifier_offset
+  - file: faraday_offset_shorted.csv
+    after: faraday_offset.csv
+    test: short_amplifier_input
+    experiment: faraday
+    truth: amplifier_offset
+    status: confirmed
+  - file: faraday_half_turns.csv
+    experiment: faraday
+    truth: turns_mismatch
+  - file: faraday_clean.csv
+    experiment: faraday
+    truth: no_fault
+    status: clear
+  - file: beer_stray_light.csv
+    experiment: beer_lambert
+    truth: stray_light
+  - file: beer_stray_light_enclosed.csv
+    after: beer_stray_light.csv
+    test: enclosure_rescan
+    experiment: beer_lambert
+    truth: stray_light
+    status: confirmed
+  - file: beer_high_alpha.csv
+    experiment: beer_lambert
+    truth: concentration_error
+  - file: beer_clean.csv
+    experiment: beer_lambert
+    truth: no_fault
+    status: clear
+  - file: malus_poor_extinction.csv
+    experiment: malus
+    truth: room_light
+  - file: malus_poor_extinction_blocked.csv
+    after: malus_poor_extinction.csv
+    test: block_beam_reading
+    experiment: malus
+    truth: room_light
+    status: confirmed
+  - file: malus_angle_offset.csv
+    experiment: malus
+    truth: analyser_zero_offset
+  - file: malus_clean.csv
+    experiment: malus
+    truth: no_fault
+    status: clear
+  - file: cooling_cjc_offset.csv
+    experiment: cooling
+    truth: cjc_offset
+  - file: cooling_cjc_ice_point.csv
+    after: cooling_cjc_offset.csv
+    test: ice_point_check
+    experiment: cooling
+    truth: cjc_offset
+    status: confirmed
+  - file: cooling_slow_contact.csv
+    experiment: cooling
+    truth: poor_thermal_contact
+  - file: cooling_clean.csv
+    experiment: cooling
+    truth: no_fault
+    status: clear
+  - file: rc_probe_loading.csv
+    experiment: rc_charging
+    truth: probe_loading
+  - file: rc_probe_loading_x10.csv
+    after: rc_probe_loading.csv
+    test: x10_probe_repeat
+    experiment: rc_charging
+    truth: probe_loading
+    status: confirmed
+  - file: rc_cap_tolerance.csv
+    experiment: rc_charging
+    truth: capacitor_tolerance
+  - file: rc_clean.csv
+    experiment: rc_charging
+    truth: no_fault
+    status: clear
+  - file: r_self_heating.csv
+    experiment: resistance_4wire
+    truth: self_heating
+    note: contributed by mtalha05-phy

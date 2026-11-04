@@ -23,10 +23,10 @@ for d in manifest["datasets"]:
     context = None
     label = d["file"]
     if d.get("after"):
-        first = analyse((SEEDED / d["after"]).read_bytes(), d["experiment"], d["expected"], use_model=False)
+        first = analyse((SEEDED / d["after"]).read_bytes(), d["experiment"], d.get("expected", {}), use_model=False)
         context = {"evidence": first["evidence"], "test": d["test"], "done": first["done"]}
         label = f"{d['after']} + {d['test']}"
-    res = analyse((SEEDED / d["file"]).read_bytes(), d["experiment"], d["expected"], context, use_model=False)
+    res = analyse((SEEDED / d["file"]).read_bytes(), d["experiment"], d.get("expected", {}), context, use_model=False)
     if "error" in res:
         rows.append((label, d["truth"], "ERROR", "", "", False))
         continue

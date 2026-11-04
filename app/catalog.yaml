@@ -1,0 +1,127 @@
+# The experiment bench. The interface is built from this file.
+# expected: [key, label, default]   samples: [file, label, tag?]
+# followups: sample result for the test a researcher would run next.
+domains:
+  - {id: electricity, label: Electricity}
+  - {id: signals, label: Signals}
+  - {id: magnetism, label: Magnetism}
+  - {id: optics, label: Optics}
+  - {id: heat, label: Heat}
+
+experiments:
+  resistance_4wire:
+    label: Low-resistance measurement
+    domain: electricity
+    blurb: Four-wire V–I sweep of a milliohm resistor or shunt
+    model: "V = R·I"
+    expected: [[resistance_ohm, "Expected resistance (Ω)", 0.010]]
+    samples:
+      - [r_offset_1.csv, "Resistor reads high at low current"]
+      - [r_self_heating.csv, "Reading curves upward at high current"]
+      - [r_clean.csv, "Healthy resistor"]
+      - [inject_1.csv, "Same data, poisoned file", "contains a hidden instruction"]
+    followups: {zero_current_reading: r_offset_1_zero.csv, current_reversal: r_offset_1_followup.csv}
+    questions: ["Fit V = R·I + V0 and report the offset", "Check the residuals for curvature"]
+
+  rc_charging:
+    label: RC charging curve
+    domain: electricity
+    blurb: Capacitor voltage after a step, read on an oscilloscope
+    model: "V = V₀(1 − e^(−t/RC))"
+    expected: [[supply_V, "Supply voltage (V)", 5.0], [resistance_ohm, "Resistor (Ω)", 1000000], [capacitance_F, "Capacitor (F)", 1.0e-7]]
+    samples:
+      - [rc_probe_loading.csv, "Charges to half the supply, too fast"]
+      - [rc_cap_tolerance.csv, "Time constant short, final voltage right"]
+      - [rc_clean.csv, "Healthy circuit"]
+    followups: {x10_probe_repeat: rc_probe_loading_x10.csv}
+    questions: ["Fit the charging curve and report V0 and tau"]
+
+  waveform:
+    label: Oscilloscope trace
+    domain: signals
+    blurb: Time-domain capture, checked for mains pickup
+    model: "spectrum of V(t)"
+    expected: [[signal_hz, "Signal frequency (Hz)", 1000], [mains_hz, "Mains frequency (Hz)", 50]]
+    samples:
+      - [scope_hum_1.csv, "Trace with a hum on it"]
+      - [scope_clean.csv, "Clean trace"]
+    followups: {single_point_ground: scope_hum_1_followup.csv}
+    questions: ["List the strongest frequencies in the trace"]
+
+  helmholtz:
+    label: Helmholtz coil calibration
+    domain: magnetism
+    blurb: Hall-probe field at the centre against coil current
+    model: "B = (4/5)^(3/2) μ₀NI/R"
+    expected: [[radius_m, "Coil radius (m)", 0.15], [turns, "Turns per coil", 100]]
+    samples:
+      - [helmholtz_ambient.csv, "Field doesn't start at zero"]
+      - [helmholtz_gain.csv, "Field 18% below theory"]
+      - [helmholtz_clean.csv, "Healthy calibration"]
+    followups: {zero_gauss_chamber: helmholtz_ambient_shield.csv}
+    questions: ["Fit B against I and compare the slope with theory"]
+
+  faraday:
+    label: Faraday's law of induction
+    domain: magnetism
+    blurb: Induced EMF in a search coil against the changing flux
+    model: "ε = −N dΦ/dt"
+    expected: [[turns, "Turns on the coil", 200]]
+    samples:
+      - [faraday_offset.csv, "EMF sits on a DC offset"]
+      - [faraday_half_turns.csv, "EMF half the predicted size"]
+      - [faraday_clean.csv, "Healthy coil"]
+    followups: {short_amplifier_input: faraday_offset_shorted.csv}
+    questions: ["Compare the measured EMF with -N dPhi/dt"]
+
+  laser_alignment:
+    label: Laser and photodetector alignment
+    domain: optics
+    blurb: Detector scanned across a Gaussian beam
+    model: "V = V_d + V_p e^(−2(x−x₀)²/w²)"
+    expected: [[expected_center_mm, "Beam should be at (mm)", 0.0], [expected_peak_mV, "Expected peak (mV)", 600], [waist_mm, "Beam radius (mm)", 1.0]]
+    samples:
+      - [laser_misaligned.csv, "Peak is off-centre"]
+      - [laser_low_power.csv, "Peak far too low"]
+      - [laser_clean.csv, "Well aligned"]
+    followups: {repeat_scan_after_warmup: laser_misaligned_rescan.csv}
+    questions: ["Fit a Gaussian and report the beam centre and radius"]
+
+  malus:
+    label: Malus's law polariser
+    domain: optics
+    blurb: Transmission through two polarisers against analyser angle
+    model: "I = I₀ cos²θ"
+    expected: [[expected_offset_deg, "Angle of maximum (°)", 0]]
+    samples:
+      - [malus_poor_extinction.csv, "Never goes dark"]
+      - [malus_angle_offset.csv, "Maximum isn't at 0°"]
+      - [malus_clean.csv, "Healthy polarisers"]
+    followups: {block_beam_reading: malus_poor_extinction_blocked.csv}
+    questions: ["Fit I0 cos^2 and report the extinction ratio"]
+
+  beer_lambert:
+    label: Beer-Lambert absorption
+    domain: optics
+    blurb: Transmitted light through samples of increasing thickness
+    model: "I = I₀ e^(−αx)"
+    expected: [[expected_alpha, "Absorption coefficient (1/cm)", 0.5], [expected_i0, "Unattenuated intensity", 1.0]]
+    samples:
+      - [beer_stray_light.csv, "Intensity levels off above zero"]
+      - [beer_high_alpha.csv, "Absorbs twice as fast as expected"]
+      - [beer_clean.csv, "Healthy absorption"]
+    followups: {enclosure_rescan: beer_stray_light_enclosed.csv}
+    questions: ["Fit the exponential and report alpha"]
+
+  cooling:
+    label: Newton's law of cooling
+    domain: heat
+    blurb: A hot sample cooling in air, read with a K-type thermocouple
+    model: "T = T_room + ΔT e^(−t/τ)"
+    expected: [[ambient_C, "Room temperature (°C)", 21.0], [expected_tau_s, "Expected time constant (s)", 420]]
+    samples:
+      - [cooling_cjc_offset.csv, "Settles 2.5 °C above the room"]
+      - [cooling_slow_contact.csv, "Cools far too slowly"]
+      - [cooling_clean.csv, "Healthy cooling curve"]
+    followups: {ice_point_check: cooling_cjc_ice_point.csv}
+    questions: ["Fit the cooling curve and report tau and the final temperature"]

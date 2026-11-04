@@ -2,7 +2,7 @@
 
 **A glovebox for AI-written science code.**
 
-Chemists handle hazardous material through a glovebox: they can work on it, but it can never touch them. PhysSandbox does the same for the code an AI writes about your experiment. Upload a measurement that came out wrong; PhysSandbox finds the cause, tells you which bench test to run next, and runs every calculation, including code a model wrote after reading your file, in a sealed box with no network that is destroyed after each job.
+Chemists handle hazardous material through a glovebox: they can work on it, but it can never touch them. PhysSandbox does the same for the code an AI writes about your experiment. Upload a measurement from any of nine bench experiments that came out wrong; PhysSandbox finds the cause, tells you which bench test to run next, and runs every calculation, including code a model wrote after reading your file, in a sealed box with no network that is destroyed after each job.
 
 Built for the **Vultr Agent Rush Hackathon** (lablab.ai), Challenge 1: *Blast Radius Zero*.
 
@@ -10,7 +10,25 @@ Built for the **Vultr Agent Rush Hackathon** (lablab.ai), Challenge 1: *Blast Ra
 
 - In physics teaching labs, "nothing works the first time": 14 of 20 electronics lab instructors said exactly that. Students and researchers lose hours guessing at causes.
 - Researchers already paste data into chatbots, but a chatbot can't run physics, and unpublished data shouldn't leave the lab. Uploaded files can also carry instructions aimed at the AI (prompt injection).
-- No product we found diagnoses why an electricity or optics measurement is off. AI-for-science money is going to biopharma and materials.
+- No product we found diagnoses why a physics bench measurement is off. AI-for-science money is going to biopharma and materials.
+
+## The experiment bench
+
+Nine real teaching-lab and research-bench experiments across five areas of physics. Each has its own physics model (fitted inside the glovebox), a fault library of the things that really go wrong on that bench, and bench tests chosen by information per minute.
+
+| Area | Experiment | Model | Faults it tells apart | Test that confirms the demo fault |
+| --- | --- | --- | --- | --- |
+| Electricity | Low-resistance measurement | V = R·I | thermal EMF, meter zero offset, gain error, lead resistance, self-heating | read V at zero current, leads on sample vs meter shorted |
+| Electricity | RC charging curve | V = V₀(1 − e^(−t/RC)) | ×1 probe loading, leaky capacitor, capacitor tolerance, low supply | repeat with a ×10 probe |
+| Signals | Oscilloscope trace | spectrum of V(t) | ground loop, magnetic pickup, aliasing | single-point grounding |
+| Magnetism | Helmholtz coil calibration | B = (4/5)^(3/2) μ₀NI/R | Earth's field, Hall-probe zero offset, probe gain, coil spacing | read the probe in a zero-gauss chamber |
+| Magnetism | Faraday's law of induction | ε = −N dΦ/dt | amplifier offset, ground offset, missing turns, flux-sensor error, reversed leads | hold the magnet still, short the amplifier input |
+| Optics | Laser and photodetector alignment | Gaussian beam profile | misalignment, warm-up pointing drift, low power, detector saturation | repeat the scan after a 15-minute warm-up |
+| Optics | Malus's law polariser | I = I₀ cos²θ | room light, worn polariser, analyser zero offset | read the crossed position with the beam blocked |
+| Optics | Beer-Lambert absorption | I = I₀ e^(−αx) | stray light, detector dark offset, concentration, path length | rescan in the closed enclosure |
+| Heat | Newton's law of cooling (thermocouple) | T = T_room + ΔT e^(−t/τ) | cold-junction error, wrong room temperature, poor thermal contact | ice-point check |
+
+The Helmholtz, laser-alignment, Faraday and Beer-Lambert experiments, and their CSV formats, come from the team's first prototype by [@mtalha05-phy](https://github.com/mtalha05-phy); his datasets run unchanged here, and his self-heating resistor dataset is part of the evaluation.
 
 ## What's new
 
@@ -59,20 +77,14 @@ Browser ──upload──▶ FastAPI app (Vultr VM)
 
 ## Evaluation on seeded faults
 
-`python eval/run_eval.py` replays the loop on datasets with known faults (`data/manifest.yaml`):
+`python eval/run_eval.py` replays the whole troubleshooting loop on 37 cases with known faults (`data/manifest.yaml`): for every experiment, a healthy run, its common faults, and the follow-up result of the recommended test.
 
-| Case | Truth | Result |
-| --- | --- | --- |
-| Resistor reads high | thermoelectric offset | ✅ 64%, recommends the zero-current test |
-| + zero-current test result | thermoelectric offset | ✅ **92%, confirmed** |
-| Reversed-current sweep | thermoelectric offset | ✅ |
-| Healthy resistor | no fault | ✅ clear, no test suggested |
-| Poisoned file (prompt injection) | thermoelectric offset | ✅ same diagnosis as clean twin |
-| Scope trace with hum | ground loop | ✅ 75%, recommends single-point grounding |
-| + grounding test result | ground loop | ✅ **92%, confirmed** |
-| Clean trace | no fault | ✅ clear |
+- **37/37 correct top cause**, run inside the real gVisor sandbox on the Vultr VM.
+- **No false alarms**: all nine healthy datasets come back "no fault found", with no test suggested.
+- **Every follow-up confirms**: in each experiment the recommended test lifts the leading cause from 55–75% to above 90%.
+- **Prompt injection changes nothing**: the poisoned file gets the same diagnosis as its clean twin.
 
-8/8 correct, run inside the real gVisor sandbox on the Vultr VM. These are synthetic datasets; we make no claim about accuracy on real lab data yet.
+These are synthetic datasets; we make no claim about accuracy on real lab data yet.
 
 ## Run it
 
@@ -94,9 +106,10 @@ SANDBOX_MODE=local uvicorn app.main:app --reload
 ## Repository layout
 
 ```
-app/        web app: sandbox runner, agent, ranking, receipts ledger, explanation, safety
-sandbox/    job image: runner.py (probe + run), physics tools, break-out attack demos
-faults/     fault library and next-test catalogue (YAML)
+app/        web app: sandbox runner, agent, ranking, receipts ledger, explanation, safety;
+            catalog.yaml describes the experiment bench the interface is built from
+sandbox/    job image: runner.py (probe + run), physics models (analyze.py, experiments.py), break-out demos
+faults/     fault library and next-test catalogue for all nine experiments (YAML)
 data/       seeded dataset generator and ground truth
 eval/       evaluation of the full troubleshooting loop
 static/     single-page interface

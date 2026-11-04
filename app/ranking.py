@@ -26,6 +26,8 @@ def _holds(cond, evidence):
         "abs_lt": lambda: abs(x) < v,
         "abs_gt": lambda: abs(x) > v,
         "is": lambda: bool(x) is bool(v),
+        "abs_dev1_lt": lambda: abs(x - 1) < v,
+        "abs_dev1_gt": lambda: abs(x - 1) > v,
     }[op]()
 
 
@@ -48,23 +50,45 @@ def rank_causes(experiment, evidence):
     )
 
 
+def _copy(*names):
+    return lambda new, prior: {n: new.get(n) for n in names}
+
+
+# What each bench test adds to the evidence. Only the outcome of the test is
+# added, so an observation already counted is never counted twice.
+OUTCOMES = {
+    # low-resistance measurement
+    "current_reversal": _copy("offset_survives_reversal", "has_current_reversal"),
+    "zero_current_reading": _copy("offset_only_on_sample"),
+    "reference_resistor": _copy("slope_error_pct"),
+    # oscilloscope
+    "single_point_ground": lambda new, prior: {"hum_gone_after_fix": new.get("mains_snr", 0) < 10},
+    "twist_and_move_leads": lambda new, prior: {
+        "hum_dropped_after_twist": new.get("mains_snr", 0) < (prior.get("mains_snr", 0) or 1) / 3},
+    "raise_sample_rate": _copy("signal_at_expected_freq"),
+    # Helmholtz coil
+    "zero_gauss_chamber": _copy("offset_gone_in_shield"),
+    # laser alignment
+    "repeat_scan_after_warmup": lambda new, prior: {
+        "centre_stable": abs(new.get("centre_offset_mm", 0) - prior.get("centre_offset_mm", 0)) < 0.1},
+    # Faraday induction
+    "short_amplifier_input": _copy("offset_with_input_shorted"),
+    # Beer-Lambert
+    "enclosure_rescan": lambda new, prior: {"background_gone_enclosed": new.get("background_sigma", 99) < 3},
+    # Malus's law
+    "block_beam_reading": _copy("light_with_beam_blocked"),
+    # cooling
+    "ice_point_check": _copy("offset_at_ice_point"),
+    # RC charging
+    "x10_probe_repeat": lambda new, prior: {
+        "loading_reduced_with_x10": new.get("final_ratio", 0) > prior.get("final_ratio", 1) + 0.2},
+}
+
+
 def test_outcome(test_id, new_evidence, prior_evidence):
     """Features that the test just run adds to the investigation."""
-    if test_id == "current_reversal":
-        return {"offset_survives_reversal": new_evidence.get("offset_survives_reversal"),
-                "has_current_reversal": new_evidence.get("has_current_reversal")}
-    if test_id == "zero_current_reading":
-        return {"offset_only_on_sample": new_evidence.get("offset_only_on_sample")}
-    if test_id == "single_point_ground":
-        return {"hum_gone_after_fix": new_evidence.get("mains_snr", 0) < 10}
-    if test_id == "twist_and_move_leads":
-        before = prior_evidence.get("mains_snr", 0) or 1
-        return {"hum_dropped_after_twist": new_evidence.get("mains_snr", 0) < before / 3}
-    if test_id == "raise_sample_rate":
-        return {"signal_at_expected_freq": new_evidence.get("signal_at_expected_freq")}
-    if test_id == "reference_resistor":
-        return {"slope_error_pct": new_evidence.get("slope_error_pct")}
-    return {}
+    hook = OUTCOMES.get(test_id)
+    return hook(new_evidence, prior_evidence) if hook else {}
 
 
 def _entropy(ps):

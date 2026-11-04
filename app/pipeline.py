@@ -1,26 +1,33 @@
 """The troubleshooting loop: summarise -> glovebox physics -> rank -> next test -> explain."""
 import json
+from pathlib import Path
+
+import yaml
 
 from .explain import explain
 from .ranking import CONFIRM_AT, next_tests, rank_causes, test_outcome
 from .sandbox import run_job
 from .summariser import summarise
 
-EXPERIMENTS = {
-    "resistance_4wire": "Low-resistance 4-wire measurement",
-    "waveform": "Oscilloscope waveform",
-}
+CATALOG = yaml.safe_load((Path(__file__).parent / "catalog.yaml").read_text())
+EXPERIMENTS = {k: v["label"] for k, v in CATALOG["experiments"].items()}
+
+
+def defaults(experiment):
+    return {k: v for k, _, v in CATALOG["experiments"][experiment]["expected"]}
 
 
 def analyse(raw: bytes, experiment: str, expected: dict, context=None, use_model=True):
     """context (follow-up data): {"evidence": {...}, "test": "<test id>", "done": [...]}"""
     if experiment not in EXPERIMENTS:
         raise ValueError(f"Unknown experiment '{experiment}'")
+    expected = {**defaults(experiment), **{k: v for k, v in (expected or {}).items() if v is not None}}
     summary = summarise(raw)
     report, events, receipt = run_job(
         ["analyze", experiment, json.dumps(expected)], raw, label=f"physics: {experiment}")
     if not report or not report.get("result"):
-        return {"error": (report or {}).get("error") or "The analysis did not finish in the sandbox.",
+        err = (report or {}).get("error") or "The analysis did not finish in the sandbox."
+        return {"error": err.replace("DataError: ", "").replace("__main__.", ""),
                 "containment": events, "receipt": receipt}
     physics = report["result"]
 

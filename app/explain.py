@@ -24,8 +24,11 @@ SYSTEM = (
 )
 
 
+PROPER = ("Earth", "Hall", "Faraday", "Malus", "Newton", "Beer")
+
+
 def _lc(name):
-    return name[0].lower() + name[1:]
+    return name if name.startswith(PROPER) else name[0].lower() + name[1:]
 
 
 def _template(result):

@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import agent, ledger
-from .pipeline import EXPERIMENTS, analyse
+from .pipeline import CATALOG, EXPERIMENTS, analyse
 from .sandbox import MODE, RUNTIME, WALLS, image_digest, read_log, run_job
 from .summariser import summarise
 
@@ -29,7 +29,7 @@ def status():
     return {
         "mode": MODE, "runtime": RUNTIME, "walls": WALLS, "image": image_digest(),
         "model": agent.MODEL if agent.model_configured() else None,
-        "experiments": EXPERIMENTS, "samples": SAMPLES,
+        "experiments": EXPERIMENTS, "catalog": CATALOG, "samples": SAMPLES,
         "ledger": ledger.verify(),
     }
 

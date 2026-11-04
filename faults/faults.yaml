@@ -15,6 +15,7 @@ experiments:
         name: No fault found
         prior: 0.30
         conditions:
+          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.05}
           - {feature: offset_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
           - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.95, p_false: 0.01}
       thermoelectric_offset:
@@ -22,6 +23,7 @@ experiments:
         prior: 0.20
         typical_size: "0.2 µV/°C (Cu–Cu) up to ~1000 µV/°C (Cu–oxidised Cu)"
         conditions:
+          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.05}
           - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.05}
           - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.9, p_false: 0.2}
           - {feature: offset_survives_reversal, op: is, value: true, p_true: 0.99, p_false: 0.5}
@@ -30,6 +32,7 @@ experiments:
         name: Voltmeter zero offset
         prior: 0.10
         conditions:
+          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.05}
           - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.05}
           - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.9, p_false: 0.2}
           - {feature: offset_survives_reversal, op: is, value: true, p_true: 0.99, p_false: 0.5}
@@ -38,12 +41,14 @@ experiments:
         name: Calibration (gain) error in meter or current source
         prior: 0.15
         conditions:
+          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.05}
           - {feature: slope_error_pct, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.05}
           - {feature: offset_sigma, op: "<", value: 3, p_true: 0.8, p_false: 0.1}
       lead_resistance:
         name: Lead or contact resistance included (2-wire style error)
         prior: 0.15
         conditions:
+          - {feature: curvature_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.05}
           - {feature: slope_error_pct, op: ">", value: 2, p_true: 0.95, p_false: 0.05}
           - {feature: offset_sigma, op: "<", value: 3, p_true: 0.8, p_false: 0.1}
       unknown_cause:
@@ -51,8 +56,25 @@ experiments:
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+      self_heating:
+        name: Sample self-heating at high current
+        prior: 0.10
+        typical_size: "Copper's resistance rises 0.39% per °C; a shunt run hot can warm by 10 °C or more"
+        conditions:
+          - {feature: curvature_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.005}
 
     tests:
+      low_current_repeat:
+        name: Repeat the sweep at a tenth of the current, pausing at each point
+        minutes: 5
+        how: Lower the maximum current tenfold and wait 10 s at each step. Self-heating scales with I squared, so the curve should straighten.
+        outcomes:
+          self_heating: line_straight
+          thermoelectric_offset: no_curve
+          meter_zero_offset: no_curve
+          calibration_gain_error: no_curve
+          lead_resistance: no_curve
+          no_fault: no_curve
       current_reversal:
         name: Reverse the current and repeat the sweep
         minutes: 5
@@ -160,6 +182,507 @@ experiments:
           ground_loop: frequency_same
           magnetic_pickup: frequency_same
           no_fault: frequency_same
+
+  helmholtz:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: gain_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
+      ambient_field:
+        name: Earth's field or nearby steel adding to the coil field
+        prior: 0.22
+        typical_size: "Earth's field is 25–65 µT; a steel bench or laptop can add tens of µT"
+        conditions:
+          - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: gain_error_pct, op: abs_lt, value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: offset_gone_in_shield, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      probe_zero_offset:
+        name: Hall probe zero offset (probe not zeroed)
+        prior: 0.12
+        typical_size: "Uncompensated Hall sensors drift by several µT to tens of µT"
+        conditions:
+          - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: gain_error_pct, op: abs_lt, value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: offset_gone_in_shield, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      probe_gain_error:
+        name: Hall probe gain (sensitivity) calibration error
+        prior: 0.15
+        conditions:
+          - {feature: gain_error_pct, op: abs_gt, value: 3, p_true: 0.95, p_false: 0.02}
+          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.2}
+      coil_geometry:
+        name: Coil spacing or radius not at the Helmholtz condition
+        prior: 0.12
+        typical_size: "Spacing off by 10% of R changes the centre field by a few per cent"
+        conditions:
+          - {feature: gain_error_pct, op: abs_gt, value: 3, p_true: 0.9, p_false: 0.02}
+          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.2}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      zero_gauss_chamber:
+        name: Read the probe at zero current, in the open and inside a zero-gauss chamber
+        minutes: 3
+        how: Switch the coil current off. Record the field with the probe at the coil centre, then with the probe inside a mu-metal zero-gauss chamber.
+        outcomes:
+          ambient_field: offset_gone
+          probe_zero_offset: offset_stays
+          no_fault: no_offset
+          probe_gain_error: no_offset
+          coil_geometry: no_offset
+      reference_magnetometer:
+        name: Compare the probe with a calibrated reference magnetometer
+        minutes: 10
+        how: Put a calibrated fluxgate or reference probe at the coil centre and read both at the same currents.
+        outcomes:
+          probe_gain_error: readings_differ
+          coil_geometry: readings_agree
+          ambient_field: readings_agree
+          probe_zero_offset: readings_differ
+          no_fault: readings_agree
+      measure_coil_spacing:
+        name: Measure the coil spacing and radius
+        minutes: 5
+        how: The coils should be one radius apart (R = 0.15 m means 0.15 m between coil planes).
+        outcomes:
+          coil_geometry: spacing_wrong
+          probe_gain_error: spacing_ok
+          ambient_field: spacing_ok
+          probe_zero_offset: spacing_ok
+          no_fault: spacing_ok
+        safety: Switch the coil current off before handling the coils; they can be hot at high current.
+
+  laser_alignment:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: centre_offset_mm, op: abs_lt, value: 0.15, p_true: 0.95, p_false: 0.01}
+          - {feature: peak_ratio, op: ">", value: 0.85, p_true: 0.95, p_false: 0.02}
+          - {feature: flat_top, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      misalignment:
+        name: Detector or beam steering misaligned
+        prior: 0.22
+        conditions:
+          - {feature: centre_offset_mm, op: abs_gt, value: 0.15, p_true: 0.95, p_false: 0.02}
+          - {feature: peak_ratio, op: ">", value: 0.85, p_true: 0.85, p_false: 0.3}
+          - {feature: centre_stable, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      pointing_drift:
+        name: Laser pointing drift during warm-up
+        prior: 0.12
+        typical_size: "Diode and HeNe lasers can drift tens of µrad in the first 15–30 min"
+        conditions:
+          - {feature: centre_offset_mm, op: abs_gt, value: 0.15, p_true: 0.9, p_false: 0.02}
+          - {feature: peak_ratio, op: ">", value: 0.85, p_true: 0.85, p_false: 0.3}
+          - {feature: centre_stable, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      low_power:
+        name: Low laser power or a dirty optic in the path
+        prior: 0.14
+        conditions:
+          - {feature: peak_ratio, op: "<", value: 0.85, p_true: 0.95, p_false: 0.02}
+          - {feature: centre_offset_mm, op: abs_lt, value: 0.15, p_true: 0.9, p_false: 0.2}
+      detector_saturation:
+        name: Photodetector saturating at the beam centre
+        prior: 0.08
+        conditions:
+          - {feature: flat_top, op: is, value: true, p_true: 0.95, p_false: 0.03}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      repeat_scan_after_warmup:
+        name: Repeat the scan after the laser has warmed up for 15 minutes
+        minutes: 5
+        how: Leave the laser on for 15 minutes, then scan the detector across the beam again with the same steps.
+        outcomes:
+          misalignment: centre_same
+          pointing_drift: centre_moves
+          low_power: centre_same
+          no_fault: centre_same
+          detector_saturation: centre_same
+        safety: Keep beam paths below eye level and wear the eyewear your laser safety officer specifies.
+      power_meter_check:
+        name: Measure the beam power with an optical power meter
+        minutes: 5
+        how: Put a power meter right after the laser, then just before the detector, and compare with the laser's rated power.
+        outcomes:
+          low_power: power_low
+          misalignment: power_ok
+          pointing_drift: power_ok
+          no_fault: power_ok
+          detector_saturation: power_ok
+      nd_filter_rescan:
+        name: Add a neutral-density filter and rescan
+        minutes: 5
+        how: Put an ND1 filter in front of the detector; a saturated profile becomes Gaussian again.
+        outcomes:
+          detector_saturation: shape_restored
+          low_power: shape_same
+          misalignment: shape_same
+          pointing_drift: shape_same
+          no_fault: shape_same
+
+  faraday:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: offset_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: gain_ratio, op: abs_dev1_lt, value: 0.05, p_true: 0.95, p_false: 0.01}
+      amplifier_offset:
+        name: Amplifier input offset voltage
+        prior: 0.18
+        typical_size: "General-purpose op-amps: 1–10 mV, multiplied by the amplifier gain"
+        conditions:
+          - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: gain_ratio, op: abs_dev1_lt, value: 0.05, p_true: 0.9, p_false: 0.2}
+          - {feature: offset_with_input_shorted, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      ground_offset:
+        name: Ground potential difference between coil circuit and recorder
+        prior: 0.14
+        conditions:
+          - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: gain_ratio, op: abs_dev1_lt, value: 0.05, p_true: 0.9, p_false: 0.2}
+          - {feature: offset_with_input_shorted, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      turns_mismatch:
+        name: Coil has fewer turns than specified, or a shorted winding
+        prior: 0.14
+        conditions:
+          - {feature: gain_ratio, op: abs_dev1_gt, value: 0.05, p_true: 0.95, p_false: 0.02}
+          - {feature: polarity_reversed, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      flux_sensor_error:
+        name: Flux sensor calibration error
+        prior: 0.10
+        conditions:
+          - {feature: gain_ratio, op: abs_dev1_gt, value: 0.05, p_true: 0.9, p_false: 0.02}
+          - {feature: polarity_reversed, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      polarity_reversed:
+        name: Coil leads connected the wrong way round
+        prior: 0.08
+        conditions:
+          - {feature: polarity_reversed, op: is, value: true, p_true: 0.95, p_false: 0.01}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      short_amplifier_input:
+        name: Hold the magnet still, then short the amplifier input
+        minutes: 3
+        how: With no changing flux, record the output with the coil connected, then with the amplifier input shorted to its own ground.
+        outcomes:
+          amplifier_offset: offset_stays
+          ground_offset: offset_gone
+          no_fault: no_offset
+          turns_mismatch: no_offset
+          flux_sensor_error: no_offset
+          polarity_reversed: no_offset
+      measure_coil_inductance:
+        name: Measure the coil inductance with an LCR meter
+        minutes: 5
+        how: Inductance scales with N squared; half the turns gives a quarter of the expected inductance.
+        outcomes:
+          turns_mismatch: inductance_low
+          flux_sensor_error: inductance_ok
+          amplifier_offset: inductance_ok
+          ground_offset: inductance_ok
+          no_fault: inductance_ok
+          polarity_reversed: inductance_ok
+      swap_coil_leads:
+        name: Swap the coil leads and repeat
+        minutes: 2
+        how: Reverse the two coil connections at the amplifier input and record one cycle.
+        outcomes:
+          polarity_reversed: sign_fixed
+          turns_mismatch: no_change
+          flux_sensor_error: no_change
+          amplifier_offset: no_change
+          ground_offset: no_change
+          no_fault: no_change
+
+  beer_lambert:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: background_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: alpha_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
+      stray_light:
+        name: Room light leaking into the detector
+        prior: 0.22
+        conditions:
+          - {feature: background_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: alpha_error_pct, op: abs_lt, value: 5, p_true: 0.85, p_false: 0.3}
+          - {feature: background_gone_enclosed, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      detector_dark_offset:
+        name: Detector dark-current or amplifier offset
+        prior: 0.14
+        conditions:
+          - {feature: background_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: alpha_error_pct, op: abs_lt, value: 5, p_true: 0.85, p_false: 0.3}
+          - {feature: background_gone_enclosed, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      concentration_error:
+        name: Sample concentration higher than labelled
+        prior: 0.14
+        conditions:
+          - {feature: alpha_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: background_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.3}
+      path_length_error:
+        name: Cuvette path length different from assumed
+        prior: 0.10
+        conditions:
+          - {feature: alpha_error_pct, op: abs_gt, value: 5, p_true: 0.9, p_false: 0.02}
+          - {feature: background_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.3}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      enclosure_rescan:
+        name: Repeat the scan with the room lights off and the lid closed
+        minutes: 5
+        how: Close the sample-compartment lid, switch off the room lights, and repeat the same thicknesses.
+        outcomes:
+          stray_light: background_gone
+          detector_dark_offset: background_stays
+          no_fault: no_background
+          concentration_error: no_background
+          path_length_error: no_background
+      measure_path_length:
+        name: Measure the cuvette or slab thickness with calipers
+        minutes: 3
+        how: Check each sample's optical path length against the value used in the analysis.
+        outcomes:
+          path_length_error: length_wrong
+          concentration_error: length_ok
+          stray_light: length_ok
+          detector_dark_offset: length_ok
+          no_fault: length_ok
+      reference_standard:
+        name: Measure a reference absorbance standard
+        minutes: 10
+        how: A certified neutral-density or holmium filter has a known absorbance; it checks the instrument, not the sample.
+        outcomes:
+          concentration_error: standard_ok
+          path_length_error: standard_ok
+          detector_dark_offset: standard_off
+          stray_light: standard_off
+          no_fault: standard_ok
+
+  malus:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: extinction_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: angle_offset_deg, op: abs_lt, value: 2, p_true: 0.95, p_false: 0.01}
+      room_light:
+        name: Room light reaching the detector
+        prior: 0.20
+        conditions:
+          - {feature: extinction_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: angle_offset_deg, op: abs_lt, value: 2, p_true: 0.85, p_false: 0.3}
+          - {feature: light_with_beam_blocked, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      leaky_polariser:
+        name: Worn or low-extinction polariser
+        prior: 0.14
+        typical_size: "Sheet polarisers: 100:1 to 1000:1; a worn one can drop below 20:1"
+        conditions:
+          - {feature: extinction_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: angle_offset_deg, op: abs_lt, value: 2, p_true: 0.85, p_false: 0.3}
+          - {feature: light_with_beam_blocked, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      analyser_zero_offset:
+        name: Analyser scale not zeroed to the polariser axis
+        prior: 0.18
+        conditions:
+          - {feature: angle_offset_deg, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.02}
+          - {feature: extinction_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.3}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      block_beam_reading:
+        name: Read the detector at the crossed position, then with the laser beam blocked
+        minutes: 2
+        how: Set the analyser to the minimum, record the reading, then block the laser before the first polariser and record again.
+        outcomes:
+          room_light: light_stays
+          leaky_polariser: light_gone
+          no_fault: no_light
+          analyser_zero_offset: no_light
+        safety: Block the beam with a beam block or card, never with your hand.
+      swap_polariser:
+        name: Swap in a new polariser and rescan
+        minutes: 5
+        how: Replace the analyser with a fresh sheet polariser and scan 0–180° again.
+        outcomes:
+          leaky_polariser: extinction_better
+          room_light: extinction_same
+          no_fault: extinction_same
+          analyser_zero_offset: extinction_same
+      find_minimum_by_hand:
+        name: Find the transmission minimum by hand and read the scale
+        minutes: 2
+        how: Rotate the analyser slowly to the darkest point; it should read 90° if the scale is zeroed.
+        outcomes:
+          analyser_zero_offset: minimum_off_90
+          room_light: minimum_at_90
+          leaky_polariser: minimum_at_90
+          no_fault: minimum_at_90
+
+  cooling:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: asymptote_sigma, op: "<", value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: tau_ratio, op: abs_dev1_lt, value: 0.3, p_true: 0.95, p_false: 0.01}
+      cjc_offset:
+        name: Thermocouple cold-junction compensation error
+        prior: 0.20
+        typical_size: "A cold junction 2–3 °C warmer than the meter assumes shifts every reading by that much"
+        conditions:
+          - {feature: asymptote_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: tau_ratio, op: abs_dev1_lt, value: 0.3, p_true: 0.9, p_false: 0.2}
+          - {feature: offset_at_ice_point, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      room_not_at_assumed:
+        name: The surroundings aren't at the room temperature you assumed
+        prior: 0.16
+        conditions:
+          - {feature: asymptote_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
+          - {feature: tau_ratio, op: abs_dev1_lt, value: 0.3, p_true: 0.9, p_false: 0.2}
+          - {feature: offset_at_ice_point, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      poor_thermal_contact:
+        name: Poor thermal contact between thermocouple and sample
+        prior: 0.14
+        conditions:
+          - {feature: tau_ratio, op: abs_dev1_gt, value: 0.3, p_true: 0.95, p_false: 0.05}
+          - {feature: asymptote_sigma, op: "<", value: 3, p_true: 0.85, p_false: 0.3}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      ice_point_check:
+        name: Put the thermocouple in an ice-water bath for two minutes
+        minutes: 3
+        how: Crushed ice topped up with water, stirred, reads 0.0 °C. Record the meter for two minutes.
+        outcomes:
+          cjc_offset: reads_offset
+          room_not_at_assumed: reads_zero
+          no_fault: reads_zero
+          poor_thermal_contact: reads_zero
+      measure_room_temperature:
+        name: Measure the air temperature next to the sample with a second thermometer
+        minutes: 5
+        how: Place a calibrated thermometer where the sample cools, away from vents and windows.
+        outcomes:
+          room_not_at_assumed: room_differs
+          cjc_offset: room_as_assumed
+          no_fault: room_as_assumed
+          poor_thermal_contact: room_as_assumed
+      thermal_paste_repeat:
+        name: Repeat with thermal paste and the junction taped to the sample
+        minutes: 30
+        how: Bond the thermocouple bead to the sample with thermal paste and Kapton tape, then repeat the cooling run.
+        outcomes:
+          poor_thermal_contact: faster_response
+          cjc_offset: same_response
+          room_not_at_assumed: same_response
+          no_fault: same_response
+        safety: Let the sample cool below 50 °C before handling it.
+
+  rc_charging:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: final_ratio, op: abs_dev1_lt, value: 0.05, p_true: 0.95, p_false: 0.01}
+          - {feature: tau_ratio, op: abs_dev1_lt, value: 0.15, p_true: 0.95, p_false: 0.01}
+      probe_loading:
+        name: Oscilloscope probe loading the circuit (x1 probe, 1 MΩ)
+        prior: 0.18
+        typical_size: "A x1 probe adds 1 MΩ across the capacitor; with a 1 MΩ resistor that halves both V and τ"
+        conditions:
+          - {feature: final_ratio, op: "<", value: 0.95, p_true: 0.95, p_false: 0.02}
+          - {feature: tau_ratio, op: "<", value: 0.85, p_true: 0.9, p_false: 0.1}
+          - {feature: loading_reduced_with_x10, op: is, value: true, p_true: 0.95, p_false: 0.05}
+      capacitor_leakage:
+        name: Leaky capacitor
+        prior: 0.12
+        conditions:
+          - {feature: final_ratio, op: "<", value: 0.95, p_true: 0.95, p_false: 0.02}
+          - {feature: tau_ratio, op: "<", value: 0.85, p_true: 0.9, p_false: 0.1}
+          - {feature: loading_reduced_with_x10, op: is, value: true, p_true: 0.05, p_false: 0.95}
+      capacitor_tolerance:
+        name: Capacitor value outside its tolerance
+        prior: 0.18
+        typical_size: "Electrolytics are often ±20%; ceramics can lose half their value with bias"
+        conditions:
+          - {feature: tau_ratio, op: abs_dev1_gt, value: 0.15, p_true: 0.95, p_false: 0.02}
+          - {feature: final_ratio, op: abs_dev1_lt, value: 0.05, p_true: 0.9, p_false: 0.02}
+      supply_low:
+        name: Supply voltage lower than set
+        prior: 0.10
+        conditions:
+          - {feature: final_ratio, op: "<", value: 0.95, p_true: 0.95, p_false: 0.02}
+          - {feature: tau_ratio, op: abs_dev1_lt, value: 0.15, p_true: 0.9, p_false: 0.05}
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+    tests:
+      x10_probe_repeat:
+        name: Repeat the measurement with a x10 (10 MΩ) probe
+        minutes: 2
+        how: Switch the probe and the scope channel to x10 and record the same charging curve.
+        outcomes:
+          probe_loading: loading_much_less
+          capacitor_leakage: no_change
+          capacitor_tolerance: no_change
+          supply_low: no_change
+          no_fault: no_change
+      lcr_meter_check:
+        name: Measure the capacitor with an LCR meter
+        minutes: 3
+        how: Take the capacitor out of circuit and measure its capacitance and leakage (or dissipation factor).
+        outcomes:
+          capacitor_tolerance: value_off
+          capacitor_leakage: leaky
+          probe_loading: value_ok
+          supply_low: value_ok
+          no_fault: value_ok
+      measure_supply:
+        name: Measure the supply voltage with a multimeter
+        minutes: 1
+        how: Read the supply at the circuit, under load.
+        outcomes:
+          supply_low: supply_low
+          probe_loading: supply_ok
+          capacitor_leakage: supply_ok
+          capacitor_tolerance: supply_ok
+          no_fault: supply_ok
+
 
 # Hard safety rules applied to every recommendation and to model text.
 safety:

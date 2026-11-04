@@ -76,3 +76,7 @@ write_wave("scope_hum_1_followup.csv", 0.0 * t)  # after single-point grounding
 write_wave("scope_clean.csv", 0.0 * t)
 
 print(f"Wrote seeded datasets to {OUT}")
+
+# Extended experiment bench
+import runpy as _r
+_r.run_path(str(Path(__file__).parent / "generate_bench.py"))
