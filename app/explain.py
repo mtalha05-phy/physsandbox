@@ -9,6 +9,7 @@ explanation is used so the app still works offline.
 import json
 import os
 
+from . import llm
 from .safety import check_text
 
 BASE_URL = os.getenv("VULTR_INFERENCE_BASE_URL", "https://api.vultrinference.com/v1")
@@ -51,24 +52,13 @@ def _template(result):
 
 
 def explain(result):
-    if not (API_KEY and MODEL):
+    if not llm.configured():
         return _template(result), "template"
-    from openai import OpenAI
-
-    client = OpenAI(base_url=BASE_URL, api_key=API_KEY, timeout=30)
-    payload = {k: result[k] for k in ("experiment", "summary", "values", "causes", "next_tests")}
-    try:
-        resp = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "system", "content": SYSTEM},
-                      {"role": "user", "content": json.dumps(payload, default=str)[:12000]}],
-            temperature=0.2,
-            max_tokens=300,
-        )
-        text = resp.choices[0].message.content.strip()
-    except Exception:  # noqa: BLE001 - fall back rather than fail the demo
-        return _template(result), "template (model unavailable)"
+    payload = {k: result[k] for k in ("experiment", "summary", "values", "causes", "next_tests", "status")}
+    text, err = llm.chat(SYSTEM, json.dumps(payload, default=str)[:12000], max_tokens=1500)
+    if text is None:
+        return _template(result), f"template (model call failed: {err})"
     ok, reason = check_text(text)
     if not ok:
         return _template(result) + f" [model text withheld: {reason}]", "template (safety)"
-    return text, MODEL
+    return text, llm.MODEL

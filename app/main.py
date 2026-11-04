@@ -90,6 +90,15 @@ def ledger_entries(limit: int = 20):
     return {"receipts": ledger.entries()[-limit:], "verify": ledger.verify()}
 
 
+@app.get("/api/model-check")
+def model_check():
+    """Tiny test call to the configured model. Reports the error type only."""
+    from . import llm
+    text, err = llm.chat("Reply with the single word: ready", "Are you there?", max_tokens=400, timeout=45)
+    return {"model": llm.MODEL or None, "ok": text is not None, "error": err,
+            "seconds": llm.LAST.get("seconds"), "reply": (text or "")[:60]}
+
+
 @app.get("/healthz")
 def health():
     return {"ok": True}

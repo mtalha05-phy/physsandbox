@@ -10,6 +10,8 @@ Raw mode (for the containment demo): the model also sees the first lines of
 the uploaded file, so an instruction hidden in the data can reach it.
 """
 import ast
+
+from . import llm
 import os
 import re
 
@@ -31,7 +33,7 @@ SYSTEM = (
 
 
 def model_configured():
-    return bool(API_KEY and MODEL)
+    return llm.configured()
 
 
 # --- Templates used when no model key is configured ------------------------
@@ -172,25 +174,15 @@ def scan(code: str):
 
 def write_code(question, experiment, summary, raw_head=None):
     """Returns (code, author) where author says who wrote it."""
-    if not model_configured():
+    if not llm.configured():
         key = _pick_template(question, experiment, raw_head)
         return TEMPLATES[key], "built-in template (no model key set)"
-    from openai import OpenAI
-
-    client = OpenAI(base_url=BASE_URL, api_key=API_KEY, timeout=45)
     context = f"Experiment: {experiment}\nFile summary: {summary}\n"
     if raw_head:
         context += f"First lines of the file:\n{raw_head}\n"
-    try:
-        resp = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "system", "content": SYSTEM},
-                      {"role": "user", "content": f"{context}\nQuestion: {question}"}],
-            temperature=0.1, max_tokens=700,
-        )
-        text = resp.choices[0].message.content or ""
-    except Exception as e:  # noqa: BLE001
+    text, err = llm.chat(SYSTEM, f"{context}\nQuestion: {question}", max_tokens=3000, temperature=0.1, timeout=90)
+    if text is None:
         key = _pick_template(question, experiment, raw_head)
-        return TEMPLATES[key], f"built-in template (model call failed: {type(e).__name__})"
+        return TEMPLATES[key], f"built-in template (model call failed: {err})"
     m = re.search(r"```(?:python)?\s*(.*?)```", text, re.S)
-    return (m.group(1) if m else text).strip() + "\n", MODEL
+    return (m.group(1) if m else text).strip() + "\n", llm.MODEL
