@@ -89,6 +89,8 @@ code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
 .exp-card:disabled { cursor: default; opacity: .45; }
 .exp-card[aria-pressed="true"]:disabled { opacity: 1; }
 .exp-card .t { font-weight: 600; line-height: 1.3; }
+.exp-card .lvl { display: inline-block; vertical-align: 2px; margin-left: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+                 text-transform: uppercase; color: var(--cobalt); border: 1px solid currentColor; border-radius: 999px; padding: 0 7px; }
 .exp-card .eq { font-size: 13px; color: var(--cobalt); font-style: italic; letter-spacing: .01em; }
 .exp-card .b { font-size: 13px; color: var(--muted); line-height: 1.4; }
 .seg { display: inline-flex; padding: 3px; background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; gap: 2px; }
@@ -470,7 +472,7 @@ function renderBench() {
   }).join("");
   $("exp-grid").innerHTML = Object.entries(CAT.experiments).filter(([, e]) => e.domain === S.domain).map(([k, e]) =>
     `<button class="exp-card" data-exp="${k}" aria-pressed="${k === S.experiment}" ${locked && k !== S.experiment ? "disabled" : ""}>
-       <span class="t">${esc(e.label)}</span><span class="eq">${esc(e.model)}</span><span class="b">${esc(e.blurb)}</span></button>`).join("");
+       <span class="t">${esc(e.label)}${e.level === "graduate" ? ` <span class="lvl">Graduate</span>` : ""}</span><span class="eq">${esc(e.model)}</span><span class="b">${esc(e.blurb)}</span></button>`).join("");
 }
 function renderExperiment() {
   const E = EX(); if (!E) return;
