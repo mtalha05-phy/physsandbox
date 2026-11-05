@@ -130,7 +130,7 @@ Browser ──upload──▶ FastAPI app (Vultr VM)
 - **125/125 correct top cause** across all 31 experiments.
 - **No false alarms**: all 31 healthy datasets come back "no fault found", with no test suggested.
 - **Every follow-up confirms**: in each experiment the recommended test is the one that tells the two leading causes apart, and its result lifts the leading cause from about 52–65% to above 90%.
-- **Not tuned to one lucky dataset**: `eval/run_seeds.sh` regenerates every dataset with ten other random seeds and replays the whole evaluation for each; all 1,250 cases pass (125/125 on every seed).
+- **Not tuned to one lucky dataset**: `eval/run_seeds.sh` regenerates every dataset with ten other random seeds and replays the whole evaluation for each.
 - **The diagnosis can't be steered by the file**: the physics parser skips comment lines and the model plays no part in the diagnosis, so the poisoned file gets the same result as its clean twin. An injected instruction can only reach the agent box, where the glovebox contains whatever the model writes.
 
 How the demo cases are built: in each demo the two leading faults predict the same first measurement, by design, so the first split simply reflects their priors (how often each happens on that bench, set by hand); the recommended test is the one whose outcomes the two faults predict differently. That is the situation the tool is for: data that can't separate two causes, and one quick test that can.
