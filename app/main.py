@@ -1,15 +1,17 @@
 """PhysSandbox web app (FastAPI)."""
 import json
 import os
+import secrets
 import time
 from collections import defaultdict, deque
 from pathlib import Path
+from typing import Any
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import agent, ledger, report
+from . import agent, ledger, report, results
 from .pipeline import CATALOG, EXPERIMENTS, analyse
 from .sandbox import MODE, RUNTIME, WALLS, SandboxBusy, image_digest, read_log, run_job
 from .summariser import summarise
@@ -90,24 +92,54 @@ def sample(name: str):
     return FileResponse(ROOT / "data" / "seeded" / name, media_type="text/csv")
 
 
+# The browser session an investigation belongs to: a random token in an
+# HttpOnly cookie. Stored results carry a hash of it, so a receipt hash from the
+# public ledger is not enough to build a report of someone else's data.
+SESSION_COOKIE = "ps_session"
+
+
+def _session(request: Request, response: Response = None):
+    """Owner id of this browser session; with response, starts a session if there is none."""
+    token = request.cookies.get(SESSION_COOKIE)
+    if results.owner_id(token) is None and response is not None:
+        token = secrets.token_urlsafe(24)
+        https = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+        response.set_cookie(SESSION_COOKIE, token, max_age=30 * 86400, path="/api", httponly=True,
+                            samesite="strict", secure=https)
+    return results.owner_id(token)
+
+
 @app.post("/api/analyse")
-def analyse_upload(file: UploadFile = File(...), experiment: str = Form(...),
-                         expected: str = Form("{}"), context: str = Form("")):
+def analyse_upload(request: Request, response: Response, file: UploadFile = File(...),
+                   experiment: str = Form(...), expected: str = Form("{}"), context: str = Form("")):
     raw = _read(file)
+    owner = _session(request, response)
     try:
-        return analyse(raw, experiment, json.loads(expected), json.loads(context) if context else None)
+        ctx = json.loads(context) if context else None
+        if ctx is not None:
+            if not isinstance(ctx, dict):
+                raise ValueError("The follow-up context must be a JSON object.")
+            # Only which step this follows and which test was run; the evidence so
+            # far is read from the server's own record of that step.
+            ctx = {"after": ctx.get("after"), "test": ctx.get("test")}
+        exp_values = json.loads(expected)
+        if not isinstance(exp_values, dict):
+            raise ValueError("The expected values must be a JSON object.")
+        return analyse(raw, experiment, exp_values, ctx,
+                       filename=results.clean_filename(file.filename) or "uploaded file", owner=owner)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
 
 
 @app.post("/api/report")
-def investigation_report(payload: dict = Body(...)):
-    """PDF of one investigation. The body is the browser's copy of it and is
-    treated as untrusted (see app/report.py)."""
+def investigation_report(request: Request, payload: Any = Body(...)):
+    """PDF of one investigation, built only from this server's own stored
+    results. The body is {"receipts": [hash, ...]}: the steps' receipt hashes,
+    in order (see app/report.py)."""
     try:
-        pdf, filename = report.build(payload)
+        pdf, filename = report.build(payload, owner=_session(request))
     except report.ReportError as e:
-        raise HTTPException(400, str(e)) from e
+        raise HTTPException(e.status, str(e)) from e
     return Response(pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{filename}"',
                              "Cache-Control": "no-store"})

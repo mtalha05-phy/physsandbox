@@ -7,3 +7,4 @@ receipts*.jsonl
 receipts*.head.json*
 .ledger_key
 .claude/
+results/

@@ -155,17 +155,31 @@ def _local_cmd(workdir, argv):
     return [sys.executable, str(ROOT / "sandbox" / "tools" / "runner.py"), *argv], env
 
 
-def run_job(argv, input_bytes=b"", code=None, label="analysis"):
+def run_job(argv, input_bytes=b"", code=None, label="analysis", seal=None):
     """Run one job. argv is passed to runner.py, e.g. ["analyze", exp, json].
+
+    seal(report) -> extra receipt fields (e.g. {"result_sha256": ...}): called
+    after the container is gone and before the receipt is signed and appended,
+    outside the sandbox slot (it may wait on the model). The receipt is
+    appended even if seal raises.
 
     Returns (report, events, receipt). report is the runner's JSON or None.
     """
     if not _slots.acquire(timeout=QUEUE_TIMEOUT_S):
         raise SandboxBusy("All sandboxes are busy right now. Try again in a minute.")
     try:
-        return _run_job(argv, input_bytes, code, label)
+        report, events, body = _run_job(argv, input_bytes, code, label)
     finally:
         _slots.release()
+    if body is None:
+        return report, events, None
+    extra = {}
+    try:
+        if seal:
+            extra = seal(report) or {}
+    finally:
+        receipt = ledger.append({**body, **extra})
+    return report, events, receipt
 
 
 def _run_job(argv, input_bytes, code, label):
@@ -266,7 +280,8 @@ def _run_job(argv, input_bytes, code, label):
     shutil.rmtree(workdir, ignore_errors=True)
 
     probe = (report or {}).get("probe") or {}
-    receipt = ledger.append({
+    # The receipt body; run_job signs and appends it.
+    return report, events, {
         "job": job_id,
         "label": label,
         "mode": MODE,
@@ -280,5 +295,4 @@ def _run_job(argv, input_bytes, code, label):
         "outcome": [e["kind"] for e in events if e["kind"] not in ("start", "end")] or ["clean"],
         "seconds": elapsed,
         "max_rss_mb": ((report or {}).get("usage") or {}).get("max_rss_mb"),
-    })
-    return report, events, receipt
+    }

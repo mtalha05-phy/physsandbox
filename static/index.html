@@ -411,32 +411,10 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 
 let CAT = { domains: [], experiments: {} };
 const EX = () => CAT.experiments[S.experiment];
-// [label, unit, plain]: plain = the unit already carries its prefix, so no SI scaling
-const LABELS = {
-  resistance_fit_ohm: ["Fitted resistance", "Ω"], offset_V: ["Voltage offset", "V"],
-  apparent_resistance_at_lowest_current_ohm: ["Apparent R at lowest current", "Ω"],
-  residual_rms_V: ["Fit residual (rms)", "V"],
-  offset_on_sample_V: ["Offset, leads on sample", "V"], offset_with_meter_shorted_V: ["Offset, meter shorted", "V"],
-  sample_rate_Hz: ["Sample rate", "Hz"], dominant_frequency_Hz: ["Strongest frequency", "Hz"],
-  signal_amplitude_V: ["Signal amplitude", "V"], mains_total_amplitude_V: ["Mains pickup", "V"], noise_floor_V: ["Noise floor", "V"],
-  coil_constant_uT_per_A: ["Coil constant, fitted", "µT/A", 1], theoretical_constant_uT_per_A: ["Coil constant, theory", "µT/A", 1],
-  field_offset_uT: ["Field at zero current", "µT", 1], field_in_open_uT: ["Field, probe in the open", "µT", 1], field_in_shield_uT: ["Field, probe in chamber", "µT", 1],
-  beam_centre_mm: ["Beam centre", "mm", 1], peak_signal_mV: ["Peak signal", "mV", 1], beam_radius_mm: ["Beam radius", "mm", 1], dark_level_mV: ["Dark level", "mV", 1],
-  measured_over_predicted: ["Measured ÷ predicted EMF", "", 1], dc_offset_V: ["DC offset", "V"], peak_predicted_emf_V: ["Peak predicted EMF", "V"],
-  offset_coil_connected_V: ["Offset, coil connected", "V"], offset_input_shorted_V: ["Offset, input shorted", "V"],
-  absorption_coefficient_per_cm: ["Absorption coefficient α", "/cm", 1], unattenuated_intensity: ["Unattenuated intensity I₀", "", 1], background_light: ["Background light", "", 1],
-  peak_transmission: ["Peak transmission", "", 1], angle_of_maximum_deg: ["Angle of maximum", "°", 1], light_at_extinction: ["Light at extinction", "", 1],
-  reading_crossed: ["Reading, polarisers crossed", "", 1], reading_beam_blocked: ["Reading, beam blocked", "", 1],
-  settles_at_C: ["Settles at", "°C", 1], room_temperature_C: ["Room temperature", "°C", 1], cooling_time_constant_s: ["Time constant τ", "s", 1], ice_point_reading_C: ["Ice-point reading", "°C", 1],
-  final_voltage_V: ["Final voltage", "V"], time_constant_s: ["Time constant τ", "s"], expected_time_constant_s: ["Expected τ", "s"],
-  g_fit_m_s2: ["g, fitted", "m/s²", 1], g_expected_m_s2: ["g, expected", "m/s²", 1], length_offset_m: ["Length offset", "m", 1],
-  spring_constant_N_per_m: ["Spring constant k", "N/m", 1], expected_spring_constant_N_per_m: ["Expected k", "N/m", 1], force_at_zero_extension_N: ["Force at zero extension", "N", 1],
-  ideality_factor: ["Ideality factor n", "", 1], series_resistance_ohm: ["Series resistance", "Ω"], max_series_resistance_ohm: ["Largest normal series R", "Ω"], max_current_A: ["Largest current", "A"],
-  wavelength_fit_nm: ["Wavelength, fitted", "nm", 1], wavelength_expected_nm: ["Wavelength, expected", "nm", 1], angle_zero_offset_deg: ["Angle zero offset", "°", 1],
-  reference_line_measured_nm: ["Reference line, measured", "nm", 1], reference_line_true_nm: ["Reference line, true", "nm", 1],
-  carrier_density_per_m3: ["Carrier density", "/m³", 1], expected_carrier_density_per_m3: ["Expected carrier density", "/m³", 1], hall_voltage_at_zero_current_V: ["Hall voltage at zero current", "V"],
-  hall_slope_V_per_A: ["Hall part of slope", "V/A", 1], misalignment_slope_V_per_A: ["Misalignment part of slope", "V/A", 1],
-};
+// [label, unit, plain]: plain = the unit already carries its prefix, so no SI scaling.
+// Filled from the catalogue at start-up (labels: in app/catalog.yaml and app/catalog.d/*.yaml),
+// the same table the server uses to format values in the PDF report.
+const LABELS = {};
 const SI_UNITS = new Set(["V", "A", "Ω", "Hz", "s", "F"]);
 function plain(v, unit = "", prec = 4) {
   if (v == null || !isFinite(v)) return "—";
@@ -563,7 +541,8 @@ async function runAnalyse() {
   fd.append("file", S.file, S.sample || S.fileLabel || "data.csv");
   fd.append("experiment", S.experiment);
   fd.append("expected", JSON.stringify(Object.fromEntries(E.expected.map(([k]) => [k, parseFloat($("x-" + k).value)]))));
-  if (S.pendingTest && S.last) fd.append("context", JSON.stringify({ evidence: S.last.evidence, test: S.pendingTest, done: S.last.done }));
+  // A follow-up names the step it follows by its receipt; the server reads that step's evidence from its own record.
+  if (S.pendingTest && S.last) fd.append("context", JSON.stringify({ after: S.last.receipt?.hash, test: S.pendingTest }));
   busy("go", true, "Running in the glovebox…"); jobStart("Physics analysis", EX().label);
   try {
     const r = await fetch("/api/analyse", { method: "POST", body: fd });
@@ -571,7 +550,7 @@ async function runAnalyse() {
     if (!r.ok || res.error) { toast(res.error || res.detail || "The analysis failed."); jobEnd(res); return; }
     if (!S.pendingTest) S.firstBlob = S.file;      // the agent works on the first measurement, upload or sample
     S.steps.push({ file: S.sample || S.fileLabel, test: S.pendingTest, causes: res.causes, receipt: res.receipt,
-                   values: res.values, rows: valueRows(res.values), status: res.status, next: res.next_tests[0],
+                   values: res.values, status: res.status, next: res.next_tests[0],
                    expected: res.expected, walls: res.walls, plot: res.plot,
                    explanation: res.explanation, explained_by: res.explained_by });
     S.last = res; S.pendingTest = null; S.sample = null; S.file = null;
@@ -600,13 +579,6 @@ function renderAll(res) {
   if (!TOUR.on) $("s2").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 }
 
-// [label, "value ± uncertainty"] pairs, formatted the way this page shows them
-function valueRows(values) {
-  return Object.entries(values || {}).filter(([k, v]) => LABELS[k] && typeof v.value !== "object").map(([k, v]) => {
-    const [label, unit, isPlain] = LABELS[k];
-    return [label, fmt(v.value, unit, isPlain) + (v.uncertainty != null ? ` ± ${fmt(v.uncertainty, unit, isPlain, 2)}` : "")];
-  });
-}
 function renderMeasured(res) {
   const vals = Object.entries(res.values).filter(([k]) => LABELS[k]);
   const tiles = vals.map(([k, v]) => {
@@ -894,7 +866,7 @@ async function downloadRecord() {
     `- Signed with Ed25519 key ${hd.key_id}; public key at ${location.origin}/api/ledger/public-key`,
     `- Server's check at download: ${nb.intact ? "intact" : `broken at #${nb.broken_at} (${nb.reason})`}`, ``,
     "```json", JSON.stringify(hd, null, 2), "```", ``);
-  lines.push(`Every number above was computed by deterministic physics code in a gVisor container with no network.`,
+  lines.push(`Every number above was computed by deterministic physics code ${whereRun(S.steps)}.`,
     `Receipts are hash-chained and signed with Ed25519. Check them yourself, without trusting the server: save ${location.origin}/api/ledger?limit=100 and the public key, then run tools/verify_receipts.py.`, ``);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/markdown" }));
@@ -903,14 +875,20 @@ async function downloadRecord() {
   toast("Investigation record downloaded");
 }
 
+// Where the jobs ran, worded from their receipts as the PDF report words it.
+function whereRun(steps) {
+  const rs = steps.map(st => st.receipt || {});
+  if (rs.every(r => r.mode === "docker" && r.walls_host_verified?.runtime === "runsc")) return "in a gVisor sandbox with no network";
+  if (rs.every(r => r.mode === "docker")) return "in a Docker container with no network (not every job had the gVisor kernel)";
+  return "in development mode, outside the sandbox, so the jobs were not isolated";
+}
+
 async function downloadPdf() {
   if (!S.steps.length) return toast("Analyse a measurement first.");
-  const body = { experiment: S.experiment, expected: S.steps[S.steps.length - 1].expected || {},
-    steps: S.steps.map(st => ({ file: st.file, test: st.test, status: st.status, causes: st.causes, next: st.next,
-      values: st.rows, plot: st.plot, explanation: st.explanation, explained_by: st.explained_by,
-      receipt: st.receipt && { seq: st.receipt.seq, time: st.receipt.time, hash: st.receipt.hash, prev: st.receipt.prev,
-        mac: st.receipt.mac, input_sha256: st.receipt.input_sha256, mode: st.receipt.mode,
-        walls_measured: st.receipt.walls_measured, walls_host_verified: st.receipt.walls_host_verified } })) };
+  // Only the receipt hashes: the server builds the report from its own stored results.
+  const receipts = S.steps.map(st => st.receipt?.hash);
+  if (!receipts.every(Boolean)) return toast("A step has no sandbox receipt, so it can't go in the report.");
+  const body = { receipts };
   busy("record-pdf", true, "Building PDF…");
   try {
     const r = await fetch("/api/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

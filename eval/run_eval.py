@@ -26,7 +26,9 @@ for d in manifest["datasets"]:
     label = d["file"]
     if d.get("after"):
         first = analyse((SEEDED / d["after"]).read_bytes(), d["experiment"], d.get("expected", {}), use_model=False)
-        context = {"evidence": first["evidence"], "test": d["test"], "done": first["done"]}
+        # The follow-up names the earlier step by its receipt; the server reads that
+        # step's evidence from its own stored record.
+        context = {"after": first["receipt"]["hash"], "test": d["test"]}
         label = f"{d['after']} + {d['test']}"
     res = analyse((SEEDED / d["file"]).read_bytes(), d["experiment"], d.get("expected", {}), context, use_model=False)
     if "error" in res:
