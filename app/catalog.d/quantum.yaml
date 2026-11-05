@@ -62,7 +62,7 @@ experiments:
 sample_info:
   planck_clean.csv: ["Turn-on voltages of seven LEDs, from 940 nm infrared to 405 nm violet, read at the onset of light.", "Nothing should look off: the slope of V against frequency gives h."]
   planck_gain.csv: ["The same seven LEDs and the same turn-on method.", "The points lie on a good straight line, but its slope gives h about 10% below the accepted value."]
-  planck_mislabelled.csv: ["The same seven LEDs and the same turn-on method.", "Six LEDs line up and give the right h, but the one labelled 590 nm sits well off the line."]
+  planck_mislabelled.csv: ["The same seven LEDs and the same turn-on method.", "Six LEDs line up and give the right h, but the one labelled 590 nm sits well below the line."]
   planck_gain_refmeter.csv: ["The 590 nm LED held at turn-on: ten readings on the lab meter, then ten on a calibrated reference meter.", "Do the two meters agree?"]
   tunnel_clean.csv: ["A solver's transmission through a 1 eV barrier for a 0.5 eV electron, widths 0.1–1.2 nm.", "Nothing should look off: matches the analytic barrier formula."]
   tunnel_mass.csv: ["The same barrier simulation.", "Transmission falls exponentially, but far more slowly than an electron at this energy should."]

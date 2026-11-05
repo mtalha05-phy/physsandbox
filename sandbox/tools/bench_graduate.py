@@ -204,7 +204,14 @@ def compton(header, data, expected):
             m = np.ones(len(th), bool)
             m[i] = False
             (a, b), _ = _wfit(f, th[m], E[m], [e0, mc2], prec)
-            z = abs(float(E[i] - f(th[i], a, b))) / prec
+            # the left-out peak is predicted from a fit to the others, which is uncertain too
+            # (most at the ends of the angle range), so add that in quadrature
+            _, cov = curve_fit(f, th[m], E[m], p0=[a, b], sigma=np.full(m.sum(), prec), absolute_sigma=True)
+            h = 1e-6
+            grad = np.array([(f(th[i], a + h, b) - f(th[i], a - h, b)) / (2 * h),
+                             (f(th[i], a, b + h) - f(th[i], a, b - h)) / (2 * h)])
+            pred_sd = float(np.sqrt(max(grad @ cov @ grad, 0.0)))
+            z = abs(float(E[i] - f(th[i], a, b))) / float(np.hypot(prec, pred_sd))
             if z > worst:
                 worst, odd = z, i
                 rest_chi2 = float(np.sum(((E[m] - f(th[m], a, b)) / prec) ** 2) / max(1, m.sum() - 2))

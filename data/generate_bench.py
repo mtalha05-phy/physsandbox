@@ -177,8 +177,8 @@ hdr = ["wavelength_nm", "turn_on_voltage_V"]
 write("planck_clean.csv", hdr, lam_led, von(lam_led) + rng.normal(0, 0.01, lam_led.size), fmt="{:.4g}")
 # the lab voltmeter reads 8% low, so h comes out about 8% low
 write("planck_gain.csv", hdr, lam_led, von(lam_led, 0.92) + rng.normal(0, 0.01, lam_led.size), fmt="{:.4g}")
-# the LED labelled 590 nm is really a 625 nm part
-true_lam = lam_led.copy(); true_lam[3] = 625
+# the LED labelled 590 nm (amber) is really a 640 nm red part
+true_lam = lam_led.copy(); true_lam[3] = 640
 write("planck_mislabelled.csv", hdr, lam_led, von(true_lam) + rng.normal(0, 0.01, lam_led.size), fmt="{:.4g}")
 # follow-up: the 590 nm LED's turn-on read on the lab meter, then on a calibrated reference meter
 groups("planck_gain_refmeter.csv", ["meter", "voltage_V"], float(von(590.0, 0.92)), float(von(590.0)), noise=0.003)
