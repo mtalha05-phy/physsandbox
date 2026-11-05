@@ -1,0 +1,13 @@
+datasets:
+  - {file: ediff_camera_length.csv, experiment: electron_diffraction, truth: camera_length_wrong}
+  - {file: ediff_camera_length_ruler.csv, after: ediff_camera_length.csv, test: measure_camera_length, experiment: electron_diffraction, truth: camera_length_wrong, status: confirmed}
+  - {file: ediff_third_ring.csv, experiment: electron_diffraction, truth: third_ring_measured}
+  - {file: ediff_clean.csv, experiment: electron_diffraction, truth: no_fault, status: clear}
+  - {file: zeeman_field_scale.csv, experiment: zeeman, truth: field_miscalibrated}
+  - {file: zeeman_field_scale_gaussmeter.csv, after: zeeman_field_scale.csv, test: calibrated_gaussmeter, experiment: zeeman, truth: field_miscalibrated, status: confirmed}
+  - {file: zeeman_ring_order.csv, experiment: zeeman, truth: ring_order_misread}
+  - {file: zeeman_clean.csv, experiment: zeeman, truth: no_fault, status: clear}
+  - {file: millikan_spacing.csv, experiment: millikan, truth: plate_spacing_wrong}
+  - {file: millikan_spacing_callipers.csv, after: millikan_spacing.csv, test: calliper_plate_spacing, experiment: millikan, truth: plate_spacing_wrong, status: confirmed}
+  - {file: millikan_evaporation.csv, experiment: millikan, truth: drops_evaporating}
+  - {file: millikan_clean.csv, experiment: millikan, truth: no_fault, status: clear}

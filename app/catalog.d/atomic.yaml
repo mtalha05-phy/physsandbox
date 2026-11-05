@@ -1,0 +1,94 @@
+# Atomic-physics experiments in the quantum area. Merged into catalog.yaml by app/pipeline.py.
+experiments:
+  electron_diffraction:
+    label: Electron diffraction (de Broglie)
+    domain: quantum
+    blurb: Graphite diffraction rings against accelerating voltage, to check λ = h/p and the lattice spacings
+    columns: [voltage_kV, ring, diameter_mm]
+    model: "λ = h/√(2meV),  2d sin θ = λ,  D = 2L tan 2θ"
+    expected:
+      - [camera_length_mm, "Foil-to-screen distance L (mm)", 135]
+      - [d_inner_nm, "Inner ring spacing d₁₀ (nm)", 0.213]
+      - [d_outer_nm, "Outer ring spacing d₁₁ (nm)", 0.123]
+      - [precision_mm, "Diameter reading precision (mm)", 0.5]
+    samples:
+      - [ediff_camera_length.csv, "Both spacings 8% large"]
+      - [ediff_third_ring.csv, "Outer ring spacing off"]
+      - [ediff_clean.csv, "Healthy measurement"]
+    followups: {measure_camera_length: ediff_camera_length_ruler.csv}
+    questions: ["Fit each ring's diameter against λ and report the lattice spacings"]
+
+  zeeman:
+    label: Zeeman effect (cadmium red line)
+    domain: quantum
+    level: graduate
+    blurb: Splitting of the Cd 643.8 nm line in a magnetic field, read on a Fabry–Pérot étalon, to measure the Bohr magneton
+    columns: [field_mT, r1_inner_mm, r1_outer_mm, r2_inner_mm, r2_outer_mm]
+    model: "Δν̃ = 2μ_B B/hc = (1/2nt)·δ/Δ"
+    expected:
+      - [etalon_thickness_mm, "Étalon thickness t (mm)", 3.0]
+      - [etalon_index, "Étalon refractive index n", 1.457]
+      - [bohr_magneton_JT, "Accepted Bohr magneton (J/T)", 9.2740100783e-24]
+      - [precision_mm, "Ring radius precision (mm)", 0.01]
+      - [gaussmeter_precision_mT, "Gaussmeter precision (mT)", 2.0]
+    samples:
+      - [zeeman_field_scale.csv, "Bohr magneton 11% low"]
+      - [zeeman_ring_order.csv, "Highest field off the line"]
+      - [zeeman_clean.csv, "Healthy measurement"]
+    followups: {calibrated_gaussmeter: zeeman_field_scale_gaussmeter.csv}
+    questions: ["Compute the splitting from the ring radii and fit it against B"]
+
+  millikan:
+    label: Millikan oil drop
+    domain: quantum
+    blurb: Charges of single oil drops, to show they come in whole steps and measure e
+    columns: [drop, charge_1e19C]
+    model: "q = n·e"
+    expected:
+      - [elementary_charge_C, "Accepted e (C)", 1.602176634e-19]
+      - [precision_pct, "Charge precision per drop (%)", 2.0]
+      - [plate_spacing_used_mm, "Plate spacing used for the charges (mm)", 7.60]
+    samples:
+      - [millikan_spacing.csv, "e comes out 13% high"]
+      - [millikan_evaporation.csv, "Charges don't fall in whole steps"]
+      - [millikan_clean.csv, "Healthy measurement"]
+    followups: {calliper_plate_spacing: millikan_spacing_callipers.csv}
+    questions: ["Find the charge unit the drops are whole multiples of"]
+
+sample_info:
+  ediff_clean.csv: ["Diameters of the two bright graphite rings on a diffraction tube's screen, 2.5–5 kV in 0.5 kV steps, read with a vernier.", "Nothing should look off: both rings give the graphite spacings 0.213 and 0.123 nm."]
+  ediff_camera_length.csv: ["The same tube, rings and voltages.", "Both rings shrink with voltage as they should, but both lattice spacings come out about 8% large, by the same factor."]
+  ediff_third_ring.csv: ["The same tube, rings and voltages.", "The inner ring gives 0.213 nm, but the outer ring's spacing comes out well below 0.123 nm."]
+  ediff_camera_length_ruler.csv: ["Eight rule readings of the distance from the graphite foil to the screen, supply off.", "Does the distance match the L used in the analysis?"]
+  zeeman_clean.csv: ["Fabry–Pérot rings of the cadmium 643.8 nm line viewed across the field, σ components only: radii of the split rings of the first two orders at 200–550 mT.", "Nothing should look off: the splitting rises in proportion to B and gives the Bohr magneton."]
+  zeeman_field_scale.csv: ["The same lamp, étalon and fields.", "The splitting is proportional to B, but its slope gives a Bohr magneton about 11% low."]
+  zeeman_ring_order.csv: ["The same lamp, étalon and fields.", "Every field lies on the expected line except the highest, whose splitting sits well above it."]
+  zeeman_field_scale_gaussmeter.csv: ["The magnet stepped from 1 to 6 A, the field read on the lab gaussmeter and on a calibrated probe where the lamp sits.", "Do the two gaussmeters agree?"]
+  millikan_clean.csv: ["Charges of 20 oil drops worked out from their fall and rise times, in units of 10⁻¹⁹ C.", "Nothing should look off: every charge is a whole multiple of 1.60 × 10⁻¹⁹ C."]
+  millikan_spacing.csv: ["Twenty drops from the same chamber, timed the same way.", "The charges fall in clean whole steps, but the step comes out about 13% above e."]
+  millikan_evaporation.csv: ["Twenty drops from the same chamber, timed the same way.", "The charges scatter between whole steps, mostly on the low side."]
+  millikan_spacing_callipers.csv: ["Calliper readings of the spacer between the plates at eight places, supply off.", "Does the spacing match the one used to work out the charges?"]
+
+labels:
+  d_inner_nm: ["Inner ring spacing", "nm", 1]
+  d_outer_nm: ["Outer ring spacing", "nm", 1]
+  accepted_d_inner_nm: ["Inner spacing, graphite", "nm", 1]
+  accepted_d_outer_nm: ["Outer spacing, graphite", "nm", 1]
+  spacing_ratio: ["Ratio of the spacings", "", 1]
+  accepted_spacing_ratio: ["Ratio, graphite (√3)", "", 1]
+  wavelength_at_highest_kV_pm: ["de Broglie λ at the highest voltage", "pm", 1]
+  camera_length_measured_mm: ["Foil-to-screen distance, measured", "mm", 1]
+  camera_length_entered_mm: ["Foil-to-screen distance, used", "mm", 1]
+  splitting_per_tesla_per_m: ["Splitting per tesla", "/m/T", 1]
+  expected_splitting_per_tesla_per_m: ["Expected splitting per tesla", "/m/T", 1]
+  bohr_magneton_JT: ["Bohr magneton, fitted", "J/T", 1]
+  accepted_bohr_magneton_JT: ["Bohr magneton, accepted", "J/T", 1]
+  e_over_m_C_per_kg: ["e/m from μ_B", "C/kg", 1]
+  lab_over_reference_field: ["Lab ÷ calibrated field", "", 1]
+  elementary_charge_C: ["Charge unit e, fitted", "C", 1]
+  accepted_elementary_charge_C: ["e, accepted", "C", 1]
+  quantisation_chi2_per_dof: ["Fit to whole steps (χ²/dof)", "", 1]
+  largest_multiple_n: ["Largest n among the drops", "", 1]
+  plate_spacing_measured_mm: ["Plate spacing, measured", "mm", 1]
+  plate_spacing_used_mm: ["Plate spacing, used", "mm", 1]
+  charge_correction_factor: ["Charge correction (measured ÷ used)", "", 1]
