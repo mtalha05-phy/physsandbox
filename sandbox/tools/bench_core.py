@@ -146,7 +146,7 @@ def franck_hertz(header, data, expected):
         return {
             "values": {"oven_temperature_C": {"value": m, "uncertainty": e},
                        "oven_setpoint_C": {"value": setp}},
-            # mercury vapour density roughly doubles every 10 °C near 180 °C
+            # mercury vapour pressure roughly doubles every 20 °C near 180 °C
             "evidence": {"oven_cold": bool(setp - m > 10), "oven_shortfall_C": setp - m},
             "plot": {"x": tmin.tolist(), "y": temp.tolist(), "x_label": "time (minutes)",
                      "y_label": "oven temperature (°C)", "unit": "°C", "x_unit": "", "connect": True,

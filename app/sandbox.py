@@ -53,7 +53,25 @@ DENIAL_MARKERS = ("Permission denied", "PermissionError", "Read-only file system
 # At most this many sandboxes at once, so a burst of visitors cannot exhaust
 # the VM (each container may use 512 MB).
 MAX_JOBS = int(os.getenv("SANDBOX_MAX_JOBS", "2"))
+QUEUE_TIMEOUT_S = float(os.getenv("SANDBOX_QUEUE_TIMEOUT_S", "20"))
 _slots = threading.BoundedSemaphore(MAX_JOBS)
+MAX_OUT = 2_000_000          # bytes of container stdout the host will read
+MAX_ERR = 64_000
+
+
+class SandboxBusy(RuntimeError):
+    """Every sandbox slot stayed busy for QUEUE_TIMEOUT_S: tell the visitor to retry."""
+
+
+def _read_capped(stream, limit, sink):
+    """Read at most `limit` bytes into sink[0]. Keep draining (and discarding) the
+    rest so the process never blocks on a full pipe; sink[1] says if any was dropped."""
+    buf, total = bytearray(), 0
+    for chunk in iter(lambda: stream.read(65536), b""):
+        total += len(chunk)
+        if len(buf) < limit:
+            buf.extend(chunk[: limit - len(buf)])
+    sink[0], sink[1] = bytes(buf), total > limit
 
 
 def log_event(kind, detail, job_id, wall=None, source="host"):
@@ -142,8 +160,12 @@ def run_job(argv, input_bytes=b"", code=None, label="analysis"):
 
     Returns (report, events, receipt). report is the runner's JSON or None.
     """
-    with _slots:
+    if not _slots.acquire(timeout=QUEUE_TIMEOUT_S):
+        raise SandboxBusy("All sandboxes are busy right now. Try again in a minute.")
+    try:
         return _run_job(argv, input_bytes, code, label)
+    finally:
+        _slots.release()
 
 
 def _run_job(argv, input_bytes, code, label):
@@ -157,9 +179,13 @@ def _run_job(argv, input_bytes, code, label):
         os.chmod(p, 0o444)
     os.chmod(workdir, 0o755)
 
-    if MODE == "local" and argv[0] == "attack":
+    # Development mode has no isolation: never run untrusted code (attack demos or
+    # agent-written code) on the host unless the developer explicitly opts in.
+    if MODE == "local" and (argv[0] == "attack" or (argv[0] == "code" and os.getenv("ALLOW_LOCAL_CODE") != "1")):
         shutil.rmtree(workdir, ignore_errors=True)
-        events.append(log_event("refused", "attack demos need the real sandbox (SANDBOX_MODE=docker)", job_id))
+        what = "attack demos need" if argv[0] == "attack" else "agent-written code needs"
+        events.append(log_event("refused", f"{what} the real sandbox (SANDBOX_MODE=docker); "
+                                "development mode would run them on this machine", job_id))
         return None, events, None
 
     env = None
@@ -171,12 +197,25 @@ def _run_job(argv, input_bytes, code, label):
     started = time.time()
     timed_out = False
     name = f"ps-{job_id}"
+    oversize = False
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+    o_sink, e_sink = [b"", False], [b"", False]
+    readers = [threading.Thread(target=_read_capped, args=(proc.stdout, MAX_OUT, o_sink), daemon=True),
+               threading.Thread(target=_read_capped, args=(proc.stderr, MAX_ERR, e_sink), daemon=True)]
+    for t in readers:
+        t.start()
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_S, env=env)
-        out, err, code_rc = proc.stdout, proc.stderr, proc.returncode
+        code_rc = proc.wait(timeout=TIMEOUT_S)
     except subprocess.TimeoutExpired:
-        subprocess.run(["docker", "kill", name], capture_output=True)
-        out, err, code_rc, timed_out = "", "", -1, True
+        if MODE != "local":
+            subprocess.run(["docker", "kill", name], capture_output=True)
+        proc.kill()
+        code_rc, timed_out = proc.wait(), True
+    for t in readers:
+        t.join(timeout=5)
+    out = o_sink[0].decode("utf-8", "replace") if not timed_out else ""
+    err = e_sink[0].decode("utf-8", "replace") if not timed_out else ""
+    oversize = bool(o_sink[1])
     elapsed = round(time.time() - started, 2)
     host = None
     if MODE != "local":
@@ -202,13 +241,19 @@ def _run_job(argv, input_bytes, code, label):
     if (host or {}).get("oom_killed") or code_rc == 137:
         events.append(log_event("killed", "stopped at the 512 MB memory limit (Docker's record)", job_id, "memory"))
     # Attempts: described by the code's own output. The wall that stopped each
-    # one is verified separately by the host check below.
+    # one is verified separately by the host check below; only say so when it passed.
+    verified = MODE != "local" and host_walls_ok(host)
     if any(m in seen for m in NETWORK_MARKERS):
-        events.append(log_event("blocked", "tried to reach the internet and found no network "
-                                "(the code's own error; host confirms network none)", job_id, "network", "code"))
+        events.append(log_event("blocked", "tried to reach the internet and found no network (the code's own error; "
+                                + ("host confirms network none)" if verified else "not verified by the host)"),
+                                job_id, "network", "code"))
     if any(m in seen for m in DENIAL_MARKERS):
-        events.append(log_event("denied", "tried to write outside scratch space and was refused "
-                                "(the code's own error; host confirms a read-only root)", job_id, "filesystem", "code"))
+        events.append(log_event("denied", "tried to write outside scratch space and was refused (the code's own error; "
+                                + ("host confirms a read-only root)" if verified else "not verified by the host)"),
+                                job_id, "filesystem", "code"))
+    if oversize:
+        events.append(log_event("tamper", f"job printed more than {MAX_OUT // 1_000_000} MB; the host kept only the "
+                                "first part", job_id, "receipt"))
     if report and (report.get("extra_lines") or report.get("forged_probe")):
         events.append(log_event("tamper", "code printed a fake receipt; ignored, the real probe was taken "
                                 "before the code ran", job_id, "receipt", "code"))

@@ -131,11 +131,18 @@ def next_tests(experiment, ranked, done=(), top_n=3):
     for key, t in tests.items():
         if key in done:
             continue
-        outcome_mass = {}
+        # Expected information = mutual information between the cause and the test's
+        # outcome. Faults whose outcome the library doesn't predict for this test carry
+        # no information: assume their outcome follows the same mix as the predicted
+        # ones. Then MI = (share of probability that is predicted) x H(predicted mix).
+        outcome_mass, predicted = {}, 0.0
         for fault, p in probs.items():
-            outcome = t["outcomes"].get(fault, "unpredicted")
+            outcome = t["outcomes"].get(fault)
+            if outcome is None:
+                continue
             outcome_mass[outcome] = outcome_mass.get(outcome, 0) + p
-        gain = _entropy(outcome_mass.values())
+            predicted += p
+        gain = predicted * _entropy([m / predicted for m in outcome_mass.values()]) if predicted > 0 else 0.0
         out.append({
             "id": key, "name": t["name"], "how": t["how"], "minutes": t["minutes"],
             "info_gain_bits": round(gain, 3),

@@ -70,11 +70,11 @@ experiments:
       cpmg_train:
         name: Measure the decay with a CPMG echo train
         minutes: 6
-        how: Record a Carr-Purcell-Meiboom-Gill train with a short echo spacing (1 ms). Short spacing suppresses diffusion loss; badly set 180° pulses make the train oscillate.
+        how: Record a Carr-Purcell-Meiboom-Gill train with a short echo spacing (1 ms). Short spacing suppresses diffusion loss. The Meiboom–Gill phase shift largely compensates mis-set 180° pulses, so a CPMG train decays smoothly even when the pulses are off; a plain Carr–Purcell train would not.
         outcomes:
           diffusion_gradient: t2_recovers
           paramagnetic_impurity: t2_stays_short
-          pulse_misset: train_oscillates
+          pulse_misset: t2_normal
           sample_off_coil: t2_normal
           no_fault: t2_normal
         safety: Keep ferromagnetic tools, keys and phones away from the magnet, and no one with a pacemaker or implant near it.
@@ -144,7 +144,7 @@ experiments:
       warming_sweep:
         name: Record a warming sweep as well and compare it with the cooling sweep
         minutes: 15
-        how: Lift the probe just out of the liquid nitrogen and log R and T as it warms through 110 K at the same rate. A thermometer that lags reads high on warming and low on cooling.
+        how: Lift the probe just out of the liquid nitrogen and log R and T as it warms through 110 K at the same rate. If the sample lags the thermometer, its transition appears at a higher thermometer reading on warming and a lower one on cooling.
         adds: {feature: sweeps_disagree, from: sweeps_disagree, op: copy}
         outcomes:
           thermometer_lag: sweeps_disagree

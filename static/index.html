@@ -445,6 +445,7 @@ function sci(v, prec = 4) {
 }
 function fmt(v, unit, isPlain, prec) { return isPlain || !SI_UNITS.has(unit) ? plain(v, unit, prec) : si(v, unit); }
 
+let SAMPLES = [];
 const S = { experiment: "resistance_4wire", domain: "electricity", file: null, fileLabel: "", sample: null, steps: [], pendingTest: null, last: null };
 
 /* ---------- formatting ---------- */
@@ -460,7 +461,8 @@ function si(v, unit = "") {
 }
 const pct = p => `${Math.round(p * 100)}%`;
 const PROPER = /^(Earth|Hall|Faraday|Malus|Newton|Beer)/;
-const lc = t => PROPER.test(t || "") ? t : (t || "").charAt(0).toLowerCase() + (t || "").slice(1);
+// keep proper nouns and acronyms (LED, RF, EMF) as they are
+const lc = t => PROPER.test(t || "") || /^.[A-Z]/.test(t || "") ? t : (t || "").charAt(0).toLowerCase() + (t || "").slice(1);
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
 
 /* ---------- step 1 ---------- */
@@ -499,7 +501,7 @@ async function renderSampleInfo() {
   const need = E.columns || [];
   const cols = need.map(c => `<code>${esc(c)}</code>`).join(", ");
   if (!S.file) {
-    box.innerHTML = `<p style="margin:0">${S.pendingTest ? "Upload the result of the test you just ran, or use the sample result above." : "Pick a sample above to see what it is: each is a recorded run with a known fault, or a healthy control."}
+    box.innerHTML = `<p style="margin:0">${S.pendingTest ? "Upload the result of the test you just ran, or use the sample result above." : "Pick a sample above to see what it is: each is a seeded (synthetic) run with a known fault, or a healthy control."}
       Your own CSV needs a header row with ${cols}, then one row per reading. Lines starting with <code>#</code> are comments.</p>`;
     return;
   }
@@ -562,6 +564,7 @@ async function runAnalyse() {
     const r = await fetch("/api/analyse", { method: "POST", body: fd });
     const res = await r.json();
     if (!r.ok || res.error) { toast(res.error || res.detail || "The analysis failed."); jobEnd(res); return; }
+    if (!S.pendingTest) S.firstBlob = S.file;      // the agent works on the first measurement, upload or sample
     S.steps.push({ file: S.sample || S.fileLabel, test: S.pendingTest, causes: res.causes, receipt: res.receipt,
                    values: res.values, rows: valueRows(res.values), status: res.status, next: res.next_tests[0],
                    expected: res.expected, walls: res.walls, plot: res.plot,
@@ -575,7 +578,7 @@ async function runAnalyse() {
   finally { busy("go", false, "Analyse in the glovebox"); refreshSide(); }
 }
 $("restart").addEventListener("click", () => {
-  Object.assign(S, { steps: [], pendingTest: null, last: null, sample: null, file: null });
+  Object.assign(S, { steps: [], pendingTest: null, last: null, sample: null, file: null, firstBlob: null });
   ["s2", "s3", "s4", "s5"].forEach(id => $(id).classList.add("locked"));
   ["s2-body", "s3-body", "s4-body", "agent-out"].forEach(id => $(id).innerHTML = "");
   $("followup-note").hidden = true; $("restart").hidden = true; $("drop").classList.remove("followup");
@@ -729,8 +732,8 @@ $("ask").addEventListener("click", () => runAgent());
 async function runAgent() {
   const q = $("question").value.trim(); if (!q) return toast("Type a question for the agent first.");
   const sample = S.steps.length ? S.steps[0].file : null;
-  let blob = S.file;
-  if (!blob && sample && sample.endsWith(".csv")) blob = await fetch("/api/samples/" + sample).then(r => r.blob());
+  let blob = S.file || S.firstBlob;
+  if (!blob && sample && (CAT.samples || SAMPLES).includes(sample)) blob = await fetch("/api/samples/" + sample).then(r => r.blob());
   if (!blob) return toast("Analyse a dataset first, so the agent has data to work on.");
   const fd = new FormData();
   fd.append("file", blob, "data.csv"); fd.append("question", q); fd.append("experiment", S.experiment);
@@ -921,7 +924,7 @@ const TOUR_STEPS = [
                        await selectSample("r_offset_1.csv", "Resistor reads high at low current"); spot($("s1")); } },
   { text: "The fit runs in a fresh, sealed container. It finds a 40 µV offset that is the same at every current, so the resistor itself is fine.",
     run: async () => { await runAnalyse(); spot($("s2")); } },
-  { text: "Six possible causes are scored against that evidence. Two lead, and they predict different results for one quick bench test.",
+  { text: "Every likely cause is scored against that evidence. Two lead, and they predict different results for one quick bench test.",
     run: async () => spot($("s3")) },
   { text: "This is the test that tells them apart best per minute of bench time. The student runs it and adds the result.",
     run: async () => spot($("s4")) },
@@ -957,7 +960,7 @@ document.addEventListener("keydown", e => { if (TOUR.on && e.key === "Escape") e
 async function init() {
   try {
     const s = await fetch("/api/status").then(r => r.json());
-    CAT = s.catalog; Object.assign(LABELS, CAT.labels || {}); renderExperiment();
+    CAT = s.catalog; SAMPLES = s.samples || []; Object.assign(LABELS, CAT.labels || {}); renderExperiment();
     const isolated = s.mode === "docker";
     $("lamp-box").className = "lamp" + (isolated ? "" : " warn");
     $("pill-box").textContent = isolated ? `Sandbox: ${s.runtime === "runsc" ? "gVisor" : "Docker"}, no network` : "Sandbox: development mode";

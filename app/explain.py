@@ -44,13 +44,14 @@ def _template(result):
         return (f"Cause confirmed: {top['name']} ({top['probability']:.0%}). "
                 "The data alone separate it from the alternatives, so no bench test is needed first.")
     if not result["next_tests"]:
-        return f"Most likely: {top['name'].lower()} ({top['probability']:.0%})."
+        return f"Most likely: {_lc(top['name'])} ({top['probability']:.0%})."
     test = result["next_tests"][0]
     second = result["causes"][1]
+    rival = "close behind" if second["probability"] >= 0.25 else "next"
     return (f"Your data don't match what you expected. The leading suspect is "
             f"{_lc(top['name'])} ({top['probability']:.0%}), with "
-            f"{_lc(second['name'])} ({second['probability']:.0%}) close behind. "
-            f"{test['name']} takes about {test['minutes']} min and tells them apart best.")
+            f"{_lc(second['name'])} ({second['probability']:.0%}) {rival}. "
+            f"The best next test, about {test['minutes']} min: {_lc(test['name'])}.")
 
 
 def explain(result):

@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import agent, ledger, report
 from .pipeline import CATALOG, EXPERIMENTS, analyse
-from .sandbox import MODE, RUNTIME, WALLS, image_digest, read_log, run_job
+from .sandbox import MODE, RUNTIME, WALLS, SandboxBusy, image_digest, read_log, run_job
 from .summariser import summarise
 
 ROOT = Path(__file__).parent.parent
@@ -22,8 +22,14 @@ MAX_UPLOAD = 1_000_000          # bytes
 # Per-visitor limits on the public demo: (requests, seconds). The model calls
 # cost inference credit, so they get the tightest limits.
 LIMITS = {"/api/agent": (8, 300), "/api/model-check": (4, 60), "/api/analyse": (40, 300),
-          "/api/containment": (20, 300), "/api/report": (20, 300)}
+          "/api/containment/": (20, 300), "/api/report": (20, 300)}   # trailing slash: not /api/containment-log
 _hits = defaultdict(deque)
+
+
+@app.exception_handler(SandboxBusy)
+def sandbox_busy(request: Request, exc: SandboxBusy):
+    # Every sandbox slot stayed busy: answer quickly instead of tying up a worker thread.
+    return JSONResponse({"detail": str(exc)}, status_code=503)
 
 
 @app.middleware("http")
@@ -129,7 +135,7 @@ def agent_run(file: UploadFile = File(...), question: str = Form(...),
                          "containment": events, "receipt": receipt, "walls": (report or {}).get("probe")})
         if not err or contained or is_red or n == agent.MAX_ATTEMPTS:
             break
-        fixed = agent.fix_code(question, experiment, summary, code, err, out)
+        fixed = agent.fix_code(question, experiment, summary, code, err, (report or {}).get("error_line"))
         if not fixed or fixed == code:
             break
         code = fixed

@@ -192,15 +192,26 @@ def _extract(text):
     return (m.group(1) if m else text).strip() + "\n"
 
 
-def fix_code(question, experiment, summary, code, error, output=""):
-    """One repair step: show the model its code and the sandbox's error.
+def error_kind(error):
+    """Only the exception's type, e.g. 'ValueError'. Never its message: a message can
+    quote the data (a failed parse echoes the offending line), and the data may carry
+    an instruction aimed at the model."""
+    head = (error or "").split(":", 1)[0].strip()
+    return head if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,60}", head) else "Error"
+
+
+def fix_code(question, experiment, summary, code, error, line=None):
+    """One repair step: show the model its own code, the exception TYPE and the line
+    it failed on. No exception message and no output go back, so file content
+    cannot reach the model through the repair loop.
     Returns new code, or None if the model is unavailable."""
     if not llm.configured():
         return None
+    where = f" at line {line}" if isinstance(line, int) else ""
     user = (f"Experiment: {experiment}\nFile summary: {summary}\nQuestion: {question}\n\n"
             f"Your previous script:\n```python\n{code}```\n"
-            f"It failed inside the sandbox with:\n{error[:800]}\n"
-            + (f"Output before the failure:\n{output[:800]}\n" if output else "")
-            + "Fix the script. The sandbox has no network and a read-only disk; do not try to change that.")
+            f"It raised {error_kind(error)}{where} inside the sandbox.\n"
+            "Fix the script. Lines starting with # in the file are comments; skip them. "
+            "The sandbox has no network and a read-only disk; do not try to change that.")
     text, _ = llm.chat(SYSTEM, user, max_tokens=3000, temperature=0.1, timeout=90)
     return _extract(text) if text else None
