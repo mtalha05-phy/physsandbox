@@ -164,4 +164,72 @@ Ir = np.r_[Ih, Ih]
 Vr2 = np.where(rev == 0, kh, -kh) * Ir - 0.2 * kh * Ir + rng.normal(0, 2e-5, Ir.size)
 write("hall_misaligned_reversed.csv", ["current_A", "hall_voltage_V", "field_reversed"], Ir, Vr2, rev)
 
+# =============================================================================
+# Quantum area. Its own generator, so the files above stay unchanged.
+rng = np.random.default_rng(2028)
+H, QE, CL, KB, ME = 6.62607015e-34, 1.602176634e-19, 299792458.0, 1.380649e-23, 9.1093837e-31
+HBAR = H / (2 * np.pi)
+
+# --- Planck's constant from LED turn-on voltages ------------------------------
+lam_led = np.array([940, 850, 660, 590, 525, 470, 405], dtype=float)
+von = lambda lam, gain=1.0: gain * (H * CL / (lam * 1e-9) / QE - 0.35)
+hdr = ["wavelength_nm", "turn_on_voltage_V"]
+write("planck_clean.csv", hdr, lam_led, von(lam_led) + rng.normal(0, 0.01, lam_led.size), fmt="{:.4g}")
+# the lab voltmeter reads 8% low, so h comes out about 8% low
+write("planck_gain.csv", hdr, lam_led, von(lam_led, 0.92) + rng.normal(0, 0.01, lam_led.size), fmt="{:.4g}")
+# the LED labelled 590 nm is really a 625 nm part
+true_lam = lam_led.copy(); true_lam[3] = 625
+write("planck_mislabelled.csv", hdr, lam_led, von(true_lam) + rng.normal(0, 0.01, lam_led.size), fmt="{:.4g}")
+# follow-up: the 590 nm LED's turn-on read on the lab meter, then on a calibrated reference meter
+groups("planck_gain_refmeter.csv", ["meter", "voltage_V"], float(von(590.0, 0.92)), float(von(590.0)), noise=0.003)
+
+# --- Quantum tunnelling simulation: rectangular barrier, V0 = 1 eV, E = 0.5 eV ---
+aw = np.round(np.arange(0.1, 1.21, 0.1), 2)
+def t_exact(a_nm, E=0.5, V0=1.0, m=1.0):
+    k = np.sqrt(2 * m * ME * (V0 - E) * QE) / HBAR
+    return 1 / (1 + V0 ** 2 * np.sinh(k * a_nm * 1e-9) ** 2 / (4 * E * (V0 - E)))
+noisy = lambda t: t * (1 + rng.normal(0, 0.01, t.size))
+hdr = ["barrier_width_nm", "transmission"]
+write("tunnel_clean.csv", hdr, aw, noisy(t_exact(aw)), fmt="{:.6g}")
+# the simulation used half the electron mass (a units slip), so the decay is too slow
+write("tunnel_mass.csv", hdr, aw, noisy(t_exact(aw, m=0.5)), fmt="{:.6g}")
+# coarse grid: the solver can't resolve tiny transmissions and levels off near 2e-4
+write("tunnel_floor.csv", hdr, aw, noisy(t_exact(aw) + 2e-4), fmt="{:.6g}")
+# follow-up: the same (half-mass) simulation run at two energies
+e2 = np.r_[np.full(aw.size, 0.5), np.full(aw.size, 0.25)]
+a2 = np.r_[aw, aw]
+write("tunnel_mass_two_energies.csv", ["barrier_width_nm", "transmission", "energy_eV"], a2,
+      noisy(t_exact(a2, E=e2, m=0.5)), e2, fmt="{:.6g}")
+
+# --- Blackbody radiation: tungsten lamp at 2800 K -----------------------------
+lb = np.arange(400, 1701, 50, dtype=float)
+def pl(lam_nm, T=2800.0):
+    l = lam_nm * 1e-9
+    return (1e-6 / l) ** 5 / np.expm1(H * CL / (l * KB * T))
+norm = pl(np.linspace(400, 1700, 500)).max()
+bb = lambda lam, T=2800.0, c=0.0: pl(lam, T) / norm + c
+hdr = ["wavelength_nm", "spectral_radiance"]
+write("blackbody_clean.csv", hdr, lb, bb(lb) + rng.normal(0, 0.005, lb.size), fmt="{:.5g}")
+# spectrometer wavelength scale reads 30 nm long: every point is labelled 30 nm too far
+write("blackbody_shift.csv", hdr, lb + 30, bb(lb) + rng.normal(0, 0.005, lb.size), fmt="{:.5g}")
+# stray light / dark current adds a constant 4% background
+write("blackbody_offset.csv", hdr, lb, bb(lb, c=0.04) + rng.normal(0, 0.005, lb.size), fmt="{:.5g}")
+# follow-up: mercury calibration lamp lines, true against measured
+hg = np.array([404.66, 435.83, 546.07, 576.96, 579.07])
+write("blackbody_shift_hg.csv", ["reference_nm", "measured_nm"], hg, hg + 30 + rng.normal(0, 0.2, hg.size), fmt="{:.2f}")
+
+# --- Atomic spectral lines: hydrogen Balmer series ------------------------------
+RH = 1.0967758e7
+nn = np.arange(3, 8, dtype=float)
+balmer = lambda n, d=0.0: 1e9 / (RH * (0.25 - 1 / n ** 2)) + d
+hdr = ["n_upper", "wavelength_nm"]
+write("balmer_clean.csv", hdr, nn, balmer(nn) + rng.normal(0, 0.05, nn.size), fmt="{:.6g}")
+# the line read as H-gamma (n = 5) is really the 435.8 nm mercury line from a contaminated tube
+lines_imp = balmer(nn) + rng.normal(0, 0.05, nn.size); lines_imp[2] = 435.83
+write("balmer_impurity.csv", hdr, nn, lines_imp, fmt="{:.6g}")
+# spectrometer calibration off by +2 nm on every line
+write("balmer_offset.csv", hdr, nn, balmer(nn, 2.0) + rng.normal(0, 0.05, nn.size), fmt="{:.6g}")
+# follow-up: the same lines measured with a fresh hydrogen tube
+write("balmer_fresh_tube.csv", hdr, nn, balmer(nn) + rng.normal(0, 0.05, nn.size), fmt="{:.6g}")
+
 print(f"Wrote bench datasets to {OUT}")

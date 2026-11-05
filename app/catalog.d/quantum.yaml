@@ -1,0 +1,99 @@
+# Quantum area. Merged into catalog.yaml by app/pipeline.py.
+domains:
+  - {id: quantum, label: Quantum}
+
+experiments:
+  planck_led:
+    label: Planck's constant from LEDs
+    domain: quantum
+    blurb: Turn-on voltage of LEDs of different colours, to measure h
+    columns: [wavelength_nm, turn_on_voltage_V]
+    model: "eV = hf − φ"
+    expected: [[planck_constant_Js, "Accepted h (J·s)", 6.62607015e-34], [precision_V, "Reading precision (V)", 0.015]]
+    samples:
+      - [planck_gain.csv, "h comes out 10% low"]
+      - [planck_mislabelled.csv, "One LED sits off the line"]
+      - [planck_clean.csv, "Healthy measurement"]
+    followups: {reference_meter_check: planck_gain_refmeter.csv}
+    questions: ["Fit V against frequency and report h"]
+
+  tunnelling:
+    label: Quantum tunnelling simulation
+    domain: quantum
+    blurb: Transmission through a rectangular barrier against its width, from a solver
+    columns: [barrier_width_nm, transmission]
+    model: "T ≈ e^(−2κa), κ = √(2m(V₀−E))/ħ"
+    expected: [[barrier_eV, "Barrier height V₀ (eV)", 1.0], [energy_eV, "Particle energy E (eV)", 0.5], [mass_me, "Mass (electron masses)", 1.0]]
+    samples:
+      - [tunnel_mass.csv, "Decays far too slowly"]
+      - [tunnel_floor.csv, "Levels off for thick barriers"]
+      - [tunnel_clean.csv, "Healthy simulation"]
+    followups: {second_energy_run: tunnel_mass_two_energies.csv}
+    questions: ["Fit the decay constant kappa from the thick barriers"]
+
+  blackbody:
+    label: Blackbody radiation
+    domain: quantum
+    blurb: Spectrum of a tungsten lamp, fitted with Planck's law
+    columns: [wavelength_nm, spectral_radiance]
+    model: "B(λ,T) ∝ λ⁻⁵ / (e^(hc/λkT) − 1)"
+    expected: [[temperature_K, "Expected lamp temperature (K)", 2800]]
+    samples:
+      - [blackbody_shift.csv, "Lamp looks 3% cooler than rated"]
+      - [blackbody_offset.csv, "Spectrum never reaches zero"]
+      - [blackbody_clean.csv, "Healthy spectrum"]
+    followups: {mercury_line_check: blackbody_shift_hg.csv}
+    questions: ["Fit Planck's law and report the temperature and Wien peak"]
+
+  spectral_lines:
+    label: Atomic spectral lines (hydrogen)
+    domain: quantum
+    blurb: Balmer lines of a hydrogen tube, to measure the Rydberg constant
+    columns: [n_upper, wavelength_nm]
+    model: "1/λ = R(1/2² − 1/n²)"
+    expected: [[rydberg_per_m, "Accepted Rydberg constant (/m)", 1.0967758e7], [precision_nm, "Reading precision (nm)", 0.1]]
+    samples:
+      - [balmer_impurity.csv, "One line is off the series"]
+      - [balmer_offset.csv, "Every line a little long"]
+      - [balmer_clean.csv, "Healthy spectrum"]
+    followups: {fresh_tube_repeat: balmer_fresh_tube.csv}
+    questions: ["Fit the Balmer formula and report the Rydberg constant"]
+
+sample_info:
+  planck_clean.csv: ["Turn-on voltages of seven LEDs, from 940 nm infrared to 405 nm violet, read at the onset of light.", "Nothing should look off: the slope of V against frequency gives h."]
+  planck_gain.csv: ["The same seven LEDs and the same turn-on method.", "The points lie on a good straight line, but its slope gives h about 10% below the accepted value."]
+  planck_mislabelled.csv: ["The same seven LEDs and the same turn-on method.", "Six LEDs line up and give the right h, but the one labelled 590 nm sits well off the line."]
+  planck_gain_refmeter.csv: ["The 590 nm LED held at turn-on: ten readings on the lab meter, then ten on a calibrated reference meter.", "Do the two meters agree?"]
+  tunnel_clean.csv: ["A solver's transmission through a 1 eV barrier for a 0.5 eV electron, widths 0.1–1.2 nm.", "Nothing should look off: matches the analytic barrier formula."]
+  tunnel_mass.csv: ["The same barrier simulation.", "Transmission falls exponentially, but far more slowly than an electron at this energy should."]
+  tunnel_floor.csv: ["The same barrier simulation.", "Right at first, but for thick barriers the transmission stops falling and levels off near 2×10⁻⁴."]
+  tunnel_mass_two_energies.csv: ["The same simulation run again at 0.5 eV and at 0.25 eV.", "Does the decay constant change between the two energies as theory says it should?"]
+  blackbody_clean.csv: ["Spectrum of a tungsten lamp rated at 2800 K, 400–1700 nm in 50 nm steps.", "Nothing should look off: Planck's law fits at 2800 K."]
+  blackbody_shift.csv: ["The same lamp and spectrometer.", "Planck's law fits, but only at about 2715 K, 3% below the lamp's rating."]
+  blackbody_offset.csv: ["The same lamp and spectrometer.", "The temperature is right, but the spectrum sits about 4% above zero at both ends."]
+  blackbody_shift_hg.csv: ["Five lines of a mercury calibration lamp on the same spectrometer, true against measured.", "Do the lines read at their true wavelengths?"]
+  balmer_clean.csv: ["Five Balmer lines of a hydrogen discharge tube (n = 3 to 7), read on a grating spectrometer.", "Nothing should look off: the Rydberg formula fits every line."]
+  balmer_impurity.csv: ["The same five Balmer lines.", "Four lines fit the Rydberg formula, but the one taken as n = 5 is almost 2 nm out."]
+  balmer_offset.csv: ["The same five Balmer lines.", "Every line reads about 2 nm long, by the same amount."]
+  balmer_fresh_tube.csv: ["The same lines read again with a fresh hydrogen tube.", "Is the odd line still there?"]
+
+labels:
+  planck_constant_Js: ["Planck's constant h", "J·s", 1]
+  accepted_planck_constant_Js: ["Accepted h", "J·s", 1]
+  work_function_term_V: ["Intercept term φ/e", "V"]
+  lab_meter_V: ["Lab meter", "V"]
+  reference_meter_V: ["Reference meter", "V"]
+  lab_over_reference: ["Lab ÷ reference", "", 1]
+  decay_constant_per_nm: ["Decay constant κ", "/nm", 1]
+  expected_decay_constant_per_nm: ["Expected κ", "/nm", 1]
+  transmission_floor: ["Transmission floor", "", 1]
+  kappa_ratio_squared: ["κ² ratio between energies", "", 1]
+  expected_ratio_squared: ["Expected κ² ratio", "", 1]
+  temperature_K: ["Temperature, fitted", "K", 1]
+  expected_temperature_K: ["Temperature, rated", "K", 1]
+  wien_peak_nm: ["Wien peak", "nm", 1]
+  background_level: ["Background level", "", 1]
+  wavelength_shift_nm: ["Wavelength scale shift", "nm", 1]
+  rydberg_per_m: ["Rydberg constant, fitted", "/m", 1]
+  accepted_rydberg_per_m: ["Rydberg constant, accepted", "/m", 1]
+  calibration_offset_nm: ["Calibration offset", "nm", 1]

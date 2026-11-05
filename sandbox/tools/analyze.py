@@ -35,6 +35,10 @@ COLUMNS = {
     "diode": (["voltage_V", "current_A"],),
     "grating": (["order_m", "angle_deg"],),
     "hall": (["current_A", "hall_voltage_V"],),
+    "planck_led": (["wavelength_nm", "turn_on_voltage_V"], ["meter", "voltage_V"]),
+    "tunnelling": (["barrier_width_nm", "transmission"],),
+    "blackbody": (["wavelength_nm", "spectral_radiance"], ["reference_nm", "measured_nm"]),
+    "spectral_lines": (["n_upper", "wavelength_nm"],),
 }
 
 
@@ -190,6 +194,7 @@ def analyze_resistance_any(header, data, expected):
     return analyze_resistance(header, data, expected)
 
 
+COLUMNS.update(experiments.EXTRA_COLUMNS)
 ANALYSES = {"resistance_4wire": analyze_resistance_any, "waveform": analyze_waveform, **experiments.ANALYSES}
 
 

@@ -500,6 +500,193 @@ def hall(header, data, expected):
     }
 
 
+# =============================================================================
+# Quantum
+H = 6.62607015e-34
+E_CH = 1.602176634e-19
+C = 299792458.0
+KB = 1.380649e-23
+HBAR = H / (2 * np.pi)
+ME = 9.1093837e-31
+
+
+# --- Planck's constant from LED turn-on voltages: eV = hf − φ ------------------
+def planck_led(header, data, expected):
+    h_exp = float(expected.get("planck_constant_Js", H))
+    if "meter" in header:
+        # follow-up: one LED's turn-on voltage read on the lab meter, then a reference meter
+        (ml, el, mr, er), plot = groups_result(header, data, "meter", "voltage_V", "V",
+                                               "turn-on voltage (V)", "reading (lab meter, then reference meter)",
+                                               expected_level=float(np.mean(col(header, data, "voltage_V"))))
+        plot["lines"] = plot["lines"][:2]
+        ratio = ml / mr
+        return {
+            "values": {"lab_meter_V": {"value": ml, "uncertainty": el},
+                       "reference_meter_V": {"value": mr, "uncertainty": er},
+                       "lab_over_reference": {"value": ratio}},
+            "evidence": {"meter_disagrees": bool(abs(ratio - 1) > 0.03 and sig(ml - mr, float(np.hypot(el, er))) > 5)},
+            "plot": plot,
+        }
+    lam = col(header, data, "wavelength_nm")
+    v = col(header, data, "turn_on_voltage_V")
+    f = C / (lam * 1e-9) / 1e14                       # in 10^14 Hz, so the fit is well conditioned
+    a, b, ea, eb = linfit(f, v)
+    h = a / 1e14 * E_CH
+    ea = ea / 1e14
+    # each LED against a line through the others, in units of the stated reading precision
+    prec = float(expected.get("precision_V", 0.015))
+    out = 0.0
+    for i in range(len(f)):
+        m = np.ones(len(f), bool)
+        m[i] = False
+        p = np.polyfit(f[m], v[m], 1)
+        out = max(out, abs(float(v[i] - np.polyval(p, f[i]))) / prec)
+    fs = dense(f)
+    return {
+        "values": {
+            "planck_constant_Js": {"value": h, "uncertainty": ea * E_CH},
+            "accepted_planck_constant_Js": {"value": h_exp},
+            "work_function_term_V": {"value": -b, "uncertainty": eb},
+        },
+        "evidence": {"h_error_pct": 100 * (h / h_exp - 1), "outlier_sigma": out},
+        "plot": {"x": f.tolist(), "y": v.tolist(), "x_label": "LED light frequency (×10¹⁴ Hz)",
+                 "y_label": "turn-on voltage (V)", "unit": "V", "x_unit": "", "connect": False,
+                 "lines": [{"role": "fit", "x": fs.tolist(), "y": (a * fs + b).tolist()},
+                           {"role": "expected", "x": fs.tolist(),
+                            "y": (h_exp / E_CH * 1e14 * fs + b).tolist()}]},
+    }
+
+
+# --- Quantum tunnelling through a rectangular barrier: T ≈ e^(−2κa) ------------
+def tunnelling(header, data, expected):
+    a_nm = col(header, data, "barrier_width_nm")
+    T = col(header, data, "transmission")
+    V0 = float(expected.get("barrier_eV", 1.0))
+    E = float(expected.get("energy_eV", 0.5))
+    m = float(expected.get("mass_me", 1.0)) * ME
+    kappa = lambda e: np.sqrt(2 * m * (V0 - e) * E_CH) / HBAR
+    def t_model(a, k, e, floor=0.0):
+        return 1 / (1 + V0 ** 2 * np.sinh(k * a * 1e-9) ** 2 / (4 * e * (V0 - e))) + floor
+    def k_fit(a, t, e, with_floor=False):
+        k0 = kappa(e) / 1e9
+        if with_floor:
+            f = lambda a, k, fl: np.log(t_model(a, k * 1e9, e, fl))
+            p, ep = fit(f, a, np.log(t), [k0, 1e-6], bounds=([k0 / 10, 0], [k0 * 10, 1]))
+            return p[0] * 1e9, ep[0] * 1e9, p[1], ep[1]
+        f = lambda a, k: np.log(t_model(a, k * 1e9, e))
+        p, ep = fit(f, a, np.log(t), [k0], bounds=([k0 / 10], [k0 * 10]))
+        return p[0] * 1e9, ep[0] * 1e9, 0.0, 0.0
+    if "energy_eV" in header:
+        # follow-up: the same simulation run at two energies
+        en = col(header, data, "energy_eV")
+        e1, e2 = sorted(set(en.tolist()))[:2]
+        k1 = k_fit(a_nm[en == e1], T[en == e1], e1)[0]
+        k2 = k_fit(a_nm[en == e2], T[en == e2], e2)[0]
+        r, r_exp = (k2 / k1) ** 2, (V0 - e2) / (V0 - e1)
+        return {
+            "values": {"kappa_ratio_squared": {"value": r}, "expected_ratio_squared": {"value": r_exp}},
+            "evidence": {"energy_scaling_ok": bool(abs(r / r_exp - 1) < 0.05)},
+            "plot": {"x": a_nm.tolist(), "y": np.log10(T).tolist(), "x_label": "barrier width (nm), two energies",
+                     "y_label": "log₁₀ transmission", "unit": "", "x_unit": "nm", "connect": False, "lines": []},
+        }
+    kf, ekf, fl, efl = k_fit(a_nm, T, E, with_floor=True)
+    k_exp = kappa(E)
+    xs = dense(a_nm)
+    return {
+        "values": {
+            "decay_constant_per_nm": {"value": kf * 1e-9, "uncertainty": ekf * 1e-9},
+            "expected_decay_constant_per_nm": {"value": k_exp * 1e-9},
+            "transmission_floor": {"value": fl, "uncertainty": efl},
+        },
+        "evidence": {"kappa_error_pct": 100 * (kf / k_exp - 1), "floor_sigma": sig(fl, efl)},
+        "plot": {"x": a_nm.tolist(), "y": np.log10(T).tolist(), "x_label": "barrier width (nm)",
+                 "y_label": "log₁₀ transmission", "unit": "", "x_unit": "nm",
+                 "lines": [{"role": "fit", "x": xs.tolist(), "y": np.log10(t_model(xs, kf, E, fl)).tolist()},
+                           {"role": "expected", "x": xs.tolist(), "y": np.log10(t_model(xs, k_exp, E)).tolist()}]},
+    }
+
+
+# --- Blackbody radiation: Planck's law -------------------------------------------
+def planck_law(lam_nm, A, T, c=0.0):
+    l = lam_nm * 1e-9
+    return A * (1e-6 / l) ** 5 / np.expm1(H * C / (l * KB * T)) + c
+
+
+def blackbody(header, data, expected):
+    if "reference_nm" in header:
+        # follow-up: lines of a mercury calibration lamp, true against measured
+        ref = col(header, data, "reference_nm")
+        meas = col(header, data, "measured_nm")
+        m, e = mean_err(meas - ref)
+        return {
+            "values": {"wavelength_shift_nm": {"value": m, "uncertainty": e}},
+            "evidence": {"calibration_shift_found": bool(abs(m) > 2 and sig(m, e) > 5)},
+            "plot": {"x": ref.tolist(), "y": (meas - ref).tolist(), "x_label": "true line wavelength (nm)",
+                     "y_label": "measured − true (nm)", "unit": "nm", "x_unit": "nm", "connect": False,
+                     "lines": [{"role": "fit", "x": [float(ref.min()), float(ref.max())], "y": [m, m]},
+                               {"role": "expected", "x": [float(ref.min()), float(ref.max())], "y": [0, 0]}]},
+        }
+    lam = col(header, data, "wavelength_nm")
+    y = col(header, data, "spectral_radiance")
+    T_exp = float(expected.get("temperature_K", 2800))
+    p0 = [1.0, T_exp, 0.0]
+    shape = planck_law(lam, 1.0, T_exp)
+    p0[0] = float(np.max(y) / np.max(shape))
+    (A, T, c), (eA, eT, ec) = fit(planck_law, lam, y, p0, bounds=([0, 500, -np.inf], [np.inf, 20000, np.inf]))
+    xs = dense(lam)
+    peak = 2.897771955e-3 / T * 1e9
+    A_exp = float(np.max(y) / np.max(planck_law(xs, 1.0, T_exp)))
+    return {
+        "values": {
+            "temperature_K": {"value": T, "uncertainty": eT},
+            "expected_temperature_K": {"value": T_exp},
+            "wien_peak_nm": {"value": peak},
+            "background_level": {"value": c, "uncertainty": ec},
+        },
+        # background as a fraction of the peak: stray light and dark current only ever add
+        "evidence": {"T_error_pct": 100 * (T / T_exp - 1), "offset_sigma": sig(c, ec),
+                     "background_fraction": float(c / np.max(y))},
+        "plot": {"x": lam.tolist(), "y": y.tolist(), "x_label": "wavelength (nm)", "y_label": "spectral radiance (relative)",
+                 "unit": "", "x_unit": "nm",
+                 "vlines": [{"x": peak, "label": f"Wien peak {peak:.0f} nm"}],
+                 "lines": [{"role": "fit", "x": xs.tolist(), "y": planck_law(xs, A, T, c).tolist()},
+                           {"role": "expected", "x": xs.tolist(), "y": planck_law(xs, A_exp, T_exp).tolist()}]},
+    }
+
+
+# --- Atomic spectral lines: hydrogen Balmer series, 1/λ = R(1/4 − 1/n²) ------------
+def spectral_lines(header, data, expected):
+    n = col(header, data, "n_upper")
+    lam = col(header, data, "wavelength_nm")
+    R_exp = float(expected.get("rydberg_per_m", 1.0967758e7))
+    prec = float(expected.get("precision_nm", 0.1))
+    x = 0.25 - 1 / n ** 2
+    model = lambda x, R, d: 1e9 / (R * x) + d          # λ in nm with a constant calibration offset d
+    p_, cov_ = curve_fit(model, x, lam, p0=[R_exp, 0.0], sigma=np.full(len(x), prec), absolute_sigma=True, maxfev=20000)
+    (R, d), (eR, ed) = p_, np.sqrt(np.diag(cov_))
+    worst = 0.0
+    if len(x) >= 4:
+        for i in range(len(x)):
+            m = np.ones(len(x), bool)
+            m[i] = False
+            (Ri, di), _ = fit(model, x[m], lam[m], [R_exp, 0.0])
+            worst = max(worst, abs(float(lam[i] - model(x[i], Ri, di))) / prec)
+    ns = np.linspace(n.min(), n.max(), 120)
+    xs = 0.25 - 1 / ns ** 2
+    return {
+        "values": {
+            "rydberg_per_m": {"value": R, "uncertainty": eR},
+            "accepted_rydberg_per_m": {"value": R_exp},
+            "calibration_offset_nm": {"value": d, "uncertainty": ed},
+        },
+        "evidence": {"R_error_pct": 100 * (R / R_exp - 1), "line_offset_sigma": sig(d, ed), "outlier_sigma": worst},
+        "plot": {"x": n.tolist(), "y": lam.tolist(), "x_label": "upper level n (Balmer series, to n = 2)",
+                 "y_label": "line wavelength (nm)", "unit": "nm", "x_unit": "", "connect": False,
+                 "lines": [{"role": "fit", "x": ns.tolist(), "y": model(xs, R, d).tolist()},
+                           {"role": "expected", "x": ns.tolist(), "y": model(xs, R_exp, 0).tolist()}]},
+    }
+
+
 ANALYSES = {
     "helmholtz": helmholtz,
     "laser_alignment": laser_alignment,
@@ -513,4 +700,20 @@ ANALYSES = {
     "diode": diode,
     "grating": grating,
     "hall": hall,
+    "planck_led": planck_led,
+    "tunnelling": tunnelling,
+    "blackbody": blackbody,
+    "spectral_lines": spectral_lines,
 }
+
+# Further experiment groups live in their own modules, sandbox/tools/bench_<group>.py,
+# each defining ANALYSES = {id: fn} and COLUMNS = {id: ([cols], [follow-up cols]...)}.
+EXTRA_COLUMNS = {}
+import importlib.util as _ilu  # noqa: E402
+import pathlib as _pl  # noqa: E402
+for _f in sorted(_pl.Path(__file__).parent.glob("bench_*.py")):
+    _spec = _ilu.spec_from_file_location(_f.stem, _f)
+    _mod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    ANALYSES.update(_mod.ANALYSES)
+    EXTRA_COLUMNS.update(getattr(_mod, "COLUMNS", {}))

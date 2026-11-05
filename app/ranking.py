@@ -11,7 +11,11 @@ from pathlib import Path
 
 import yaml
 
-LIB = yaml.safe_load((Path(__file__).parent.parent / "faults" / "faults.yaml").read_text())
+_FAULTS = Path(__file__).parent.parent / "faults"
+LIB = yaml.safe_load((_FAULTS / "faults.yaml").read_text())
+# Further experiment groups: faults/bench_<group>.yaml, each with an `experiments:` map.
+for _p in sorted(_FAULTS.glob("bench_*.yaml")):
+    LIB["experiments"].update(yaml.safe_load(_p.read_text())["experiments"])
 CONFIRM_AT = 0.90
 
 
@@ -99,7 +103,21 @@ OUTCOMES = {
 def test_outcome(test_id, new_evidence, prior_evidence):
     """Features that the test just run adds to the investigation."""
     hook = OUTCOMES.get(test_id)
-    return hook(new_evidence, prior_evidence) if hook else {}
+    if hook:
+        return hook(new_evidence, prior_evidence)
+    # Declarative form in a fault library test:
+    #   adds: {feature: offset_gone, from: offset_sigma, op: "<", value: 4}
+    # (op "copy" passes the follow-up feature through unchanged)
+    for exp in LIB["experiments"].values():
+        spec = (exp.get("tests", {}).get(test_id) or {}).get("adds")
+        if spec:
+            v = new_evidence.get(spec["from"])
+            if spec.get("op", "copy") == "copy":
+                return {spec["feature"]: v} if v is not None else {}
+            if v is None:
+                return {}
+            return {spec["feature"]: bool(_holds({"feature": "v", "op": spec["op"], "value": spec["value"]}, {"v": v}))}
+    return {}
 
 
 def _entropy(ps):

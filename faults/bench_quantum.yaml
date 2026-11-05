@@ -1,0 +1,245 @@
+# Quantum area fault library. Same format as faults.yaml; `fix` is what to do
+# once a cause is confirmed (used in the PDF report).
+experiments:
+
+  planck_led:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: h_error_pct, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the value of h with its uncertainty.
+      voltmeter_gain_error:
+        name: Voltmeter reading low or high (gain error)
+        prior: 0.20
+        typical_size: "A meter reading 8% low makes h come out about 8% low"
+        conditions:
+          - {feature: h_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: meter_disagrees, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Recalibrate or replace the voltmeter, or correct every reading by the ratio to the reference meter, then refit.
+      nominal_wavelengths:
+        name: LED wavelengths taken from the datasheet, not measured
+        prior: 0.18
+        typical_size: "LEDs emit 10–30 nm away from their nominal wavelength, which tilts the line"
+        conditions:
+          - {feature: h_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: meter_disagrees, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Measure each LED's peak wavelength with a spectrometer or grating and refit with the measured values.
+      mislabelled_led:
+        name: One LED isn't the colour on its label
+        prior: 0.12
+        conditions:
+          - {feature: outlier_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Measure the odd LED's wavelength, correct its label in the data, or drop it and say so.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Repeat the run with fresh LEDs and a second meter, and look at the residuals point by point.
+    tests:
+      reference_meter_check:
+        name: Read one LED's turn-on voltage on a calibrated reference meter too
+        minutes: 3
+        how: Hold the LED at its turn-on current and read the voltage on the lab meter, then on a calibrated meter, ten times each.
+        adds: {feature: meter_disagrees, from: meter_disagrees, op: copy}
+        outcomes:
+          voltmeter_gain_error: meters_disagree
+          nominal_wavelengths: meters_agree
+          mislabelled_led: meters_agree
+          no_fault: meters_agree
+      measure_led_spectra:
+        name: Measure each LED's peak wavelength with a spectrometer
+        minutes: 8
+        how: Point a fibre spectrometer at each LED at its turn-on current and record the peak.
+        outcomes:
+          nominal_wavelengths: peaks_differ
+          mislabelled_led: one_peak_differs
+          voltmeter_gain_error: peaks_match
+          no_fault: peaks_match
+        safety: Don't look straight into bright LEDs; ultraviolet ones can damage your eyes.
+
+  tunnelling:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: kappa_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: floor_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. The simulation agrees with the analytic barrier result.
+      wrong_mass:
+        name: Particle mass wrong in the simulation (units or effective mass)
+        prior: 0.20
+        typical_size: "Half the electron mass makes the decay constant 29% too small"
+        conditions:
+          - {feature: kappa_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: floor_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: energy_scaling_ok, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Check the mass used in the code (SI units, and the effective mass if it's a semiconductor), then rerun.
+      energy_reference_wrong:
+        name: Barrier height or energy measured from the wrong zero
+        prior: 0.16
+        conditions:
+          - {feature: kappa_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: floor_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: energy_scaling_ok, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Print V₀ − E inside the solver and make sure both share the same zero and the same units (J, not eV).
+      numerical_floor:
+        name: Solver grid too coarse to resolve small transmissions
+        prior: 0.15
+        typical_size: "The transmission levels off instead of falling exponentially for thick barriers"
+        conditions:
+          - {feature: floor_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Refine the spatial grid (at least 20 points per decay length) or use the transfer-matrix method, then rerun.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Compare the solver against the analytic rectangular-barrier formula one width at a time.
+    tests:
+      second_energy_run:
+        name: Rerun the simulation at a second energy (0.25 eV)
+        minutes: 2
+        how: Keep everything else the same and run at E = 0.25 eV. A mass error scales both energies alike; a wrong energy zero does not.
+        adds: {feature: energy_scaling_ok, from: energy_scaling_ok, op: copy}
+        outcomes:
+          wrong_mass: scaling_ok
+          energy_reference_wrong: scaling_off
+          numerical_floor: scaling_ok
+          no_fault: scaling_ok
+      analytic_check:
+        name: Compare one thick barrier with the analytic formula
+        minutes: 5
+        how: Run a 1.2 nm barrier and compare with T = [1 + V₀² sinh²(κa) / 4E(V₀ − E)]⁻¹.
+        outcomes:
+          numerical_floor: solver_high
+          wrong_mass: solver_high
+          energy_reference_wrong: solver_differs
+          no_fault: solver_matches
+
+  blackbody:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: T_error_pct, op: abs_lt, value: 1.5, p_true: 0.95, p_false: 0.01}
+          - {feature: background_fraction, op: "<", value: 0.015, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the temperature and the Wien peak.
+      wavelength_scale_shift:
+        name: Spectrometer wavelength scale shifted
+        prior: 0.20
+        typical_size: "A 30 nm shift moves the peak and makes a 2800 K lamp look about 3% cooler"
+        conditions:
+          - {feature: T_error_pct, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.02}
+          - {feature: background_fraction, op: "<", value: 0.015, p_true: 0.9, p_false: 0.2}
+          - {feature: calibration_shift_found, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Recalibrate the wavelength axis with the mercury lines, or subtract the measured shift, then refit.
+      lamp_underpowered:
+        name: Lamp running below its rated temperature (supply low)
+        prior: 0.18
+        conditions:
+          - {feature: T_error_pct, op: "<", value: -2, p_true: 0.95, p_false: 0.02}
+          - {feature: background_fraction, op: "<", value: 0.015, p_true: 0.9, p_false: 0.2}
+          - {feature: calibration_shift_found, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Set the lamp to its rated voltage, measured at the lamp, let it settle for five minutes and repeat.
+      stray_light_background:
+        name: Stray light or dark current adding a background
+        prior: 0.14
+        conditions:
+          - {feature: background_fraction, op: ">", value: 0.02, p_true: 0.95, p_false: 0.01}
+        fix: Take a dark spectrum with the lamp shuttered and subtract it, and close the spectrometer to room light.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the detector's response curve and whether it was applied to the spectrum.
+    tests:
+      mercury_line_check:
+        name: Record a mercury calibration lamp on the same spectrometer
+        minutes: 3
+        how: Swap in a mercury pen lamp and read its five strongest lines (404.7, 435.8, 546.1, 577.0, 579.1 nm).
+        adds: {feature: calibration_shift_found, from: calibration_shift_found, op: copy}
+        outcomes:
+          wavelength_scale_shift: lines_shifted
+          lamp_underpowered: lines_on_scale
+          stray_light_background: lines_on_scale
+          no_fault: lines_on_scale
+        safety: Mercury lamps emit ultraviolet; keep the cover on and don't look at the bare lamp.
+      measure_lamp_supply:
+        name: Measure the lamp's voltage and current at its terminals
+        minutes: 4
+        how: Compare with the lamp's rating; filament temperature follows its resistance.
+        outcomes:
+          lamp_underpowered: below_rating
+          wavelength_scale_shift: at_rating
+          stray_light_background: at_rating
+          no_fault: at_rating
+        safety: Tungsten lamps get hot enough to burn; let them cool before handling.
+
+  spectral_lines:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: line_offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the Rydberg constant with its uncertainty.
+      impurity_line:
+        name: A line from another element mistaken for a hydrogen line
+        prior: 0.17
+        typical_size: "Mercury's 435.8 nm line sits 1.8 nm from H-gamma at 434.0 nm"
+        conditions:
+          - {feature: outlier_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: outlier_gone_fresh_tube, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Replace the discharge tube (or note the impurity), find the true hydrogen line nearby, and refit.
+      misassigned_line:
+        name: A line assigned the wrong upper level n
+        prior: 0.15
+        conditions:
+          - {feature: outlier_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: outlier_gone_fresh_tube, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Reassign the line (red 656 nm is n = 3, then 486, 434, 410, 397 nm) and refit.
+      calibration_offset:
+        name: Spectrometer wavelength calibration offset
+        prior: 0.18
+        typical_size: "A constant shift shows up as an offset the Rydberg formula can't absorb"
+        conditions:
+          - {feature: line_offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+        fix: Recalibrate with a reference lamp, or subtract the fitted offset, and quote it in the result.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check air against vacuum wavelengths and the spectrometer's dispersion calibration.
+    tests:
+      fresh_tube_repeat:
+        name: Remeasure the odd line with a fresh hydrogen tube
+        minutes: 5
+        how: Swap in a new hydrogen discharge tube and read the same line again.
+        adds: {feature: outlier_gone_fresh_tube, from: outlier_sigma, op: "<", value: 4}
+        outcomes:
+          impurity_line: line_moves
+          misassigned_line: line_stays
+          calibration_offset: line_stays
+          no_fault: line_stays
+        safety: Discharge tubes run at several kilovolts; switch off before swapping and let the tube cool.
+      reference_lamp_calibration:
+        name: Calibrate the spectrometer with a reference lamp
+        minutes: 4
+        how: Read the lines of a mercury or helium lamp and compare with their tabulated wavelengths.
+        outcomes:
+          calibration_offset: offset_found
+          impurity_line: no_offset
+          misassigned_line: no_offset
+          no_fault: no_offset

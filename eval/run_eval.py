@@ -18,6 +18,8 @@ from app.pipeline import analyse  # noqa: E402
 
 SEEDED = ROOT / "data" / "seeded"
 manifest = yaml.safe_load((ROOT / "data" / "manifest.yaml").read_text())
+for _p in sorted((ROOT / "data" / "manifest.d").glob("*.yaml")):
+    manifest["datasets"] += yaml.safe_load(_p.read_text())["datasets"]
 rows, passed = [], 0
 for d in manifest["datasets"]:
     context = None

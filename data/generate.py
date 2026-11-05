@@ -80,3 +80,5 @@ print(f"Wrote seeded datasets to {OUT}")
 # Extended experiment bench
 import runpy as _r
 _r.run_path(str(Path(__file__).parent / "generate_bench.py"))
+for _g in sorted(Path(__file__).parent.glob("gen_*.py")):  # further experiment groups
+    _r.run_path(str(_g))

@@ -432,8 +432,13 @@ const LABELS = {
 const SI_UNITS = new Set(["V", "A", "Ω", "Hz", "s", "F"]);
 function plain(v, unit = "", prec = 4) {
   if (v == null || !isFinite(v)) return "—";
-  const n = Math.abs(v) >= 1e4 || (Math.abs(v) < 1e-3 && v !== 0) ? v.toExponential(2) : (+v.toPrecision(prec)).toString();
+  const n = Math.abs(v) >= 1e4 || (Math.abs(v) < 1e-3 && v !== 0) ? sci(v, prec) : (+v.toPrecision(prec)).toString();
   return unit ? (unit === "°" ? `${n}°` : `${n} ${unit}`) : n;
+}
+const SUP = { "-": "⁻", 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
+function sci(v, prec = 4) {
+  const [m, e] = v.toExponential(Math.max(1, Math.min(prec, 4) - 1)).split("e");
+  return `${m}×10${String(+e).split("").map(c => SUP[c] || c).join("")}`;
 }
 function fmt(v, unit, isPlain, prec) { return isPlain || !SI_UNITS.has(unit) ? plain(v, unit, prec) : si(v, unit); }
 
@@ -911,7 +916,7 @@ document.addEventListener("keydown", e => { if (TOUR.on && e.key === "Escape") e
 async function init() {
   try {
     const s = await fetch("/api/status").then(r => r.json());
-    CAT = s.catalog; renderExperiment();
+    CAT = s.catalog; Object.assign(LABELS, CAT.labels || {}); renderExperiment();
     const isolated = s.mode === "docker";
     $("lamp-box").className = "lamp" + (isolated ? "" : " warn");
     $("pill-box").textContent = isolated ? `Sandbox: ${s.runtime === "runsc" ? "gVisor" : "Docker"}, no network` : "Sandbox: development mode";

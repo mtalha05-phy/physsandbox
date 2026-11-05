@@ -10,6 +10,16 @@ from .sandbox import run_job
 from .summariser import summarise
 
 CATALOG = yaml.safe_load((Path(__file__).parent / "catalog.yaml").read_text())
+CATALOG.setdefault("labels", {})
+# Further experiment groups: app/catalog.d/<group>.yaml with domains, experiments,
+# sample_info and labels (display names for the values the analyses return).
+for _p in sorted((Path(__file__).parent / "catalog.d").glob("*.yaml")):
+    _c = yaml.safe_load(_p.read_text())
+    known = {d["id"] for d in CATALOG["domains"]}
+    CATALOG["domains"] += [d for d in _c.get("domains", []) if d["id"] not in known]
+    CATALOG["experiments"].update(_c.get("experiments", {}))
+    CATALOG["sample_info"].update(_c.get("sample_info", {}))
+    CATALOG["labels"].update(_c.get("labels", {}))
 EXPERIMENTS = {k: v["label"] for k, v in CATALOG["experiments"].items()}
 
 

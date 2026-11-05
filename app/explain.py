@@ -25,7 +25,10 @@ PROPER = ("Earth", "Hall", "Faraday", "Malus", "Newton", "Beer")
 
 
 def _lc(name):
-    return name if name.startswith(PROPER) else name[0].lower() + name[1:]
+    # keep proper nouns and acronyms (LED, EMF) as they are
+    if name.startswith(PROPER) or (len(name) > 1 and name[1].isupper()):
+        return name
+    return name[0].lower() + name[1:]
 
 
 def _template(result):
