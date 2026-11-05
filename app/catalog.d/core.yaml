@@ -1,0 +1,87 @@
+# Core undergraduate experiments. Merged into catalog.yaml by app/pipeline.py.
+# Quantum is listed first so the new Nuclear area sorts after it; the loader
+# de-duplicates domains by id, so this doesn't clash with quantum.yaml.
+domains:
+  - {id: quantum, label: Quantum}
+  - {id: nuclear, label: "Nuclear & particle"}
+
+experiments:
+  photoelectric:
+    label: Photoelectric effect (h/e)
+    domain: quantum
+    blurb: Stopping voltage for mercury lines through filters, to measure h/e and the work function
+    columns: [wavelength_nm, stopping_voltage_V]
+    model: "eV_s = hf − φ"
+    expected: [[h_over_e_Vs, "Accepted h/e (V·s)", 4.135667696e-15], [precision_V, "Reading precision (V)", 0.01]]
+    samples:
+      - [photo_anode.csv, "h/e comes out 12% low"]
+      - [photo_filter_leak.csv, "Yellow point sits above the line"]
+      - [photo_clean.csv, "Healthy measurement"]
+    followups: {mask_anode: photo_anode_masked.csv}
+    questions: ["Fit stopping voltage against frequency and report h/e and the work function"]
+
+  franck_hertz:
+    label: Franck–Hertz experiment (mercury)
+    domain: quantum
+    blurb: Anode current against accelerating voltage in a heated mercury tube; the peak spacing gives the first excitation energy
+    columns: [accelerating_voltage_V, anode_current_nA]
+    model: "peaks at V = V_c + n·E₁/e"
+    expected: [[excitation_eV, "First excitation energy (eV)", 4.9], [peak_precision_V, "Peak reading precision (V)", 0.15], [oven_setpoint_C, "Oven set point (°C)", 180]]
+    samples:
+      - [fh_cool_oven.csv, "Dips between the peaks are shallow"]
+      - [fh_saturated.csv, "Top peaks cut flat"]
+      - [fh_clean.csv, "Healthy sweep"]
+    followups: {read_oven_thermometer: fh_oven_thermometer.csv}
+    questions: ["Find the peaks and report the excitation energy from their spacing"]
+
+  radioactive_decay:
+    label: Radioactive decay (Geiger–Müller)
+    domain: nuclear
+    blurb: Counts per interval from a Ba-137m sample on a GM counter, to measure the half-life
+    columns: [time_s, counts]
+    model: "N = N₀ e^(−λt) + B, t½ = ln 2 / λ"
+    expected: [[half_life_s, "Expected half-life (s)", 153.1], [dead_time_us, "Counter dead time (µs)", 150]]
+    samples:
+      - [decay_background.csv, "Counts level off instead of falling to zero"]
+      - [decay_dead_time.csv, "Decays too slowly at the start"]
+      - [decay_clean.csv, "Healthy decay"]
+    followups: {source_removed_count: decay_background_removed.csv}
+    questions: ["Fit the decay and report the half-life"]
+
+sample_info:
+  photo_clean.csv: ["A mercury lamp and five filters (UV 365, violet 405, blue 436, green 546 and yellow 577 nm) on a vacuum phototube; the stopping voltage is read for each line.", "Nothing should look off: the slope of stopping voltage against frequency gives h/e."]
+  photo_anode.csv: ["The same lamp, filters and phototube.", "The five points lie on a good straight line, but its slope gives h/e about 12% below the accepted value."]
+  photo_filter_leak.csv: ["The same lamp, filters and phototube.", "Four lines fall on a straight line, but the yellow 577 nm point sits about 0.12 V above it."]
+  photo_anode_masked.csv: ["Every line read again: first as before, then with a mask fitted so the light falls only on the cathode.", "Does the slope change when the anode is masked?"]
+  fh_clean.csv: ["A mercury Franck–Hertz tube in its oven, accelerating voltage swept 0–30 V in 0.1 V steps, retarding voltage 1.5 V.", "Nothing should look off: peaks about 4.9 V apart with deep dips between them."]
+  fh_cool_oven.csv: ["The same tube and settings.", "The peaks are still 4.9 V apart, but the dips are shallow, the current is higher and the first peak barely shows above the rise."]
+  fh_saturated.csv: ["The same tube and settings.", "The lower peaks look right, but the top two are cut flat at the same current."]
+  fh_oven_thermometer.csv: ["The oven thermometer read once a minute for six minutes.", "Is the oven at its 180 °C set point?"]
+  decay_clean.csv: ["A Ba-137m sample eluted from a Cs-137 generator, counted on an end-window GM tube in 10 s intervals for 25 minutes, room background subtracted.", "Nothing should look off: a straight line on the log plot with the 2.55-minute half-life."]
+  decay_background.csv: ["The same generator, counter and intervals, starting at about 120 counts per second.", "The decay starts at the right rate, but after about 15 minutes the counts level off near 8 per interval instead of falling towards zero."]
+  decay_dead_time.csv: ["The same generator and counter, with the sample right against the tube window: nearly 1800 counts per second at the start.", "The decay looks too slow at the start and the half-life comes out about 15% long."]
+  decay_background_removed.csv: ["The same decay log, then the sample taken away and the room background counted for three more minutes.", "Is the level the counts settle at the same as the room background?"]
+
+labels:
+  h_over_e_Vs: ["h/e, fitted", "V·s", 1]
+  accepted_h_over_e_Vs: ["h/e, accepted", "V·s", 1]
+  planck_from_photoelectric_Js: ["Planck's constant h (from h/e)", "J·s", 1]
+  work_function_eV: ["Work function + contact potential", "eV", 1]
+  threshold_frequency_1e14Hz: ["Threshold frequency", "×10¹⁴ Hz", 1]
+  h_over_e_open_Vs: ["h/e, anode lit", "V·s", 1]
+  h_over_e_masked_Vs: ["h/e, anode masked", "V·s", 1]
+  slope_change_masked_pct: ["Slope change with the anode masked", "%", 1]
+  peaks_found: ["Peaks found", "", 1]
+  saturated_peaks: ["Peaks cut flat", "", 1]
+  peak_contrast: ["Peak contrast (dip depth ÷ peak)", "", 1]
+  excitation_energy_eV: ["First excitation energy (peak spacing)", "eV", 1]
+  accepted_excitation_eV: ["Accepted excitation energy", "eV", 1]
+  contact_potential_V: ["Contact potential (intercept)", "V"]
+  first_peak_V: ["First peak found at", "V"]
+  oven_temperature_C: ["Oven temperature", "°C", 1]
+  oven_setpoint_C: ["Oven set point", "°C", 1]
+  half_life_s: ["Half-life, fitted", "s"]
+  expected_half_life_s: ["Half-life, expected", "s"]
+  floor_cps: ["Level the counts settle at", "counts/s", 1]
+  peak_count_rate_cps: ["Highest count rate", "counts/s", 1]
+  room_background_cps: ["Room background, source removed", "counts/s", 1]

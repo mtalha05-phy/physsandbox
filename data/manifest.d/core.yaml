@@ -1,0 +1,13 @@
+datasets:
+  - {file: photo_anode.csv, experiment: photoelectric, truth: anode_photoemission, status: investigating}
+  - {file: photo_anode_masked.csv, after: photo_anode.csv, test: mask_anode, experiment: photoelectric, truth: anode_photoemission, status: confirmed}
+  - {file: photo_filter_leak.csv, experiment: photoelectric, truth: filter_leak}
+  - {file: photo_clean.csv, experiment: photoelectric, truth: no_fault, status: clear}
+  - {file: fh_cool_oven.csv, experiment: franck_hertz, truth: oven_too_cool, status: investigating}
+  - {file: fh_oven_thermometer.csv, after: fh_cool_oven.csv, test: read_oven_thermometer, experiment: franck_hertz, truth: oven_too_cool, status: confirmed}
+  - {file: fh_saturated.csv, experiment: franck_hertz, truth: amplifier_saturated}
+  - {file: fh_clean.csv, experiment: franck_hertz, truth: no_fault, status: clear}
+  - {file: decay_background.csv, experiment: radioactive_decay, truth: background_not_subtracted, status: investigating}
+  - {file: decay_background_removed.csv, after: decay_background.csv, test: source_removed_count, experiment: radioactive_decay, truth: background_not_subtracted, status: confirmed}
+  - {file: decay_dead_time.csv, experiment: radioactive_decay, truth: dead_time_losses}
+  - {file: decay_clean.csv, experiment: radioactive_decay, truth: no_fault, status: clear}
