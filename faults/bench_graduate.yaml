@@ -1,0 +1,358 @@
+# Graduate advanced-lab fault library. Same format as faults.yaml; `fix` is what to do
+# once a cause is confirmed (used in the PDF report). Test ids are global, so they are
+# specific to each experiment.
+experiments:
+
+  nmr_echo:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: t2_error_pct, op: abs_lt, value: 10, p_true: 0.95, p_false: 0.01}
+          - {feature: amplitude_ratio, op: abs_dev1_lt, value: 0.1, p_true: 0.95, p_false: 0.01}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record T₂ with its uncertainty and the echo amplitude.
+      pulse_misset:
+        name: RF pulses not 90° and 180° (pulse length mis-set)
+        prior: 0.20
+        typical_size: "Pulses at 60% of the true 90° length leave the echo at about half its full size"
+        conditions:
+          - {feature: amplitude_ratio, op: "<", value: 0.8, p_true: 0.95, p_false: 0.02}
+          - {feature: t2_error_pct, op: abs_lt, value: 10, p_true: 0.9, p_false: 0.2}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: pulse_misset, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Set the 90° pulse to the first maximum of the nutation sweep (and the 180° to twice it), then repeat the echo decay.
+      sample_off_coil:
+        name: Sample sitting partly outside the RF coil (wrong depth)
+        prior: 0.17
+        typical_size: "A tube set a centimetre high can lose 30–50% of the signal"
+        conditions:
+          - {feature: amplitude_ratio, op: "<", value: 0.8, p_true: 0.95, p_false: 0.02}
+          - {feature: t2_error_pct, op: abs_lt, value: 10, p_true: 0.9, p_false: 0.2}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: pulse_misset, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Set the sample depth with the depth gauge so the liquid fills the coil, then repeat.
+      diffusion_gradient:
+        name: Molecules diffusing through a field gradient (magnet poorly shimmed)
+        prior: 0.15
+        typical_size: "A few gauss per cm in water adds an e^(−(2τ)³) decay that shortens the apparent T₂"
+        conditions:
+          - {feature: curvature_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: t2_error_pct, op: "<", value: -15, p_true: 0.9, p_false: 0.2}
+        fix: Shim the magnet (or move the sample to the field's sweet spot) and measure T₂ with a CPMG train, which suppresses diffusion loss.
+      paramagnetic_impurity:
+        name: Sample really relaxes faster (paramagnetic impurity or wrong dopant)
+        prior: 0.12
+        conditions:
+          - {feature: t2_error_pct, op: "<", value: -15, p_true: 0.95, p_false: 0.02}
+          - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+        fix: Make up a fresh sample with the stated dopant concentration (and degas it if oxygen matters), then repeat.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the spectrometer on a reference sample with a known T₂, then compare the two decays point by point.
+    tests:
+      nutation_sweep:
+        name: Run a nutation sweep (FID amplitude against pulse length)
+        minutes: 4
+        how: Apply one pulse, read the FID amplitude, and step the pulse length from 2 to 34 µs. The first maximum is the true 90° pulse.
+        adds: {feature: pulse_misset, from: pulse_misset, op: copy}
+        outcomes:
+          pulse_misset: maximum_shifted
+          sample_off_coil: maximum_at_set_length
+          diffusion_gradient: maximum_at_set_length
+          paramagnetic_impurity: maximum_at_set_length
+          no_fault: maximum_at_set_length
+        safety: Keep ferromagnetic tools, keys and phones away from the magnet, and no one with a pacemaker or implant near it. Don't touch the probe connector while the RF is on.
+      cpmg_train:
+        name: Measure the decay with a CPMG echo train
+        minutes: 6
+        how: Record a Carr-Purcell-Meiboom-Gill train with a short echo spacing (1 ms). Short spacing suppresses diffusion loss; badly set 180° pulses make the train oscillate.
+        outcomes:
+          diffusion_gradient: t2_recovers
+          paramagnetic_impurity: t2_stays_short
+          pulse_misset: train_oscillates
+          sample_off_coil: t2_normal
+          no_fault: t2_normal
+        safety: Keep ferromagnetic tools, keys and phones away from the magnet, and no one with a pacemaker or implant near it.
+      reseat_sample:
+        name: Re-seat the sample with the depth gauge and repeat one echo
+        minutes: 5
+        how: Lift the tube out, set its depth with the gauge so the liquid fills the coil, and repeat the echo at the shortest 2τ.
+        outcomes:
+          sample_off_coil: signal_recovers
+          pulse_misset: still_low
+          diffusion_gradient: unchanged
+          paramagnetic_impurity: unchanged
+          no_fault: unchanged
+        safety: Keep ferromagnetic tools, keys and phones away from the magnet, and no one with a pacemaker or implant near it.
+
+  sc_transition:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: tc_shift_K, op: abs_lt, value: 0.5, p_true: 0.95, p_false: 0.01}
+          - {feature: width_ratio, op: "<", value: 1.3, p_true: 0.95, p_false: 0.01}
+          - {feature: residual_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record Tc and the 10–90% transition width.
+      thermometer_lag:
+        name: Thermometer not at the sample's temperature (lag or gradient)
+        prior: 0.20
+        typical_size: "Sweeping at 2 K/min with the sensor on the cold stage can put the reading 1–2 K off the sample"
+        conditions:
+          - {feature: tc_shift_K, op: abs_gt, value: 0.8, p_true: 0.95, p_false: 0.02}
+          - {feature: width_ratio, op: ">", value: 1.5, p_true: 0.9, p_false: 0.1}
+          - {feature: residual_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: sweeps_disagree, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Mount the thermometer on the sample block with grease, sweep slower (under 0.5 K/min), and quote Tc as the mean of the cooling and warming sweeps.
+      current_too_high:
+        name: Measuring current too high (near the critical current)
+        prior: 0.17
+        typical_size: "Near Jc the transition moves down by a kelvin or more and broadens"
+        conditions:
+          - {feature: tc_shift_K, op: "<", value: -0.8, p_true: 0.95, p_false: 0.02}
+          - {feature: width_ratio, op: ">", value: 1.5, p_true: 0.9, p_false: 0.1}
+          - {feature: residual_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: sweeps_disagree, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Drop the current tenfold (use a lock-in or a nanovoltmeter to keep the signal) and repeat the sweep.
+      oxygen_deficient:
+        name: Sample degraded (oxygen loss lowers Tc)
+        prior: 0.12
+        conditions:
+          - {feature: tc_shift_K, op: "<", value: -2, p_true: 0.95, p_false: 0.02}
+          - {feature: width_ratio, op: "<", value: 1.3, p_true: 0.9, p_false: 0.05}
+        fix: Re-anneal the pellet in flowing oxygen (or use a fresh one) and store it dry.
+      thermal_emf:
+        name: Thermal EMF at the voltage contacts (resistance never reaches zero)
+        prior: 0.15
+        typical_size: "A few microvolts of thermocouple voltage at the contacts reads as 0.01–0.1 mΩ"
+        conditions:
+          - {feature: residual_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Average readings with the current forward and reversed (or use AC with a lock-in), and keep the leads' joints at one temperature.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the four contacts' resistances and the thermometer calibration at 77 K in liquid nitrogen.
+    tests:
+      warming_sweep:
+        name: Record a warming sweep as well and compare it with the cooling sweep
+        minutes: 15
+        how: Lift the probe just out of the liquid nitrogen and log R and T as it warms through 110 K at the same rate. A thermometer that lags reads high on warming and low on cooling.
+        adds: {feature: sweeps_disagree, from: sweeps_disagree, op: copy}
+        outcomes:
+          thermometer_lag: sweeps_disagree
+          current_too_high: sweeps_agree
+          oxygen_deficient: sweeps_agree
+          thermal_emf: sweeps_agree
+          no_fault: sweeps_agree
+        safety: Liquid nitrogen causes cold burns; wear cryogenic gloves and a face shield, and never seal a dewar. Use it only in a ventilated room, as boil-off can displace the oxygen in a closed one.
+      lower_current_repeat:
+        name: Repeat the sweep at a tenth of the current
+        minutes: 25
+        how: Drop the current from 100 mA to 10 mA and sweep again, averaging more readings per point to keep the noise down.
+        outcomes:
+          current_too_high: transition_sharpens
+          thermometer_lag: unchanged
+          oxygen_deficient: unchanged
+          thermal_emf: residual_grows
+          no_fault: unchanged
+        safety: Liquid nitrogen causes cold burns; wear cryogenic gloves and a face shield, and never seal a dewar. Use it only in a ventilated room, as boil-off can displace the oxygen in a closed one.
+      sc_current_reversal:
+        name: Read the voltage below Tc with the current forward and reversed
+        minutes: 3
+        how: Hold the sample at 80 K and read the voltage at +100 mA and −100 mA. A thermal EMF keeps its sign; a real resistance flips with the current.
+        outcomes:
+          thermal_emf: offset_keeps_sign
+          thermometer_lag: no_offset
+          current_too_high: no_offset
+          oxygen_deficient: no_offset
+          no_fault: no_offset
+        safety: Liquid nitrogen causes cold burns; wear cryogenic gloves and never seal a dewar.
+
+  compton:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: me_error_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: e0_error_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record m_e c² with its uncertainty.
+      mca_gain_error:
+        name: MCA energy calibration gain off (PMT voltage or temperature drift)
+        prior: 0.20
+        typical_size: "A 5% gain drift scales every peak, so both 662 keV and m_e c² come out 5% low"
+        conditions:
+          - {feature: me_error_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: e0_error_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.05}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: mca_gain_off, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Recalibrate the MCA with two or more known lines at the same PMT voltage, let the detector settle at room temperature, and refit.
+      mca_zero_offset:
+        name: MCA energy calibration zero offset
+        prior: 0.17
+        typical_size: "A 15 keV zero offset shifts every peak by the same amount"
+        conditions:
+          - {feature: me_error_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: e0_error_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.05}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: mca_gain_off, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Recalibrate with a low-energy line (Am-241 at 59.5 keV) and a high one, fitting a gain and an offset, then refit.
+      angle_zero_offset:
+        name: Detector arm's zero angle misread
+        prior: 0.12
+        typical_size: "A 5° zero error bends the small-angle points away from the Compton curve"
+        conditions:
+          - {feature: outlier_sigma, op: ">", value: 5, p_true: 0.9, p_false: 0.1}
+          - {feature: rest_chi2, op: ">", value: 2, p_true: 0.95, p_false: 0.02}
+        fix: Find the true zero by measuring at equal angles either side of the beam and taking the midpoint, then correct every angle.
+      backscatter_peak:
+        name: Backscatter peak taken for the scattered photopeak at one angle
+        prior: 0.14
+        typical_size: "Near 135° the 206 keV photopeak sits close to the 184 keV backscatter peak"
+        conditions:
+          - {feature: outlier_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: rest_chi2, op: "<", value: 2, p_true: 0.9, p_false: 0.1}
+        fix: At that angle, subtract a spectrum taken with the scatterer removed, pick the peak that moves with angle, and refit.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the scatterer is in the beam's centre and the collimators are aligned, then look at the raw spectra one by one.
+    tests:
+      mca_line_calibration:
+        name: Read known calibration lines with the same MCA settings
+        minutes: 6
+        how: Without touching the PMT voltage or gain, record Am-241 (59.5 keV), Na-22 (511 and 1274.5 keV) and the unscattered Cs-137 line (661.7 keV), and fit reading against true energy.
+        adds: {feature: mca_gain_off, from: mca_gain_off, op: copy}
+        outcomes:
+          mca_gain_error: gain_off
+          mca_zero_offset: offset_only
+          angle_zero_offset: calibration_ok
+          backscatter_peak: calibration_ok
+          no_fault: calibration_ok
+        safety: Handle the sealed sources with tongs, keep them in their lead pots when not in use, wear your dosimeter, and follow the local rules of your radiation safety officer.
+      both_sides_angle:
+        name: Measure at the same angle on both sides of the beam
+        minutes: 12
+        how: Take the photopeak at +45° and −45°. With the zero right they agree; a zero error makes them differ.
+        outcomes:
+          angle_zero_offset: sides_differ
+          mca_gain_error: sides_agree
+          mca_zero_offset: sides_agree
+          backscatter_peak: sides_agree
+          no_fault: sides_agree
+        safety: The direct Cs-137 beam is the highest dose point; never put your hands in front of the collimator, and follow your radiation safety officer's rules.
+      scatterer_out_spectrum:
+        name: Take the largest-angle spectrum again with the scatterer removed
+        minutes: 8
+        how: Remove the aluminium rod and record the spectrum at the same angle. Peaks that stay are background (backscatter from shielding); the Compton peak goes.
+        outcomes:
+          backscatter_peak: peak_stays
+          angle_zero_offset: peak_goes
+          mca_gain_error: peak_goes
+          mca_zero_offset: peak_goes
+          no_fault: peak_goes
+        safety: Handle the source and scatterer with tongs, wear your dosimeter, and follow your radiation safety officer's rules.
+
+  optical_pumping:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: g_scale_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: ratio_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: residual_field_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record g_F for both isotopes and the residual field.
+      ammeter_gain_error:
+        name: Coil current read high or low (ammeter or sense resistor)
+        prior: 0.20
+        typical_size: "A sense resistor 8% off makes both g_F values about 8% off, with the ratio still 3/2"
+        conditions:
+          - {feature: g_scale_error_pct, op: abs_gt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: ratio_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: residual_field_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: ammeter_disagrees, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Correct the current readings by the ratio to the calibrated ammeter (or replace the sense resistor) and refit.
+      coil_constant_wrong:
+        name: Coil constant wrong (turns, radius or spacing)
+        prior: 0.17
+        typical_size: "Coils set 10% off Helmholtz spacing, or a miscounted turn number, scale every g_F alike"
+        conditions:
+          - {feature: g_scale_error_pct, op: abs_gt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: ratio_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: residual_field_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: ammeter_disagrees, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Measure the coils' radius and spacing, count or look up the turns, recompute k = (4/5)^(3/2) μ₀N/R, and refit.
+      residual_field:
+        name: Lab field along the coil axis not nulled
+        prior: 0.20
+        typical_size: "Earth's horizontal field is about 18 µT in the UK; any part along the axis shifts every resonance"
+        conditions:
+          - {feature: residual_field_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Turn the apparatus to align its axis with the field and null the rest with the horizontal coil (adjust until the zero-field resonance is at its narrowest), then repeat.
+      ammeter_zero_offset:
+        name: Coil current reading has a zero offset
+        prior: 0.08
+        conditions:
+          - {feature: residual_field_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Zero the meter (or subtract its reading at zero current) and refit.
+      isotopes_swapped:
+        name: ⁸⁵Rb and ⁸⁷Rb resonances swapped
+        prior: 0.10
+        conditions:
+          - {feature: ratio_error_pct, op: "<", value: -20, p_true: 0.95, p_false: 0.01}
+        fix: The stronger, lower-frequency resonance is ⁸⁵Rb (72% abundance, g_F = 1/3); relabel and refit.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the RF frequency on a counter and look for a transverse field (a resonance that bends at low current).
+    tests:
+      reference_ammeter_series:
+        name: Read the coil current on a calibrated ammeter in series
+        minutes: 3
+        how: Put a calibrated ammeter in series with the sweep coil, set 0.5 A on the lab reading, and take ten readings on each.
+        adds: {feature: ammeter_disagrees, from: ammeter_disagrees, op: copy}
+        outcomes:
+          ammeter_gain_error: ammeters_disagree
+          ammeter_zero_offset: ammeters_disagree
+          coil_constant_wrong: ammeters_agree
+          residual_field: ammeters_agree
+          isotopes_swapped: ammeters_agree
+          no_fault: ammeters_agree
+        safety: Switch the coil supply off before breaking the circuit; the coils are inductive and can arc.
+      ammeter_zero_check:
+        name: Read the current meter with the coil supply off
+        minutes: 1
+        how: Switch the sweep supply off and read the current meter. It should read zero.
+        outcomes:
+          ammeter_zero_offset: reads_nonzero
+          residual_field: reads_zero
+          ammeter_gain_error: reads_zero
+          coil_constant_wrong: reads_zero
+          isotopes_swapped: reads_zero
+          no_fault: reads_zero
+      coil_geometry_check:
+        name: Measure the coils' radius and spacing
+        minutes: 10
+        how: Measure each coil's mean radius and the distance between them (it should equal the radius), and check the turn count against the manual.
+        outcomes:
+          coil_constant_wrong: geometry_off
+          ammeter_gain_error: geometry_ok
+          ammeter_zero_offset: geometry_ok
+          residual_field: geometry_ok
+          isotopes_swapped: geometry_ok
+          no_fault: geometry_ok
+        safety: Switch off the RF and let the rubidium lamp and cell oven cool before reaching inside the coils. If your setup pumps with a 795 nm diode laser, wear the laser eyewear; the beam is nearly invisible.
