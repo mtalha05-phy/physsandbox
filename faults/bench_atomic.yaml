@@ -1,0 +1,232 @@
+# Atomic-physics bench (quantum area): electron diffraction, the normal Zeeman
+# effect, Millikan's oil drop. Same format as faults.yaml; `fix` is what to do
+# once a cause is confirmed (used in the PDF report).
+experiments:
+
+  electron_diffraction:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: scale_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: ring_ratio_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record both lattice spacings with their uncertainties; λ = h/√(2meV) holds.
+      camera_length_wrong:
+        name: Foil-to-screen distance L wrong (another tube's figure, or measured from the wrong point)
+        prior: 0.20
+        typical_size: "Entering 135 mm for a tube whose foil sits 125 mm from the screen makes both spacings 8% large"
+        conditions:
+          - {feature: scale_error_pct, op: abs_gt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: ring_ratio_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: camera_length_differs, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Use the measured foil-to-screen distance (graphite foil to the screen along the axis) and refit.
+      hv_reading_off:
+        name: Accelerating voltage reads off (supply meter gain error)
+        prior: 0.17
+        typical_size: "A supply meter reading 15% high makes λ, and both spacings, about 7% small"
+        conditions:
+          - {feature: scale_error_pct, op: abs_gt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: ring_ratio_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: camera_length_differs, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Read the anode voltage on a calibrated high-voltage divider, correct the readings by the ratio, and refit.
+      third_ring_measured:
+        name: Faint third ring (d = 0.107 nm) measured as the outer ring
+        prior: 0.12
+        typical_size: "The outer spacing comes out 13% small while the inner ring is right"
+        conditions:
+          - {feature: ring_ratio_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Remeasure the second ring out from the centre (the bright 0.123 nm ring), not the faint one beyond it.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the rings are centred on the undiffracted spot and measure each diameter on two axes.
+    tests:
+      measure_camera_length:
+        name: Measure the foil-to-screen distance with a rule
+        minutes: 3
+        how: With the supply off, measure from the graphite foil (just behind the anode aperture) to the screen along the tube axis, several times.
+        adds: {feature: camera_length_differs, from: camera_length_differs, op: copy}
+        outcomes:
+          camera_length_wrong: differs
+          hv_reading_off: matches
+          third_ring_measured: matches
+          no_fault: matches
+        safety: Switch off and unplug the high-voltage supply before reaching near the tube. It is evacuated glass; don't knock it or lean on the screen.
+      count_rings:
+        name: Count the rings out from the centre at one voltage
+        minutes: 2
+        how: At 4 kV in a darkened room, count the rings from the central spot outwards and note which one was measured as the outer ring (the bright 0.123 nm ring is the second; a faint one lies beyond it).
+        outcomes:
+          third_ring_measured: outer_was_third
+          camera_length_wrong: outer_was_second
+          hv_reading_off: outer_was_second
+          no_fault: outer_was_second
+        safety: Keep to the tube's rated voltage and don't touch the tube or its leads while the supply is on.
+      hv_divider_check:
+        name: Read the accelerating voltage on a calibrated high-voltage divider
+        minutes: 8
+        how: With the supply off, connect a calibrated divider across the anode supply, then step through 2.5–5 kV and compare with the supply meter.
+        outcomes:
+          hv_reading_off: reads_off
+          camera_length_wrong: reads_true
+          third_ring_measured: reads_true
+          no_fault: reads_true
+        safety: The anode runs at up to 5 kV. Make every connection with the supply off and discharged, use HV-rated leads, and never exceed the tube's rated voltage.
+
+  zeeman:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: muB_error_pct, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the Bohr magneton (and e/m) with its uncertainty.
+      field_miscalibrated:
+        name: Field reading off (gaussmeter on the wrong scale or not zeroed)
+        prior: 0.20
+        typical_size: "A gaussmeter reading 12% high makes the Bohr magneton come out about 11% low"
+        conditions:
+          - {feature: muB_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: field_disagrees, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Zero the gaussmeter in its zero-gauss chamber, check its range, or calibrate it against a reference probe at the lamp position; correct the fields and refit.
+      etalon_constant_wrong:
+        name: Étalon thickness or refractive index wrong in the analysis
+        prior: 0.17
+        typical_size: "Leaving out the index (n = 1.457) makes every splitting 46% large"
+        conditions:
+          - {feature: muB_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: field_disagrees, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Take the étalon's thickness and index from its certificate (or measure its free spectral range) and refit.
+      ring_order_misread:
+        name: Rings of neighbouring orders paired wrongly at one field
+        prior: 0.12
+        typical_size: "Near half a free spectral range, σ⁺ of one order sits as close to σ⁻ of the next as to its own partner"
+        conditions:
+          - {feature: outlier_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Reread that field's rings, following each order out from the centre as the field is raised, and refit.
+      one_field_misread:
+        name: One field reading wrong (gaussmeter range switched or value misread at that point)
+        prior: 0.08
+        conditions:
+          - {feature: outlier_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Set that magnet current again, read the field with the probe where the lamp sits, and refit.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the polariser (σ components only), the field uniformity over the lamp, and the camera focus on the rings.
+    tests:
+      calibrated_gaussmeter:
+        name: Measure the field in the gap with a calibrated gaussmeter
+        minutes: 5
+        how: Remove the lamp, put a calibrated Hall probe where the lamp sat, step the magnet current and read both gaussmeters at each step.
+        adds: {feature: field_disagrees, from: field_disagrees, op: copy}
+        outcomes:
+          field_miscalibrated: field_differs
+          one_field_misread: field_differs
+          etalon_constant_wrong: field_agrees
+          ring_order_misread: field_agrees
+          no_fault: field_agrees
+        safety: Strong electromagnet. Keep steel tools, watches and cards away from the gap, no pacemakers nearby, and ramp the current down slowly (the coils kick back when switched off).
+      reread_ring_orders:
+        name: Reread the ring orders at the odd field
+        minutes: 4
+        how: Raise the field slowly from zero while watching the camera image, and follow each σ pair out from the centre so every ring keeps its order.
+        outcomes:
+          ring_order_misread: pairing_changes
+          one_field_misread: pairing_holds
+          field_miscalibrated: pairing_holds
+          etalon_constant_wrong: pairing_holds
+          no_fault: pairing_holds
+        safety: Strong electromagnet. Keep steel tools, watches and cards away from the gap, and ramp the current down slowly.
+      sodium_doublet_check:
+        name: Measure the étalon's free spectral range with the sodium D doublet
+        minutes: 12
+        how: Swap in a sodium lamp, read the rings of the D lines (0.597 nm apart) and compare their spacing with the one the étalon constants predict.
+        outcomes:
+          etalon_constant_wrong: range_differs
+          one_field_misread: range_matches
+          field_miscalibrated: range_matches
+          ring_order_misread: range_matches
+          no_fault: range_matches
+        safety: Discharge lamps run from a high-voltage supply and get hot; switch off and let the cadmium lamp cool before swapping.
+
+  millikan:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: e_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: quantisation_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record e with its uncertainty and the number of drops.
+      plate_spacing_wrong:
+        name: Plate spacing wrong in the field E = V/d
+        prior: 0.20
+        typical_size: "Using 7.60 mm for a 6.70 mm spacer makes every charge 13% high, still in whole steps"
+        conditions:
+          - {feature: e_error_pct, op: abs_gt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: quantisation_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: spacing_differs, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Use the measured spacer thickness, scale every charge by measured ÷ used spacing, and refit.
+      plate_voltage_off:
+        name: Plate voltage reads off (supply meter gain error)
+        prior: 0.17
+        typical_size: "A meter reading 10% high makes every charge about 9% low"
+        conditions:
+          - {feature: e_error_pct, op: abs_gt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: quantisation_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: spacing_differs, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Read the plate voltage on a calibrated meter, scale every charge by supply ÷ true voltage, and refit.
+      drops_evaporating:
+        name: Drops evaporating while being timed
+        prior: 0.14
+        typical_size: "Each drop shrinks by a different amount, so its charge comes out several % low and the whole steps blur"
+        conditions:
+          - {feature: quantisation_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Use low-vapour-pressure oil (silicone or Millikan oil), keep the lamp's heat filter in, and time each drop soon after it is sprayed.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the viscosity of air at the chamber's temperature and the oil density, and time a few drops again.
+    tests:
+      calliper_plate_spacing:
+        name: Measure the plate spacing with callipers
+        minutes: 4
+        how: Switch off, open the chamber, lift the top plate and measure the spacer ring at several places around it.
+        adds: {feature: spacing_differs, from: spacing_differs, op: copy}
+        outcomes:
+          plate_spacing_wrong: spacing_differs
+          plate_voltage_off: spacing_matches
+          drops_evaporating: spacing_matches
+          no_fault: spacing_matches
+        safety: The plates run at several hundred volts. Switch the supply off and let the interlock discharge the plates before opening the chamber.
+      calibrated_plate_voltage:
+        name: Read the plate voltage on a calibrated meter
+        minutes: 7
+        how: With the supply off, connect a calibrated meter across the plate terminals, then step through the working voltages and compare with the supply meter.
+        outcomes:
+          plate_voltage_off: voltage_differs
+          plate_spacing_wrong: voltage_matches
+          drops_evaporating: voltage_matches
+          no_fault: voltage_matches
+        safety: Several hundred volts across the plates. Connect the meter with the supply off, use rated leads, and keep the chamber interlock closed.
+      repeat_timing_same_drop:
+        name: Time the same drop rising and falling repeatedly
+        minutes: 5
+        how: Hold one drop in view and time it over the same graticule distance, down and up, ten times; an evaporating drop falls more slowly each time.
+        outcomes:
+          drops_evaporating: speed_drifts
+          plate_spacing_wrong: speed_steady
+          plate_voltage_off: speed_steady
+          no_fault: speed_steady
+        safety: The plate voltage is switched on and off repeatedly; keep the chamber closed and your hands off the terminals.
