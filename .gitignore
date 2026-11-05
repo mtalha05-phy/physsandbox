@@ -3,6 +3,7 @@
 __pycache__/
 *.pyc
 containment_log.jsonl
-receipts.jsonl
+receipts*.jsonl
+receipts*.head.json*
 .ledger_key
 .claude/

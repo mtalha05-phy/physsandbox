@@ -238,6 +238,10 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
 .verify-row button { border: 1px solid #4E6476; background: transparent; color: var(--chamber-ink); border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
 .verify-msg { font-size: 13px; color: var(--chamber-muted); }
 .verify-msg.ok { color: #4FD1A1; } .verify-msg.bad { color: #FF8A80; }
+.nb-meta { margin: 4px 0 6px; font-size: 12px; color: var(--chamber-muted); overflow-wrap: anywhere; }
+.nb-meta a { color: var(--chamber-ink); text-underline-offset: 2px; }
+.nb-meta .kid { font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
+.nb-meta .nw { white-space: nowrap; }
 .tour-btn { border: 1px solid var(--ink); background: var(--ink); color: var(--surface); border-radius: 999px; padding: 6px 14px;
             font-size: 13px; font-weight: 600; cursor: pointer; }
 .tour-btn:hover { filter: brightness(1.15); }
@@ -389,6 +393,7 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
   <div class="gb-section">
     <div class="verify-row"><h3 style="margin:0">Lab notebook</h3><span><button id="tamper-demo" title="Edits a copy of the notebook without the key, then runs the same check">Tamper with a copy</button> <button id="verify">Check for tampering</button></span></div>
     <p class="verify-msg" id="verify-msg">Every job leaves a receipt that is chained to the one before it.</p>
+    <p class="nb-meta" id="nb-meta">Signed with Ed25519 · <a href="/api/ledger/public-key?format=pem" target="_blank" rel="noopener">public key</a></p>
     <div class="receipts" id="receipts"></div>
   </div>
 </aside>
@@ -816,9 +821,15 @@ async function refreshSide() {
   }).join("") || `<p class="empty" style="color:var(--chamber-muted)">No receipts yet.</p>`;
   ledgerPill(led.verify);
 }
+const utc = t => String(t || "").replace("T", " ").replace(/:\d\dZ$/, " UTC");
 function ledgerPill(v) {
   $("lamp-ledger").className = "lamp" + (v.intact ? "" : " warn");
   $("pill-ledger").textContent = v.intact ? `Lab notebook: ${v.receipts} receipts, intact` : `Lab notebook: broken at #${v.broken_at}`;
+  // The start time makes a wipe visible: a wiped notebook starts again, later.
+  const started = v.started ? `Notebook started ${utc(v.started)}` : v.intact ? "The notebook starts with the first job" : "Notebook start not verified";
+  $("nb-meta").innerHTML = `<span class="nw">${esc(started)}</span> · <span class="nw">Ed25519 key <span class="kid">${esc(v.key_id || "n/a")}</span></span> · `
+    + `<a href="/api/ledger/public-key?format=pem" target="_blank" rel="noopener">public key</a> · `
+    + `<a href="/api/ledger?limit=100" target="_blank" rel="noopener">export</a>`;
 }
 $("verify").addEventListener("click", () => runVerify());
 $("tamper-demo").addEventListener("click", () => runTamperDemo());
@@ -835,13 +846,16 @@ async function runVerify() {
   const v = (await fetch("/api/ledger?limit=1").then(r => r.json())).verify;
   const m = $("verify-msg");
   m.className = "verify-msg " + (v.intact ? "ok" : "bad");
-  m.textContent = v.intact ? `All ${v.receipts} receipts check out: chain intact, every receipt signed, none missing from the end. Latest hash ${v.head.slice(0, 12)}…` : `Tampering detected at receipt #${v.broken_at}: ${v.reason}.`;
+  m.textContent = !v.intact ? `Tampering detected at receipt #${v.broken_at}: ${v.reason}.`
+    : !v.receipts ? "No receipts yet. The notebook starts with the first job."
+    : `All ${v.receipts} receipts since the notebook started (${utc(v.started)}) check out: chain intact, every Ed25519 signature valid, none missing from the end. Latest hash ${v.head.slice(0, 12)}…`;
   ledgerPill(v); return v;
 }
 
 /* ---------- investigation record ---------- */
-function downloadRecord() {
+async function downloadRecord() {
   const E = EX(), last = S.steps[S.steps.length - 1];
+  const nb = await fetch("/api/ledger?limit=1").then(r => r.json()).then(j => j.verify).catch(() => null);
   const top = S.last.causes[0];
   const lines = [
     `# PhysSandbox investigation record`, ``,
@@ -868,9 +882,17 @@ function downloadRecord() {
     `- Kernel: ${w.kernel || "n/a"}`, `- Network interfaces: ${(w.interfaces || []).join(", ") || "n/a"}; DNS ${w.dns}; outbound ${w.egress}`,
     `- Root filesystem: ${w.root_fs}; uid ${w.uid}; secrets visible: ${(w.secrets_visible || []).length ? w.secrets_visible.join(", ") : "none"}`,
     ...(last.receipt?.walls_host_verified ? [`- Checked by the host with docker inspect: runtime ${last.receipt.walls_host_verified.runtime}, network ${last.receipt.walls_host_verified.network}, read-only root ${last.receipt.walls_host_verified.read_only_root}, memory ${last.receipt.walls_host_verified.memory_mb} MB, user ${last.receipt.walls_host_verified.user}`] : []),
-    ...(last.receipt?.mac ? [`- Receipt signature (HMAC-SHA256): \`${last.receipt.mac}\``] : []), ``,
-    `Every number above was computed by deterministic physics code in a gVisor container with no network.`,
-    `Receipts are hash-chained; check them at ${location.origin}/api/ledger.`, ``);
+    ...(last.receipt?.sig ? [`- Receipt signature (Ed25519, key ${last.receipt.key_id}): \`${last.receipt.sig}\``] : []), ``);
+  const hd = nb?.head_record;
+  if (hd) lines.push(`## Lab notebook head`, ``,
+    `The notebook's signed head when this record was downloaded. Keep this file: with it anyone can later tell whether the notebook was rolled back to an older copy or wiped (\`python tools/verify_receipts.py export.json notebook.pem --expect-head <this file>\`).`, ``,
+    `- Notebook started: ${hd.genesis_time} (id ${hd.notebook_id})`,
+    `- Receipts: ${hd.count}; latest hash \`${hd.last_hash}\``,
+    `- Signed with Ed25519 key ${hd.key_id}; public key at ${location.origin}/api/ledger/public-key`,
+    `- Server's check at download: ${nb.intact ? "intact" : `broken at #${nb.broken_at} (${nb.reason})`}`, ``,
+    "```json", JSON.stringify(hd, null, 2), "```", ``);
+  lines.push(`Every number above was computed by deterministic physics code in a gVisor container with no network.`,
+    `Receipts are hash-chained and signed with Ed25519. Check them yourself, without trusting the server: save ${location.origin}/api/ledger?limit=100 and the public key, then run tools/verify_receipts.py.`, ``);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/markdown" }));
   a.download = `physsandbox-${S.experiment}-${new Date().toISOString().slice(0, 10)}.md`;

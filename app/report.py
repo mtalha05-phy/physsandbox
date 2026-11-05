@@ -178,7 +178,7 @@ def _clean_plot(p):
 
 
 def _hexish(v, n=64):
-    v = _s(v, 80)
+    v = _s(v, max(n, 80))
     return v if re.fullmatch(r"[0-9a-f]{%d}" % n, v) else ""
 
 
@@ -188,7 +188,8 @@ def _clean_receipt(r):
     return {
         "seq": int(seq) if isinstance(seq, int) and not isinstance(seq, bool) and 0 < seq < 10**9 else None,
         "time": _s(r.get("time"), 40),
-        "hash": _hexish(r.get("hash")), "prev": _hexish(r.get("prev")), "mac": _hexish(r.get("mac")),
+        "hash": _hexish(r.get("hash")), "prev": _hexish(r.get("prev")),
+        "sig": _hexish(r.get("sig") or r.get("mac"), 128 if r.get("sig") else 64), "key_id": _hexish(r.get("key_id"), 16),
         "input_sha256": _hexish(r.get("input_sha256")),
         "mode": _s(r.get("mode"), 20),
         "walls_measured": _dict(r.get("walls_measured")),
@@ -608,8 +609,10 @@ def _notebook_check(steps):
     for st in steps:
         r = st["receipt"]
         e = by_seq.get(r["seq"])
-        if e and e.get("hash") == r["hash"] and e.get("mac") == r["mac"]:
-            r.update({"matched": True, "walls_measured": _dict(e.get("walls_measured")),
+        if e and e.get("hash") == r["hash"] and (not r["sig"] or (e.get("sig") or e.get("mac")) == r["sig"]):
+            r.update({"matched": True, "sig": _hexish(e.get("sig"), 128) or _hexish(e.get("mac")),
+                      "key_id": _hexish(e.get("key_id"), 16),
+                      "walls_measured": _dict(e.get("walls_measured")),
                       "walls_host_verified": e.get("walls_host_verified") if isinstance(
                           e.get("walls_host_verified"), dict) else None,
                       "input_sha256": _hexish(e.get("input_sha256")), "prev": _hexish(e.get("prev")),
@@ -780,7 +783,8 @@ def _render(inv):
     flow.append(CondPageBreak(60 * mm))
     flow += [P("Containment", "h2"),
              P("Every step ran in a fresh container that was destroyed afterwards. Each job leaves a receipt, "
-               "hash-chained to the one before it and signed with HMAC-SHA256 by this server.", "small"),
+               "hash-chained to the one before it and signed with this server's Ed25519 key, which anyone can "
+               "check with its public key (GET /api/ledger/public-key).", "small"),
              Spacer(1, 4)]
     for i, st in enumerate(steps):
         r = st["receipt"]
@@ -788,7 +792,8 @@ def _render(inv):
                  + (f' · <font color="{GREEN}">matches this server\'s lab notebook</font>' if r["matched"]
                     else f' · <font color="{LASER}">not found in this server\'s lab notebook; shown as supplied</font>')),
                 ("Hash", f'<font name="DVM" size="7.2">{r["hash"] or "n/a"}</font>'),
-                ("Signature", f'<font name="DVM" size="7.2">{r["mac"] or "n/a"}</font>'),
+                ("Ed25519 signature", f'<font name="DVM" size="7.2">{r["sig"] or "n/a"}</font>'),
+                ("Signing key", f'<font name="DVM" size="7.2">{r["key_id"] or "n/a"}</font>'),
                 ("Previous hash", f'<font name="DVM" size="7.2">{r["prev"] or "n/a"}</font>')]
         flow += [KeepTogether([_kv(rows, 28 * mm, W - 28 * mm), Spacer(1, 5)])]
 
