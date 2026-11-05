@@ -5,3 +5,4 @@ __pycache__/
 containment_log.jsonl
 receipts.jsonl
 .ledger_key
+.claude/
