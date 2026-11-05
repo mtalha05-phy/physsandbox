@@ -1,0 +1,79 @@
+# Classic lab experiments. Merged into catalog.yaml by app/pipeline.py.
+domains:
+  - {id: waves, label: "Waves & sound"}
+
+experiments:
+  michelson:
+    label: Michelson interferometer
+    domain: optics
+    blurb: Fringes counted against mirror travel on the micrometer, to measure the laser wavelength
+    columns: [micrometer_um, fringes]
+    model: "N = 2d/λ"
+    expected: [[wavelength_nm, "Laser wavelength (nm)", 632.8], [precision_um, "Micrometer reading precision (µm)", 0.2]]
+    samples:
+      - [michelson_miscount.csv, "Wavelength 3% long, line straight"]
+      - [michelson_backlash.csv, "First reading off the line"]
+      - [michelson_clean.csv, "Healthy measurement"]
+    followups: {slow_recount: michelson_miscount_recount.csv}
+    questions: ["Fit the micrometer travel against fringe count and report the wavelength"]
+
+  resonance_tube:
+    label: Speed of sound (resonance tube)
+    domain: waves
+    blurb: First resonance length of a closed tube against 1/f, to measure the speed of sound
+    columns: [frequency_Hz, resonance_length_m]
+    model: "L + e = v/4f, e ≈ 0.3 D"
+    expected: [[air_temperature_C, "Air temperature (°C)", 20.0], [tube_diameter_m, "Tube inner diameter (m)", 0.035], [precision_mm, "Length reading precision (mm)", 1.0]]
+    samples:
+      - [sound_warm_air.csv, "Speed of sound 2.5% high"]
+      - [sound_ruler_zero.csv, "Lengths all a few cm long"]
+      - [sound_clean.csv, "Healthy measurement"]
+    followups: {tube_thermometer: sound_warm_air_thermometer.csv}
+    questions: ["Fit length against 1/f and report v and the end correction"]
+
+  stefan_lamp:
+    label: Stefan–Boltzmann law (lamp filament)
+    domain: heat
+    blurb: Electrical power into a tungsten filament against its temperature from its resistance, to test P ∝ T⁴
+    columns: [voltage_V, current_A]
+    model: "P = εσA T⁴,  R/R₀ = (T/T₀)^1.209"
+    expected: [[cold_resistance_ohm, "Cold filament resistance R₀ (Ω)", 1.60], [room_temperature_K, "Room temperature T₀ (K)", 293.0], [precision_pct, "Meter precision (%)", 0.5]]
+    samples:
+      - [stefan_ammeter_zero.csv, "Exponent below 4, worst when cold"]
+      - [stefan_supply_voltage.csv, "Exponent above 4"]
+      - [stefan_clean.csv, "Healthy measurement"]
+    followups: {ammeter_open_circuit: stefan_ammeter_open.csv}
+    questions: ["Fit ln P against ln T and report the exponent"]
+
+sample_info:
+  michelson_clean.csv: ["A HeNe laser (632.8 nm) in a Michelson interferometer: micrometer reading of the mirror travel, through a 10:1 lever, every 20 fringes up to 300.", "Nothing should look off: the slope gives 632.8 nm."]
+  michelson_miscount.csv: ["The same interferometer, counting 300 fringes and noting the reading every 20.", "The points lie on a straight line, but its slope gives a wavelength about 3% longer than the laser's 632.8 nm."]
+  michelson_backlash.csv: ["The same interferometer, counting 300 fringes and noting the reading every 20.", "The starting reading sits well off the line through all the others, which run parallel to the expected line."]
+  michelson_miscount_recount.csv: ["The same 300 fringes counted again, slowly, turning the micrometer one way only.", "Does the wavelength come out right this time?"]
+  sound_clean.csv: ["A closed tube over water, 35 mm across, driven by a small speaker from a signal generator; first resonance length at eleven frequencies, 200–1000 Hz, air at 20 °C.", "Nothing should look off: the slope gives v at 20 °C and the intercept is the end correction, about 0.3 × diameter."]
+  sound_warm_air.csv: ["The same tube and generator, with the air temperature entered as 20 °C.", "The points lie on a good straight line, but its slope gives a speed of sound about 2.5% above the value for 20 °C."]
+  sound_ruler_zero.csv: ["The same tube and generator, air at 20 °C.", "The speed of sound is right, but every length is a few centimetres longer than expected, and the end correction comes out negative."]
+  sound_warm_air_thermometer.csv: ["A thermometer lowered down the same tube, read at seven depths below the open end.", "Is the air in the tube at the temperature that was entered?"]
+  stefan_clean.csv: ["A 12 V, 6 W vacuum lamp: voltage across and current through the filament from 1.5 to 12 V, cold resistance 1.60 Ω measured on a four-wire meter.", "Nothing should look off: power follows T⁴ over 1200–2700 K."]
+  stefan_ammeter_zero.csv: ["The same lamp and meters, from 1.5 to 12 V.", "The exponent comes out about 3.8, not 4: power ÷ T⁴ climbs at the cold end, by about a fifth at the coldest point."]
+  stefan_supply_voltage.csv: ["The same lamp and meters, from 1.5 to 12 V.", "The exponent comes out about 4.3, above 4: power ÷ T⁴ falls away at the cold end."]
+  stefan_ammeter_open.csv: ["The ammeter read ten times with the supply off and the lamp disconnected.", "Does it read zero?"]
+
+labels:
+  laser_wavelength_fit_nm: ["Laser wavelength, fitted", "nm", 1]
+  laser_wavelength_expected_nm: ["Laser wavelength, expected", "nm", 1]
+  dead_travel_at_start_um: ["Travel before counting started", "µm", 1]
+  scatter_about_line_um: ["Scatter about the line (rms)", "µm", 1]
+  speed_of_sound_fit_m_s: ["Speed of sound, fitted", "m/s", 1]
+  speed_of_sound_expected_m_s: ["Speed of sound at the entered temperature", "m/s", 1]
+  end_correction_fit_mm: ["End correction, fitted", "mm", 1]
+  end_correction_expected_mm: ["End correction, 0.3 × diameter", "mm", 1]
+  tube_air_temperature_C: ["Air temperature in the tube", "°C", 1]
+  stated_air_temperature_C: ["Air temperature entered", "°C", 1]
+  speed_expected_in_tube_m_s: ["Speed of sound at the tube's temperature", "m/s", 1]
+  stefan_exponent_fit: ["Exponent n in P ∝ Tⁿ", "", 1]
+  stefan_exponent_hottest: ["Exponent at the hottest point", "", 1]
+  hottest_filament_temperature_K: ["Hottest filament temperature", "K", 1]
+  coldest_filament_temperature_K: ["Coldest filament temperature", "K", 1]
+  power_excess_coldest_pct: ["Power above T⁴ at the coldest point", "%", 1]
+  ammeter_reading_open_circuit_A: ["Ammeter reading, circuit open", "A"]
