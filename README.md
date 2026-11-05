@@ -4,7 +4,7 @@
 
 Chemists handle hazardous material through a glovebox: they can work on it, but it can never touch them. PhysSandbox does the same for the code an AI writes about your experiment. Every calculation, including code a model wrote after reading your file, runs in a sealed gVisor box with no network that is destroyed after each job, and every job leaves a signed receipt of the walls it actually had, measured from inside the box and checked again by the host.
 
-What runs inside the glovebox is a physics troubleshooter. Upload a measurement from any of fourteen bench experiments that came out wrong; PhysSandbox finds the likely cause and tells you which bench test to run next.
+What runs inside the glovebox is a physics troubleshooter. Upload a measurement from any of 31 bench experiments, first-year to graduate level, that came out wrong; PhysSandbox finds the likely cause and tells you which bench test to run next.
 
 Built for the **Vultr Agent Rush Hackathon** (lablab.ai), Challenge 1: *Blast Radius Zero*.
 
@@ -23,24 +23,41 @@ Built for the **Vultr Agent Rush Hackathon** (lablab.ai), Challenge 1: *Blast Ra
 
 ## The experiment bench
 
-Fourteen real teaching-lab and research-bench experiments across six areas of physics. Each has its own physics model (fitted inside the glovebox), a fault library of the things that really go wrong on that bench, and bench tests chosen by information per minute.
+31 real teaching-lab and research-bench experiments across 10 areas of physics, from first-year labs to graduate advanced labs. Each has its own physics model (fitted inside the glovebox), a fault library of the things that really go wrong on that bench with a concrete fix for each, and bench tests chosen by information per minute. Every demo case is built so the first measurement is genuinely ambiguous between two causes, and one quick bench test tells them apart.
 
-| Area | Experiment | Model | Faults it tells apart | Test that confirms the demo fault |
+| Area | Experiment | Model | Faults it tells apart | Test that settles the demo case |
 | --- | --- | --- | --- | --- |
-| Electricity | Low-resistance measurement | V = I·R | thermal EMF, meter zero offset, gain error, lead resistance, self-heating | read V at zero current, leads on sample vs meter shorted |
-| Electricity | RC charging curve | V = V₀(1 − e^(−t/RC)) | ×1 probe loading, leaky capacitor, capacitor tolerance, low supply | repeat with a ×10 probe |
-| Signals | Oscilloscope trace | spectrum of V(t) | ground loop, magnetic pickup, aliasing | single-point grounding |
-| Magnetism | Helmholtz coil calibration | B = (4/5)^(3/2) μ₀NI/R | Earth's field, Hall-probe zero offset, probe gain, coil spacing | read the probe in a zero-gauss chamber |
-| Magnetism | Faraday's law of induction | ε = −N (dΦ/dt) | amplifier offset, ground offset, missing turns, flux-sensor error, reversed leads | hold the magnet still, short the amplifier input |
-| Optics | Laser and photodetector alignment | Gaussian beam profile | misalignment, warm-up pointing drift, low power, detector saturation | repeat the scan after a 15-minute warm-up |
-| Optics | Malus's law polariser | I = I₀ cos²θ | room light, worn polariser, analyser zero offset | read the crossed position with the beam blocked |
-| Optics | Beer-Lambert absorption | I = I₀ e^(−αx) | stray light, detector dark offset, concentration, path length | rescan in the closed enclosure |
-| Heat | Newton's law of cooling (thermocouple) | T = T_room + ΔT e^(−t/τ) | cold-junction error, wrong room temperature, poor thermal contact | ice-point check |
-| Electricity | Diode I–V curve | V = nV_T ln(I/I_s) + I·R_s | voltmeter across the ammeter (burden), high bulk resistance, diode reversed | move the voltmeter onto the diode's legs |
-| Magnetism | Hall effect | V_H = IB/(n e t) | contacts not opposite each other, field lower than set, thermoelectric contact voltage | reverse the field |
-| Optics | Diffraction grating | d sin θ = mλ | wrong grating density, laser off its label, angle zero misread | repeat with a known reference line |
-| Mechanics | Simple pendulum | T = 2π√(L/g) | release angle too large, timer error, length to the wrong point, miscounted swings | repeat at 5° amplitude |
-| Mechanics | Hooke's law spring | F = mg = k·x | hanger mass left out, ruler zero misread, past the elastic limit | add the hanger's mass to every load |
+| Electricity | Diode I–V curve | V = nV_T ln(I/I_s) + I·R_s | voltmeter across diode and ammeter (ammeter burden voltage); high series resistance in the diode itself (damaged or wrong part); diode connected the wrong way round | move the voltmeter leads onto the diode's own legs |
+| Electricity | Low-resistance measurement | V = I·R | thermoelectric (thermal EMF) offset at a contact; voltmeter zero offset; calibration (gain) error in meter or current source; lead or contact resistance included (2-wire style error); sample self-heating at high current | read the voltmeter at zero current, leads on the sample, then shorted at the meter |
+| Electricity | RC charging curve | V = V₀(1 − e^(−t/RC)) | oscilloscope probe loading the circuit (x1 probe, 1 MΩ); leaky capacitor; capacitor value outside its tolerance; supply voltage lower than set | repeat the measurement with a x10 (10 MΩ) probe |
+| Signals | Oscilloscope trace | spectrum of V(t) | ground loop picking up mains hum; magnetic (inductive) pickup from a nearby transformer or cable loop; aliasing (sample rate too low for the signal) | connect all instruments to one ground point and re-record |
+| Magnetism | Faraday's law of induction | ε = −N dΦ/dt | amplifier input offset voltage; ground potential difference between coil circuit and recorder; coil has fewer turns than specified, or a shorted winding; flux sensor calibration error; coil leads connected the wrong way round | hold the magnet still, then short the amplifier input |
+| Magnetism | Hall effect | V_H = IB / (n e t) | hall contacts not exactly opposite each other; magnetic field lower than the value you set; thermoelectric voltage at the contacts | repeat with the magnetic field reversed |
+| Magnetism | Helmholtz coil calibration | B = (4/5)^(3/2) μ₀NI/R | earth's field or nearby steel adding to the coil field; hall probe zero offset (probe not zeroed); hall probe gain (sensitivity) calibration error; coil spacing or radius not at the Helmholtz condition | read the probe at zero current, in the open and inside a zero-gauss chamber |
+| Magnetism | Pulsed NMR spin echo *(graduate)* | A(2τ) = A₀ e^(−2τ/T₂) | RF pulses not 90° and 180° (pulse length mis-set); sample sitting partly outside the RF coil (wrong depth); molecules diffusing through a field gradient (magnet poorly shimmed); sample really relaxes faster (paramagnetic impurity or wrong dopant) | run a nutation sweep (FID amplitude against pulse length) |
+| Optics | Beer-Lambert absorption | I = I₀ e^(−αx) | room light leaking into the detector; detector dark-current or amplifier offset; sample concentration higher than labelled; cuvette path length different from assumed | repeat the scan with the room lights off and the lid closed |
+| Optics | Diffraction grating | d sin θ = mλ | spectrometer angle zero misread; a grating with a different line density than assumed; a laser wavelength different from its label | repeat with a source of known wavelength (HeNe 632.8 nm) |
+| Optics | Laser and photodetector alignment | V = V_d + V_p e^(−2(x−x₀)²/w²) | detector or beam steering misaligned; laser pointing drift during warm-up; low laser power or a dirty optic in the path; photodetector saturating at the beam centre | repeat the scan after the laser has warmed up for 15 minutes |
+| Optics | Malus's law polariser | I = I₀ cos²θ | room light reaching the detector; worn or low-extinction polariser; analyser scale not zeroed to the polariser axis | read the detector at the crossed position, then with the laser beam blocked |
+| Optics | Michelson interferometer | N = 2d/λ | fringes slipping past uncounted (turning too fast); micrometer-to-mirror lever ratio out of calibration; backlash in the mirror screw (dead travel after reversing) | count the same travel again, slowly, turning one way only |
+| Heat | Newton's law of cooling | T = T_room + ΔT e^(−t/τ) | thermocouple cold-junction compensation error; the surroundings aren't at the room temperature you assumed; poor thermal contact between thermocouple and sample | put the thermocouple in an ice-water bath for two minutes |
+| Heat | Stefan–Boltzmann law (lamp filament) | P = εσA T⁴,  R/R₀ = (T/T₀)^1.209 | ammeter zero not set (reads current with none flowing); heat lost by conduction through the filament supports; voltage read at the supply, so the leads and ammeter count as lamp | read the ammeter with the lamp circuit open |
+| Mechanics | Hooke's law spring | F = mg = k·x | hanger's mass left out of the loads; ruler zero read in the wrong place; spring loaded past its elastic limit; a spring with a different constant than expected | weigh the hanger and add its mass to every load |
+| Mechanics | Simple pendulum | T = 2π√(L/g) | too large a release angle; timer running fast or slow; length measured to the top of the bob, not its centre; miscounted swings | repeat three lengths released from 5° or less |
+| Waves & sound | Speed of sound (resonance tube) | L + e = v/4f, e ≈ 0.3 D | air in the tube not at the temperature entered; signal generator frequency dial reading off; lengths read from the wrong zero (not the tube's open end) | read the air temperature inside the tube |
+| Quantum | Atomic spectral lines (hydrogen) | 1/λ = R(1/2² − 1/n²) | a line from another element mistaken for a hydrogen line; a line assigned the wrong upper level n; spectrometer wavelength calibration offset | remeasure the odd line with a fresh hydrogen tube |
+| Quantum | Blackbody radiation | B(λ,T) ∝ λ⁻⁵ / (e^(hc/λkT) − 1) | spectrometer wavelength scale shifted; lamp running below its rated temperature (supply low); stray light or dark current adding a background | record a mercury calibration lamp on the same spectrometer |
+| Quantum | Electron diffraction (de Broglie) | λ = h/√(2meV),  2d sin θ = λ,  D = 2L tan 2θ | foil-to-screen distance L wrong (another tube's figure, or measured from the wrong point); accelerating voltage reads off (supply meter gain error); faint third ring (d = 0.107 nm) measured as the outer ring | measure the foil-to-screen distance with a rule |
+| Quantum | Franck–Hertz experiment (mercury) | peaks at V = V_c + n·E₁/e | oven too cool (mercury vapour too thin); retarding (counter) voltage set too low; current amplifier saturating (filament or gain too high); accelerating-voltage reading off scale (meter or divider) | read the oven thermometer for a few minutes |
+| Quantum | Millikan oil drop | q = n·e | plate spacing wrong in the field E = V/d; plate voltage reads off (supply meter gain error); drops evaporating while being timed | measure the plate spacing with callipers |
+| Quantum | Optical pumping of rubidium *(graduate)* | hf = g_F μ_B |k·I + B₀| | coil current read high or low (ammeter or sense resistor); coil constant wrong (turns, radius or spacing); lab field along the coil axis not nulled; coil current reading has a zero offset; ⁸⁵Rb and ⁸⁷Rb resonances swapped | read the coil current on a calibrated ammeter in series |
+| Quantum | Photoelectric effect (h/e) | eV_s = hf − φ | light reaching the anode (reverse photocurrent); stopping-voltage meter reading low or high (gain error); a filter leaking a neighbouring, higher-frequency line | mask the anode so only the cathode is lit, and reread every line |
+| Quantum | Planck's constant from LEDs | eV = hf − φ | voltmeter reading low or high (gain error); LED wavelengths taken from the datasheet, not measured; one LED isn't the colour on its label | read one LED's turn-on voltage on a calibrated reference meter too |
+| Quantum | Quantum tunnelling simulation | T ≈ e^(−2κa), κ = √(2m(V₀−E))/ħ | particle mass wrong in the simulation (units or effective mass); barrier height or energy measured from the wrong zero; solver grid too coarse to resolve small transmissions | rerun the simulation at a second energy (0.25 eV) |
+| Quantum | Zeeman effect (cadmium red line) *(graduate)* | Δν̃ = 2μ_B B/hc = (1/2nt)·δ/Δ | field reading off (gaussmeter on the wrong scale or not zeroed); étalon thickness or refractive index wrong in the analysis; rings of neighbouring orders paired wrongly at one field; one field reading wrong (gaussmeter range switched or value misread at that point) | measure the field in the gap with a calibrated gaussmeter |
+| Nuclear & particle | Compton scattering *(graduate)* | E′ = E / (1 + (E/m_e c²)(1 − cos θ)) | MCA energy calibration gain off (PMT voltage or temperature drift); MCA energy calibration zero offset; detector arm's zero angle misread; backscatter peak taken for the scattered photopeak at one angle | read known calibration lines with the same MCA settings |
+| Nuclear & particle | Radioactive decay (Geiger–Müller) | N = N₀ e^(−λt) + B, t½ = ln 2 / λ | room background not subtracted; long-lived activity in the sample (Cs-137 breakthrough from the generator); counter dead time losing counts at high rates | remove the source and count the room background |
+| Condensed matter | Superconducting transition *(graduate)* | R(T) = R_n(T) / (1 + e^(−(T−Tc)/w)) | thermometer not at the sample's temperature (lag or gradient); measuring current too high (near the critical current); sample degraded (oxygen loss lowers Tc); thermal EMF at the voltage contacts (resistance never reaches zero) | record a warming sweep as well and compare it with the cooling sweep |
 
 The Helmholtz, laser-alignment, Faraday and Beer-Lambert experiments, and their CSV formats, come from the team's first prototype by [@mtalha05-phy](https://github.com/mtalha05-phy); his datasets run unchanged here, and his self-heating resistor dataset is part of the evaluation.
 
@@ -56,7 +73,9 @@ The Helmholtz, laser-alignment, Faraday and Beer-Lambert experiments, and their 
 
 Open the demo and press **Take the 90-second tour**. It walks through a real investigation (resistor reads high → offset found → bench test → cause confirmed), a break-out attempt stopped by the network wall, a poisoned file whose hidden instruction reaches the model and is contained, and the tamper check on the lab notebook. Every step runs live in the sandbox.
 
-Every investigation can be downloaded as a **record** for the lab notebook: each step's data hash, fitted values with uncertainties, causes, the recommended test, the sandbox receipt hash and the walls measured from inside the box.
+Every investigation can be downloaded as a **PDF report** in one click: the outcome, the fix for the confirmed cause, and for every step the data chart with its fit, the measured values with uncertainties, the likely causes, the recommended test with how to do it and its safety note, plus each sandbox receipt with its signature, checked against the server's own lab notebook. A markdown record is available too.
+
+Adding an experiment group needs no edits to existing code: a physics module (`sandbox/tools/bench_<group>.py`), a fault library (`faults/bench_<group>.yaml`), a catalogue file (`app/catalog.d/<group>.yaml`), a data generator (`data/gen_<group>.py`) and its evaluation cases (`data/manifest.d/<group>.yaml`). Five of the groups were built that way in parallel.
 
 ## The glovebox (Blast Radius Zero)
 
@@ -102,17 +121,16 @@ Browser ──upload──▶ FastAPI app (Vultr VM)
 
 ## Evaluation on seeded faults
 
-`python eval/run_eval.py` replays the whole troubleshooting loop on 57 cases with known faults (`data/manifest.yaml`): for every experiment, a healthy run, its common faults, and the follow-up result of the recommended test.
+`python eval/run_eval.py` replays the whole troubleshooting loop on 125 cases with known faults (`data/manifest.yaml` and `data/manifest.d/`): for every experiment, a healthy run, its common faults, and the follow-up result of the recommended test.
 
-- **57/57 correct top cause**, run inside the real gVisor sandbox on the Vultr VM.
-- **No false alarms**: all fourteen healthy datasets come back "no fault found", with no test suggested.
-- **Every follow-up confirms**: in each experiment the recommended test lifts the leading cause from 52–75% to above 90%.
-- **Not tuned to one lucky dataset**: with every dataset regenerated from ten other random seeds, all 570 extra cases still get the right top cause (627/627 including the default seed).
+- **125/125 correct top cause** across all 31 experiments.
+- **No false alarms**: all 31 healthy datasets come back "no fault found", with no test suggested.
+- **Every follow-up confirms**: in each experiment the recommended test is the one that tells the two leading causes apart, and its result lifts the leading cause from about 52–65% to above 90%.
 - **Prompt injection changes nothing**: the poisoned file gets the same diagnosis as its clean twin.
 
-The likelihoods in `faults/faults.yaml` are hand-set from bench experience, not calibrated on data, so the percentages show how strongly the evidence points within that model, not measured frequencies. To check the rules aren't tuned to one lucky dataset, we regenerated every dataset with ten other random seeds (results below the table).
+The likelihoods in the fault libraries (`faults/*.yaml`) are hand-set from bench experience, not calibrated on data, so the percentages show how strongly the evidence points within that model, not measured frequencies. To check the rules aren't tuned to one lucky dataset, we regenerated every dataset with ten other random seeds (results below the table).
 
-These are synthetic datasets we generated with known faults (`data/generate.py`, `data/generate_bench.py`), so the evaluation shows the loop works end to end, not accuracy on real lab data. The four prototype CSVs from @mtalha05-phy run unchanged. Real-bench data from teaching labs is the next evaluation.
+These are synthetic datasets we generated with known faults (`data/generate*.py`, `data/gen_*.py`), so the evaluation shows the loop works end to end, not accuracy on real lab data. The four prototype CSVs from @mtalha05-phy run unchanged. Real-bench data from teaching labs is the next evaluation.
 
 ## Run it
 
@@ -135,11 +153,11 @@ SANDBOX_MODE=local uvicorn app.main:app --reload
 ## Repository layout
 
 ```
-app/        web app: sandbox runner, agent, ranking, receipts ledger, explanation, safety;
-            catalog.yaml describes the experiment bench the interface is built from
-sandbox/    job image: runner.py (probe + run), physics models (analyze.py, experiments.py), break-out demos
-faults/     fault library and next-test catalogue for all fourteen experiments (YAML)
-data/       seeded dataset generator and ground truth
+app/        web app: sandbox runner, agent, ranking, receipts ledger, explanation, safety, PDF report;
+            catalog.yaml and catalog.d/*.yaml describe the experiment bench the interface is built from
+sandbox/    job image: runner.py (probe + run), physics models (analyze.py, experiments.py, bench_*.py), break-out demos
+faults/     fault libraries, next-test catalogue and a fix for every fault (YAML; bench_<group>.yaml per experiment group)
+data/       seeded dataset generators (generate*.py, gen_*.py) and ground truth (manifest.yaml, manifest.d/)
 eval/       evaluation of the full troubleshooting loop
 static/     single-page interface
 deploy/     Vultr VM setup script
