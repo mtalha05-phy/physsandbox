@@ -264,7 +264,7 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
     <svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="5" width="26" height="22" rx="4" fill="currentColor"/><circle cx="11" cy="21" r="3.2" fill="var(--page)"/><circle cx="21" cy="21" r="3.2" fill="var(--page)"/><circle cx="16" cy="11" r="2.4" fill="var(--laser)"/></svg>
     <div>
       <h1 class="wordmark">PhysSandbox</h1>
-      <p class="tagline">Find out why your experiment gave the wrong answer. Every calculation, including code an AI writes, runs sealed off from the internet and from this server.</p>
+      <p class="tagline">Are you want to find out why your experiment gave the wrong answer? PhysSandbox is a lab-troubleshooting assistant that solve your problem. Pick an experiment, tell it what you expected, and upload your measurements (CSV). It fits your data, compares it with theory, ranks the most likely causes of any mismatch, and suggests the next bench test to run.</p>
     </div>
   </div>
   <div class="status" aria-live="polite">
@@ -322,7 +322,7 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
     <header><span class="step-n">5</span><div><h2 id="h5">Ask the agent</h2><p class="hint">An AI writes Python to answer your question. We assume that code is hostile and run it in the glovebox anyway.</p></div></header>
     <div class="step-body">
       <label class="sr" for="question">Your question</label>
-      <textarea id="question" placeholder="For example: fit V = R·I + V0 and report the offset"></textarea>
+      <textarea id="question" placeholder="For example: fit V = I·R + V0 and report the offset"></textarea>
       <div class="drop-row" id="agent-chips" style="margin-top:10px"></div>
       <label class="toggle"><input type="checkbox" id="raw-mode"><span>Let the agent read the raw file<small>Off by default: the agent sees only column names and ranges. Turn it on with the poisoned sample and the hidden instruction reaches the model.</small></span></label>
       <label class="toggle"><input type="checkbox" id="compromised"><span>Red team: simulate a compromised model<small>A good model may ignore the hidden instruction. We don't rely on that: this writes the code a fooled model would, and the glovebox still has to hold.</small></span></label>
