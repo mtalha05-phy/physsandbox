@@ -1,0 +1,230 @@
+# Core undergraduate experiments: photoelectric effect, Franck–Hertz, radioactive decay.
+# Same format as faults.yaml; `fix` is what to do once a cause is confirmed.
+experiments:
+
+  photoelectric:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: h_dev_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record h/e with its uncertainty; the intercept is the work function plus the contact potential.
+      anode_photoemission:
+        name: Light reaching the anode (reverse photocurrent)
+        prior: 0.20
+        typical_size: "A coated anode lit by stray light can pull the slope 10–15% low"
+        conditions:
+          - {feature: h_dev_sigma, op: "<", value: -5, p_true: 0.95, p_false: 0.02}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.05}
+          - {feature: anode_effect_found, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Fit the mask or aperture so the light falls only on the cathode, realign the lamp, then remeasure every line.
+      voltmeter_gain_error:
+        name: Stopping-voltage meter reading low or high (gain error)
+        prior: 0.17
+        typical_size: "A panel meter reading 10% low makes h/e come out 10% low"
+        conditions:
+          - {feature: h_dev_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.05}
+          - {feature: anode_effect_found, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Read the stopping voltage on a calibrated meter (or correct every reading by its ratio to one), then refit.
+      filter_leak:
+        name: A filter leaking a neighbouring, higher-frequency line
+        prior: 0.14
+        typical_size: "Green leaking through the yellow filter raises that point by about 0.12 V"
+        conditions:
+          - {feature: outlier_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Replace the leaking filter (or add a second one), check it on a spectrometer, and remeasure that line.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Record the full current–voltage curve for each line and look at how it approaches zero.
+    tests:
+      mask_anode:
+        name: Mask the anode so only the cathode is lit, and reread every line
+        minutes: 4
+        how: Fit the aperture mask (or turn the tube) so no light reaches the anode ring, then read the stopping voltage for each filter again.
+        adds: {feature: anode_effect_found, from: anode_effect_found, op: copy}
+        outcomes:
+          anode_photoemission: voltages_rise
+          voltmeter_gain_error: no_change
+          filter_leak: no_change
+          no_fault: no_change
+        safety: Mercury lamps emit ultraviolet that can burn eyes and skin. Keep the lamp housing closed, don't look into the aperture, and let the lamp cool before touching it.
+      reference_meter:
+        name: Check the stopping voltage on a calibrated meter
+        minutes: 7
+        how: Fetch a calibrated meter, put it across the anode and cathode terminals and compare it with the panel reading at three settings.
+        outcomes:
+          voltmeter_gain_error: meters_disagree
+          anode_photoemission: meters_agree
+          filter_leak: meters_agree
+          no_fault: meters_agree
+      filter_spectrum_check:
+        name: Look at the light through each filter with a spectrometer
+        minutes: 3
+        how: Put each filter between the lamp and a fibre spectrometer and check that only its own mercury line comes through.
+        outcomes:
+          filter_leak: second_line_seen
+          anode_photoemission: one_line_each
+          voltmeter_gain_error: one_line_each
+          no_fault: one_line_each
+        safety: Mercury lamps emit ultraviolet; keep the housing closed and never look straight at the lamp.
+
+  franck_hertz:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: peak_contrast, op: ">", value: 0.38, p_true: 0.95, p_false: 0.01}
+          - {feature: spacing_dev_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: amplifier_saturated, op: is, value: false, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Quote the first excitation energy from the peak spacing; the first peak's position includes the contact potential.
+      oven_too_cool:
+        name: Oven too cool (mercury vapour too thin)
+        prior: 0.20
+        typical_size: "At 145 °C instead of 180 °C the dips fill in and the first peak barely shows"
+        conditions:
+          - {feature: peak_contrast, op: "<", value: 0.3, p_true: 0.95, p_false: 0.02}
+          - {feature: oven_cold, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Let the oven reach its set point (about 180 °C for mercury) and settle for ten minutes, then repeat the sweep.
+      retarding_voltage_low:
+        name: Retarding (counter) voltage set too low
+        prior: 0.17
+        typical_size: "At 0.2 V instead of 1.5 V, slowed electrons still reach the anode and the dips fill in"
+        conditions:
+          - {feature: peak_contrast, op: "<", value: 0.3, p_true: 0.95, p_false: 0.02}
+          - {feature: oven_cold, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Set the retarding voltage to the tube's recommended value (about 1.5 V), checked with a meter at the terminals, and repeat.
+      amplifier_saturated:
+        name: Current amplifier saturating (filament or gain too high)
+        prior: 0.13
+        typical_size: "The upper peaks are cut flat at the amplifier's limit"
+        conditions:
+          - {feature: amplifier_saturated, op: is, value: true, p_true: 0.95, p_false: 0.01}
+        fix: Turn the filament heating down or the amplifier gain down one range until the top peak sits below the limit, then repeat.
+      voltage_scale_error:
+        name: Accelerating-voltage reading off scale (meter or divider)
+        prior: 0.12
+        typical_size: "A display reading 5% high spreads the peaks 0.25 V too far apart"
+        conditions:
+          - {feature: spacing_dev_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: amplifier_saturated, op: is, value: false, p_true: 0.9, p_false: 0.3}
+        fix: Check the accelerating-voltage reading (or the ÷10 output used for the scope) against a calibrated meter and rescale.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the filament current, the tube's wiring against its diagram, and repeat the sweep slowly.
+    tests:
+      read_oven_thermometer:
+        name: Read the oven thermometer for a few minutes
+        minutes: 1
+        how: Read the oven's thermometer (or thermocouple) once a minute and compare with the set point.
+        adds: {feature: oven_cold, from: oven_cold, op: copy}
+        outcomes:
+          oven_too_cool: below_set_point
+          retarding_voltage_low: at_set_point
+          amplifier_saturated: at_set_point
+          voltage_scale_error: at_set_point
+          no_fault: at_set_point
+        safety: The oven runs at about 180 °C; read it without touching the housing. The tube contains mercury, so don't move it while hot.
+      check_retarding_voltage:
+        name: Measure the retarding voltage at the tube terminals
+        minutes: 3
+        how: Put a meter across the anode and grid-2 terminals and compare with the setting (about 1.5 V).
+        outcomes:
+          retarding_voltage_low: below_setting
+          oven_too_cool: at_setting
+          amplifier_saturated: at_setting
+          voltage_scale_error: at_setting
+          no_fault: at_setting
+        safety: The oven and its terminals get hot (about 180 °C); use insulated probes and don't touch the housing. If the tube ever breaks, leave the room and follow the mercury-spill procedure.
+      calibrated_meter_check:
+        name: Check the accelerating voltage on a calibrated meter
+        minutes: 5
+        how: Put a calibrated meter across the accelerating-voltage terminals and compare it with the display at 10, 20 and 30 V.
+        outcomes:
+          voltage_scale_error: meter_disagrees
+          oven_too_cool: meter_agrees
+          retarding_voltage_low: meter_agrees
+          amplifier_saturated: meter_agrees
+          no_fault: meter_agrees
+        safety: The oven terminals are hot; use insulated probes.
+
+  radioactive_decay:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: half_life_dev_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: floor_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the half-life with its uncertainty.
+      background_not_subtracted:
+        name: Room background not subtracted
+        prior: 0.20
+        typical_size: "About 0.8 counts per second, which is most of the count by the end of a 25-minute run"
+        conditions:
+          - {feature: floor_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: floor_from_room_background, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Subtract the room background (counted with the source away) from every interval and refit.
+      long_lived_contamination:
+        name: Long-lived activity in the sample (Cs-137 breakthrough from the generator)
+        prior: 0.17
+        typical_size: "A little Cs-137 washed out with the barium keeps the count from ever reaching background"
+        conditions:
+          - {feature: floor_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: floor_from_room_background, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Report the long-lived component, fit it as a constant, and tell whoever looks after the generator; it may need replacing.
+      dead_time_losses:
+        name: Counter dead time losing counts at high rates
+        prior: 0.15
+        typical_size: "At 2000 counts per second a 150 µs dead time loses about a quarter of the counts"
+        conditions:
+          - {feature: half_life_dev_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: peak_loss_pct, op: ">", value: 10, p_true: 0.95, p_false: 0.05}
+        fix: Move the source back until the rate is below about 500 per second, or correct each interval for dead time, n = m / (1 − mτ), and refit.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the counter's operating voltage is on its plateau and the interval timer is right, then repeat.
+    tests:
+      source_removed_count:
+        name: Remove the source and count the room background
+        minutes: 4
+        how: Take the sample well away (back in its lead pot) and count for three minutes with the same interval, appended to the same log.
+        adds: {feature: floor_from_room_background, from: floor_from_room_background, op: copy}
+        outcomes:
+          background_not_subtracted: floor_matches_background
+          long_lived_contamination: floor_above_background
+          dead_time_losses: no_floor
+          no_fault: no_floor
+        safety: Pick up the sample with tongs, not fingers, and put it straight back in its lead pot. Keep your time near it short and your distance large; the eluate is an open source, so wear gloves, work over a tray and dispose of it as your radiation safety officer directs.
+      recount_after_30_min:
+        name: Count the same sample again after 30 minutes
+        minutes: 35
+        how: Leave the sample in place for 30 minutes (over 10 half-lives of Ba-137m) and count for five minutes.
+        outcomes:
+          long_lived_contamination: activity_persists
+          background_not_subtracted: back_to_background
+          dead_time_losses: back_to_background
+          no_fault: back_to_background
+        safety: Keep the sample shielded and labelled while you wait, and follow your radiation safety officer's rules for open sources.
+      two_source_dead_time:
+        name: Measure the dead time with the two-source method
+        minutes: 10
+        how: Count source A alone, A and B together, then B alone, without moving either; the shortfall in the combined count gives the dead time.
+        outcomes:
+          dead_time_losses: losses_found
+          background_not_subtracted: no_losses
+          long_lived_contamination: no_losses
+          no_fault: no_losses
+        safety: Handle the sealed sources with tongs, keep them in their lead pots when not in use, and use time, distance and shielding; ask your radiation safety officer before using sources you haven't been signed off on.
