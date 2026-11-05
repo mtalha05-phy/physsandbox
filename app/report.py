@@ -1,13 +1,18 @@
-"""PDF report of one investigation.
+"""PDF report of one investigation, built only from what this server computed.
 
-The browser sends the investigation it holds (each step's plot, causes, next
-test, preformatted values and receipt). All of it is untrusted: every string is
-truncated and escaped before it reaches reportlab's Paragraph markup, every
-number must be finite, sizes are capped, and the experiment must be in the
-catalogue. Names, fixes, test instructions and safety notes are looked up here
-from the fault library rather than taken from the request, and each receipt is
-checked against this server's lab notebook. Nothing in the input is ever used
-as a URL or a file path.
+The browser sends nothing but the receipt hashes of the investigation's steps,
+{"receipts": [hash, ...]}, in order. For each one the server finds the receipt
+in its own lab notebook (which must pass its tamper check), loads the record
+of that step that analyse() stored (app/results.py), and recomputes the
+record's SHA-256, which must equal the result_sha256 sealed inside the signed
+receipt. The records must belong to the browser session asking, be for one
+experiment, and form one chain: a first measurement, then follow-ups that
+each name the step before. Status, causes, values, plot and explanation all
+come from those records; names, fixes, test instructions and safety notes come
+from the fault library; the receipt fields come from the notebook. Strings are
+still escaped before they reach reportlab's Paragraph markup (a file name or a
+column label can come from an uploaded file), and nothing is used as a URL or
+a file path.
 """
 import io
 import math
@@ -15,6 +20,7 @@ import os
 import re
 import threading
 import time
+from decimal import ROUND_HALF_UP, Decimal, localcontext
 from xml.sax.saxutils import escape
 
 import matplotlib
@@ -36,7 +42,7 @@ from reportlab.platypus import (CondPageBreak, Image, KeepTogether, Paragraph,  
                                 SimpleDocTemplate, Spacer, Table, TableStyle)
 from reportlab.platypus.doctemplate import LayoutError  # noqa: E402
 
-from . import ledger
+from . import ledger, results
 from .pipeline import CATALOG
 from .ranking import LIB
 
@@ -52,7 +58,9 @@ _busy = threading.BoundedSemaphore(2)     # charts are CPU work; two reports at 
 
 
 class ReportError(ValueError):
-    pass
+    def __init__(self, msg, status=400):
+        super().__init__(msg)
+        self.status = status
 
 
 # ---------------------------------------------------------------- brand
@@ -182,56 +190,92 @@ def _hexish(v, n=64):
     return v if re.fullmatch(r"[0-9a-f]{%d}" % n, v) else ""
 
 
-def _clean_receipt(r):
-    r = _dict(r)
-    seq = r.get("seq")
+def _receipt(e):
+    """The receipt fields the report shows, from this server's lab notebook."""
+    seq = e.get("seq")
+    sig = e.get("sig") or e.get("mac")
     return {
         "seq": int(seq) if isinstance(seq, int) and not isinstance(seq, bool) and 0 < seq < 10**9 else None,
-        "time": _s(r.get("time"), 40),
-        "hash": _hexish(r.get("hash")), "prev": _hexish(r.get("prev")), "mac": _hexish(r.get("mac")),
-        "input_sha256": _hexish(r.get("input_sha256")),
-        "mode": _s(r.get("mode"), 20),
-        "walls_measured": _dict(r.get("walls_measured")),
-        "walls_host_verified": r.get("walls_host_verified") if isinstance(r.get("walls_host_verified"), dict) else None,
+        "time": _s(e.get("time"), 40),
+        "hash": _hexish(e.get("hash")), "prev": _hexish(e.get("prev")),
+        "sig": _s(sig, 200) if isinstance(sig, str) else "",
+        "sig_kind": "Ed25519" if e.get("sig") else "HMAC-SHA256",
+        "input_sha256": _hexish(e.get("input_sha256")),
+        "result_sha256": _hexish(e.get("result_sha256")),
+        "mode": _s(e.get("mode"), 20),
+        "walls_measured": _dict(e.get("walls_measured")),
+        "walls_host_verified": e.get("walls_host_verified") if isinstance(e.get("walls_host_verified"), dict) else None,
     }
 
 
-def validate(payload):
-    """Untrusted JSON from the browser -> a clean investigation, or ReportError."""
-    if not isinstance(payload, dict):
-        raise ReportError("The report data must be a JSON object.")
-    exp = payload.get("experiment")
-    if not isinstance(exp, str) or exp not in CATALOG["experiments"]:
-        raise ReportError("Unknown experiment.")
+_HASH = re.compile(r"[0-9a-f]{64}")
+_FORMAT = ('Send {"receipts": [hash, ...]}: the receipt hashes of the investigation\'s steps, in order. '
+           "The report is built from this server's own stored results, so nothing else is accepted.")
+
+
+def load(payload, owner):
+    """{"receipts": [hash, ...]} -> the investigation as this server stored it, or ReportError."""
+    if not isinstance(payload, dict) or set(payload) != {"receipts"}:
+        raise ReportError(_FORMAT)
+    hashes = payload["receipts"]
+    if not isinstance(hashes, list) or not 1 <= len(hashes) <= MAX_STEPS:
+        raise ReportError(f"A report covers 1 to {MAX_STEPS} steps: send their receipt hashes, in order.")
+    if not all(isinstance(h, str) and _HASH.fullmatch(h) for h in hashes):
+        raise ReportError("Each receipt must be its 64-character SHA-256 hash in lowercase hex.")
+    if len(set(hashes)) != len(hashes):
+        raise ReportError("The same receipt appears twice.")
+    check = ledger.verify()
+    if not check.get("intact"):
+        raise ReportError("This server's lab notebook fails its tamper check "
+                          f"({_s(check.get('reason'), 120) or 'see Check for tampering'}), "
+                          "so it can't vouch for any result.", 409)
+    items = ledger.entries()
+    recs = []
+    for h in hashes:
+        e = results.receipt_in_notebook(h, items)
+        if e is None:
+            raise ReportError(f"Receipt {h[:12]}… isn't in this server's lab notebook.", 404)
+        try:
+            rec = results.load_verified(h, e)
+        except results.StoreError as err:
+            raise ReportError(str(err), 409) from err
+        if rec is None:
+            raise ReportError(f"Receipt #{e.get('seq')} ({_s(e.get('label'), 60) or 'a job'}) has no stored "
+                              "analysis on this server. Reports are built only from physics analyses run "
+                              "here.", 404)
+        if owner is None or rec.get("owner") != owner:
+            raise ReportError(f"Receipt #{e.get('seq')} belongs to an investigation run in another browser "
+                              "session. A report can only be built in the session that ran the analyses.", 403)
+        recs.append((e, rec))
+    exp = recs[0][1].get("experiment")
+    if not isinstance(exp, str) or exp not in CATALOG["experiments"] or \
+            any(r.get("experiment") != exp for _, r in recs):
+        raise ReportError("These receipts are from different experiments. A report covers one investigation.")
+    for i, (e, r) in enumerate(recs):
+        if i == 0 and (r.get("test_run") or r.get("after")):
+            raise ReportError(f"Receipt #{e.get('seq')} is a follow-up test. A report starts with the first "
+                              "measurement of the investigation.")
+        if i > 0 and (not r.get("test_run") or r.get("after") != hashes[i - 1]):
+            raise ReportError(f"Receipt #{e.get('seq')} isn't the follow-up to receipt #{recs[i - 1][0].get('seq')}. "
+                              "Give the steps in order, each one the follow-up to the step before.")
+
     lib = LIB["experiments"].get(exp, {"faults": {}, "tests": {}})
-    steps_in = payload.get("steps")
-    if not isinstance(steps_in, list) or not steps_in:
-        raise ReportError("The investigation has no steps yet. Analyse a measurement first.")
-    if len(steps_in) > MAX_STEPS:
-        raise ReportError(f"A report covers at most {MAX_STEPS} steps.")
-    expected_in = _dict(payload.get("expected"))
-    expected = []
-    for key, label, default in CATALOG["experiments"][exp]["expected"]:
-        v = expected_in.get(key, default)
-        expected.append((label, _num(v, "expected value") if v is not None else default))
+    expected_in = _dict(recs[-1][1].get("expected"))
+    expected = [(label, expected_in.get(key, default)) for key, label, default in CATALOG["experiments"][exp]["expected"]]
     steps = []
-    for st in steps_in:
-        st = _dict(st)
-        status = st.get("status") if st.get("status") in ("investigating", "confirmed", "clear") else "investigating"
+    for e, r in recs:
         causes = []
-        for c in _list(st.get("causes"), MAX_CAUSES):
+        for c in _list(r.get("causes"), MAX_CAUSES):
             c = _dict(c)
             cid = c.get("id")
             if not isinstance(cid, str) or cid not in lib["faults"]:
                 continue
             p = _num(c.get("probability"), "probability")
-            if not 0 <= p <= 1:
-                raise ReportError("A cause probability is outside 0 to 1.")
             f = lib["faults"][cid]
-            causes.append({"id": cid, "name": f["name"], "p": p, "size": f.get("typical_size") or "",
-                           "fix": f.get("fix") or ""})
+            causes.append({"id": cid, "name": f["name"], "p": min(max(p, 0.0), 1.0),
+                           "size": f.get("typical_size") or "", "fix": f.get("fix") or ""})
         causes.sort(key=lambda c: -c["p"])
-        nxt = _dict(st.get("next"))
+        nxt = _dict(r.get("next"))
         test = None
         if isinstance(nxt.get("id"), str) and nxt["id"] in lib["tests"]:
             t = lib["tests"][nxt["id"]]
@@ -239,58 +283,141 @@ def validate(payload):
                     "safety": t.get("safety") or "",
                     "bits": _opt_num(nxt.get("info_gain_bits"), "information gain"),
                     "bpm": _opt_num(nxt.get("bits_per_minute"), "bits per minute")}
-        ran = st.get("test")
-        values = []
-        for row in _list(st.get("values"), MAX_VALUES):
-            if isinstance(row, list) and len(row) == 2:
-                values.append((_s(row[0], 80), _s(row[1], 80)))
+        ran = r.get("test_run")
         steps.append({
-            "file": _s(st.get("file"), 200) or "uploaded file",
+            "file": _s(r.get("file"), 200) or "uploaded file",
             "test_id": ran if isinstance(ran, str) and ran in lib["tests"] else None,
             "test_given": bool(ran),
-            "status": status, "causes": causes, "next": test, "values": values,
-            "explanation": _s(st.get("explanation"), 1200),
-            "explained_by": _s(st.get("explained_by"), 60),
-            "plot": _clean_plot(st.get("plot")),
-            "receipt": _clean_receipt(st.get("receipt")),
+            "status": r.get("status") if r.get("status") in ("investigating", "confirmed", "clear") else "investigating",
+            "causes": causes, "next": test,
+            "values": value_rows(r.get("values"))[:MAX_VALUES],
+            "explanation": _s(r.get("explanation"), 1200),
+            "explained_by": _s(r.get("explained_by"), 60),
+            "plot": _clean_plot(r.get("plot")),
+            "receipt": _receipt(e),
         })
     return {"experiment": exp, "cat": CATALOG["experiments"][exp], "lib": lib,
             "expected": expected, "steps": steps}
 
 
 # ---------------------------------------------------------------- numbers
+# The same formatting as the page (static/index.html: fmt, si, plain, sci),
+# down to JavaScript's rounding (ties away from zero) and Number#toString.
 _SUP = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
 SI_UNITS = {"V", "A", "Ω", "Hz", "s", "F"}
+_PREFIXES = [(1e9, "G"), (1e6, "M"), (1e3, "k"), (1, ""), (1e-3, "m"), (1e-6, "µ"), (1e-9, "n")]
 
 
 def _g(v, prec=4):
     return f"{float(f'{v:.{prec}g}'):g}" if abs(v) < 1e15 else f"{v:.{prec}g}"
 
 
+def _isnum(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+
+def _round_sig(x, p):
+    """|x| to p significant figures as JavaScript rounds them: (digits as an int of p digits, exponent)."""
+    with localcontext() as ctx:
+        ctx.prec = 1200
+        d = abs(Decimal(x))
+        e = d.adjusted()
+        n = int(d.scaleb(p - 1 - e).to_integral_value(rounding=ROUND_HALF_UP))
+    if n >= 10 ** p:
+        n, e = n // 10, e + 1
+    return n, e
+
+
+def _to_precision(x, p):
+    """+x.toPrecision(p)"""
+    if x == 0:
+        return 0.0
+    n, e = _round_sig(x, p)
+    return float(f"{'-' if x < 0 else ''}{n}e{e - p + 1}")
+
+
+def _js_str(x):
+    """String(x) for a finite number (ECMAScript Number::toString)."""
+    if x == 0:
+        return "0"
+    if x < 0:
+        return "-" + _js_str(-x)
+    _, digits, exp = Decimal(repr(float(x))).normalize().as_tuple()
+    s = "".join(map(str, digits))
+    k, n = len(s), exp + len(s)
+    if k <= n <= 21:
+        return s + "0" * (n - k)
+    if 0 < n <= 21:
+        return s[:n] + "." + s[n:]
+    if -6 < n <= 0:
+        return "0." + "0" * -n + s
+    return s[0] + ("." + s[1:] if k > 1 else "") + "e" + ("+" if n - 1 >= 0 else "-") + str(abs(n - 1))
+
+
+def _mantissa(x, f):
+    """x.toExponential(f) split into (mantissa, exponent)."""
+    n, e = _round_sig(x, f + 1)
+    s = str(n)
+    return ("-" if x < 0 else "") + s[0] + ("." + s[1:] if f else ""), e
+
+
+def _locale(x):
+    """x.toLocaleString() in English: grouped thousands, at most 3 decimals."""
+    d = Decimal(repr(float(x))).normalize()
+    if d.as_tuple().exponent < -3:
+        d = d.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP).normalize()
+    return format(d, ",f")
+
+
+def sci(v, prec=4):
+    m, e = _mantissa(v, max(1, min(prec, 4) - 1))
+    return f"{m}×10{str(e).translate(_SUP)}"
+
+
 def plain(v, unit="", prec=4):
+    if not _isnum(v):
+        return "—"
     a = abs(v)
-    if a >= 1e4 or (0 < a < 1e-3):
-        m, e = f"{v:.{max(1, min(prec, 4) - 1)}e}".split("e")
-        n = f"{m}×10{str(int(e)).translate(_SUP)}"
-    else:
-        n = _g(v, prec)
+    n = sci(v, prec) if a >= 1e4 or (a < 1e-3 and v != 0) else _js_str(_to_precision(v, prec))
     return (f"{n}°" if unit == "°" else f"{n} {unit}") if unit else n
 
 
 def si(v, unit=""):
+    if not _isnum(v):
+        return "—"
     a = abs(v)
     if a == 0:
         return f"0 {unit}".strip()
     if unit in ("Hz", "s") and a >= 1:
-        return f"{_g(v)} {unit}"
-    for f, p in [(1e9, "G"), (1e6, "M"), (1e3, "k"), (1, ""), (1e-3, "m"), (1e-6, "µ"), (1e-9, "n")]:
-        if a >= f * 0.9999999:
-            return f"{_g(v / f)} {p}{unit}".strip()
-    return f"{v:.2e} {unit}".strip()
+        return f"{_locale(_to_precision(v, 4))} {unit}"
+    for f, p in _PREFIXES:
+        if a >= f:
+            return f"{_js_str(_to_precision(v / f, 4))} {p}{unit}".strip()
+    m, e = _mantissa(v, 2)
+    return f"{m}e{'+' if e >= 0 else '-'}{abs(e)} {unit}".strip()
 
 
-def fmt(v, unit):
-    return si(v, unit) if unit in SI_UNITS else plain(v, unit)
+def fmt(v, unit, is_plain=False, prec=4):
+    return plain(v, unit, prec) if is_plain or unit not in SI_UNITS else si(v, unit)
+
+
+def value_rows(values):
+    """[(label, "value ± uncertainty")] for the labelled values, as the page shows them."""
+    rows = []
+    for key, v in (values if isinstance(values, dict) else {}).items():
+        lab = CATALOG["labels"].get(key)
+        if not isinstance(lab, list) or not lab:
+            continue
+        v = v if isinstance(v, dict) else {}
+        if "value" in v and (v["value"] is None or isinstance(v["value"], (dict, list))):
+            continue
+        label, unit = str(lab[0]), str(lab[1]) if len(lab) > 1 and lab[1] else ""
+        is_plain = len(lab) > 2 and bool(lab[2])
+        text = fmt(v.get("value"), unit, is_plain)
+        if v.get("uncertainty") is not None:
+            text += f" ± {fmt(v['uncertainty'], unit, is_plain, 2)}"
+        rows.append((label, text))
+    return rows
 
 
 def pct(p):
@@ -582,11 +709,12 @@ def _mark(ok):
 
 
 # ---------------------------------------------------------------- the report
-def build(payload):
-    """Returns (pdf bytes, filename). Raises ReportError for bad input."""
-    inv = validate(payload)
+def build(payload, owner=None):
+    """payload: {"receipts": [hash, ...]}; owner: the asking browser session
+    (app/results.owner_id). Returns (pdf bytes, filename); raises ReportError."""
+    inv = load(payload, owner)
     if not _busy.acquire(timeout=30):
-        raise ReportError("The server is busy building other reports. Try again in a moment.")
+        raise ReportError("The server is busy building other reports. Try again in a moment.", 503)
     try:
         return _render(inv)
     except LayoutError as e:
@@ -595,34 +723,10 @@ def build(payload):
         _busy.release()
 
 
-def _notebook_check(steps):
-    """Match each receipt against this server's lab notebook. A match means the
-    receipt's walls and host check below are the server's own record, not the
-    browser's copy."""
-    by_seq = {}
-    want = {st["receipt"]["seq"] for st in steps if st["receipt"]["seq"]}
-    if want:
-        for e in ledger.entries():
-            if e.get("seq") in want:
-                by_seq[e["seq"]] = e
-    for st in steps:
-        r = st["receipt"]
-        e = by_seq.get(r["seq"])
-        if e and e.get("hash") == r["hash"] and e.get("mac") == r["mac"]:
-            r.update({"matched": True, "walls_measured": _dict(e.get("walls_measured")),
-                      "walls_host_verified": e.get("walls_host_verified") if isinstance(
-                          e.get("walls_host_verified"), dict) else None,
-                      "input_sha256": _hexish(e.get("input_sha256")), "prev": _hexish(e.get("prev")),
-                      "time": _s(e.get("time"), 40), "mode": _s(e.get("mode"), 20)})
-        else:
-            r["matched"] = False
-
-
 def _render(inv):
     exp, cat, steps = inv["experiment"], inv["cat"], inv["steps"]
     for st in steps:
         st["lib_test_name"] = inv["lib"]["tests"][st["test_id"]]["name"] if st["test_id"] else ""
-    _notebook_check(steps)
     now = time.gmtime()
     stamp = time.strftime("%Y-%m-%d %H:%M UTC", now)
     last = steps[-1]
@@ -672,7 +776,7 @@ def _render(inv):
                         if top else "Still investigating"), COBALT
     flow += [_pill(pill, colour), Spacer(1, 8)]
 
-    expected = ", ".join(f"{_e(l)} = {_e(plain(v, '', 6))}" for l, v in inv["expected"])
+    expected = ", ".join(f"{_e(l)} = {_e(plain(v, '', 6) if _isnum(v) else _s(v, 40))}" for l, v in inv["expected"])
     meta = [("Expected", expected or "n/a"),
             ("Steps", f"{len(steps)} ({'first measurement' if len(steps) == 1 else 'first measurement and '}"
                       f"{'' if len(steps) == 1 else str(len(steps) - 1) + ' follow-up test' + ('s' if len(steps) > 2 else '')})"),
@@ -737,8 +841,7 @@ def _render(inv):
         r = st["receipt"]
         meta = [("Data file", _e(st["file"])),
                 ("Input SHA-256", f'<font name="DVM" size="7.2">{r["input_sha256"] or "n/a"}</font>'),
-                ("Receipt", f"#{r['seq'] or 'n/a'}" + (f" · {_e(r['time'])}" if r["time"] else "")
-                 + ("" if r["matched"] else ' · <font color="%s">not found in this server\'s lab notebook</font>' % LASER))]
+                ("Receipt", f"#{r['seq'] or 'n/a'}" + (f" · {_e(r['time'])}" if r["time"] else ""))]
         part += [_kv(meta, 28 * mm, W - 28 * mm), Spacer(1, 6)]
         if st["plot"] and (st["plot"]["x"] or st["plot"]["lines"]):
             png = chart_png(st["plot"])
@@ -778,18 +881,23 @@ def _render(inv):
 
     # ---- containment
     flow.append(CondPageBreak(60 * mm))
+    kinds = sorted({st["receipt"]["sig_kind"] for st in steps})
     flow += [P("Containment", "h2"),
              P("Every step ran in a fresh container that was destroyed afterwards. Each job leaves a receipt, "
-               "hash-chained to the one before it and signed with HMAC-SHA256 by this server.", "small"),
+               f"hash-chained to the one before it and signed with {' and '.join(kinds)} by this server. "
+               "This report was built by the server from its own stored result of each step, whose SHA-256 is "
+               "sealed in that step's receipt; nothing in it was taken from the browser.", "small"),
              Spacer(1, 4)]
     for i, st in enumerate(steps):
         r = st["receipt"]
         rows = [("Receipt", f"#{r['seq'] or 'n/a'} · step {i + 1}"
-                 + (f' · <font color="{GREEN}">matches this server\'s lab notebook</font>' if r["matched"]
-                    else f' · <font color="{LASER}">not found in this server\'s lab notebook; shown as supplied</font>')),
+                 + f' · <font color="{GREEN}">in this server\'s lab notebook, which passes its tamper check</font>'),
                 ("Hash", f'<font name="DVM" size="7.2">{r["hash"] or "n/a"}</font>'),
-                ("Signature", f'<font name="DVM" size="7.2">{r["mac"] or "n/a"}</font>'),
-                ("Previous hash", f'<font name="DVM" size="7.2">{r["prev"] or "n/a"}</font>')]
+                ("Signature", f'<font name="DVM" size="7.2">{_e(r["sig"]) or "n/a"}</font>'),
+                ("Previous hash", f'<font name="DVM" size="7.2">{r["prev"] or "n/a"}</font>'),
+                ("Result SHA-256", f'<font name="DVM" size="7.2">{r["result_sha256"] or "n/a"}</font>'
+                 f'<br/><font size="7" color="{GREEN}">sealed in the signed receipt; the stored result this '
+                 "step's pages were built from matches it</font>")]
         flow += [KeepTogether([_kv(rows, 28 * mm, W - 28 * mm), Spacer(1, 5)])]
 
     walls = [(st["receipt"]["walls_measured"], st["receipt"]["walls_host_verified"], st["receipt"]["mode"])
@@ -823,7 +931,8 @@ def _render(inv):
     flow += [KeepTogether(blocks), Spacer(1, 10),
              P("To check these receipts later, compare the hashes above with the lab notebook on the server "
                "(GET /api/ledger) and run its tamper check. Keep this report as an independent copy of the "
-               "hashes and signatures.", "small")]
+               "hashes and signatures. Sending these receipt hashes to POST /api/report from the browser "
+               "session that ran the analyses rebuilds this report from the server's records.", "small")]
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm,
