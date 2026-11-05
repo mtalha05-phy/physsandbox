@@ -27,11 +27,11 @@ Fourteen real teaching-lab and research-bench experiments across six areas of ph
 
 | Area | Experiment | Model | Faults it tells apart | Test that confirms the demo fault |
 | --- | --- | --- | --- | --- |
-| Electricity | Low-resistance measurement | V = R·I | thermal EMF, meter zero offset, gain error, lead resistance, self-heating | read V at zero current, leads on sample vs meter shorted |
+| Electricity | Low-resistance measurement | V = I·R | thermal EMF, meter zero offset, gain error, lead resistance, self-heating | read V at zero current, leads on sample vs meter shorted |
 | Electricity | RC charging curve | V = V₀(1 − e^(−t/RC)) | ×1 probe loading, leaky capacitor, capacitor tolerance, low supply | repeat with a ×10 probe |
 | Signals | Oscilloscope trace | spectrum of V(t) | ground loop, magnetic pickup, aliasing | single-point grounding |
 | Magnetism | Helmholtz coil calibration | B = (4/5)^(3/2) μ₀NI/R | Earth's field, Hall-probe zero offset, probe gain, coil spacing | read the probe in a zero-gauss chamber |
-| Magnetism | Faraday's law of induction | ε = −N dΦ/dt | amplifier offset, ground offset, missing turns, flux-sensor error, reversed leads | hold the magnet still, short the amplifier input |
+| Magnetism | Faraday's law of induction | ε = −N (dΦ/dt) | amplifier offset, ground offset, missing turns, flux-sensor error, reversed leads | hold the magnet still, short the amplifier input |
 | Optics | Laser and photodetector alignment | Gaussian beam profile | misalignment, warm-up pointing drift, low power, detector saturation | repeat the scan after a 15-minute warm-up |
 | Optics | Malus's law polariser | I = I₀ cos²θ | room light, worn polariser, analyser zero offset | read the crossed position with the beam blocked |
 | Optics | Beer-Lambert absorption | I = I₀ e^(−αx) | stray light, detector dark offset, concentration, path length | rescan in the closed enclosure |
@@ -40,7 +40,7 @@ Fourteen real teaching-lab and research-bench experiments across six areas of ph
 | Magnetism | Hall effect | V_H = IB/(n e t) | contacts not opposite each other, field lower than set, thermoelectric contact voltage | reverse the field |
 | Optics | Diffraction grating | d sin θ = mλ | wrong grating density, laser off its label, angle zero misread | repeat with a known reference line |
 | Mechanics | Simple pendulum | T = 2π√(L/g) | release angle too large, timer error, length to the wrong point, miscounted swings | repeat at 5° amplitude |
-| Mechanics | Hooke's law spring | mg = k·x | hanger mass left out, ruler zero misread, past the elastic limit | add the hanger's mass to every load |
+| Mechanics | Hooke's law spring | F = mg = k·x | hanger mass left out, ruler zero misread, past the elastic limit | add the hanger's mass to every load |
 
 The Helmholtz, laser-alignment, Faraday and Beer-Lambert experiments, and their CSV formats, come from the team's first prototype by [@mtalha05-phy](https://github.com/mtalha05-phy); his datasets run unchanged here, and his self-heating resistor dataset is part of the evaluation.
 
