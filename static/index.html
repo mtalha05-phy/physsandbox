@@ -106,6 +106,17 @@ code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
 .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--surface); }
 .chip .tag { font-size: 12px; color: var(--laser); margin-left: 6px; }
 .chip[aria-pressed="true"] .tag { color: #FFB3AD; }
+.sample-info { border-top: 1px solid var(--line-soft); padding-top: 12px; display: grid; gap: 8px; font-size: 14px; color: var(--muted); }
+.sample-info dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; }
+.sample-info dt { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
+.sample-info dd { margin: 0; color: var(--ink); }
+.sample-info .facts { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.sample-info .ok { color: var(--interlock); font-weight: 600; } .sample-info .bad { color: var(--laser); font-weight: 600; }
+.sample-info pre { margin: 0; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 8px;
+                   font-size: 12px; line-height: 1.5; overflow-x: auto; white-space: pre; max-width: 100%; }
+.sample-info pre .cm { color: var(--laser); }
+.sample-info code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; color: var(--ink); }
+@media (max-width: 600px) { .sample-info dl { grid-template-columns: 1fr; } .sample-info dt { padding-top: 6px; } }
 .file-name { font-size: 14px; color: var(--muted); }
 .btn { display: inline-flex; align-items: center; gap: 10px; border: 0; border-radius: 10px; padding: 11px 18px; cursor: pointer;
        background: var(--ink); color: var(--surface); font-weight: 600; }
@@ -278,6 +289,7 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
           <label class="btn secondary small" for="file">Upload a CSV<input id="file" class="sr" type="file" accept=".csv,text/csv"></label>
           <span class="file-name" id="file-name">or drop it here</span>
         </div>
+        <div class="sample-info" id="sample-info" aria-live="polite"></div>
       </div>
       <div class="actions">
         <button class="btn" id="go">Analyse in the glovebox</button>
@@ -471,6 +483,37 @@ function renderSamples() {
   $("samples").innerHTML = list.map(([f, l, tag]) =>
     `<button class="chip" data-sample="${f}" aria-pressed="${S.sample === f}">${esc(l)}${tag ? `<span class="tag">${esc(tag)}</span>` : ""}</button>`).join("")
     || `<span class="file-name">Upload the CSV you recorded for this test.</span>`;
+  renderSampleInfo();
+}
+let infoSeq = 0;
+async function renderSampleInfo() {
+  const box = $("sample-info"), E = EX(), seq = ++infoSeq;
+  const need = E.columns || [];
+  const cols = need.map(c => `<code>${esc(c)}</code>`).join(", ");
+  if (!S.file) {
+    box.innerHTML = `<p style="margin:0">${S.pendingTest ? "Upload the result of the test you just ran, or use the sample result above." : "Pick a sample above to see what it is: each is a recorded run with a known fault, or a healthy control."}
+      Your own CSV needs a header row with ${cols}, then one row per reading. Lines starting with <code>#</code> are comments.</p>`;
+    return;
+  }
+  let text = "";
+  try { text = await S.file.text(); } catch { }
+  if (seq !== infoSeq) return;
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const comments = lines.filter(l => l.startsWith("#")).length;
+  const data = lines.filter(l => !l.startsWith("#"));
+  const header = (data[0] || "").split(",").map(h => h.trim());
+  const missing = need.filter(c => !header.includes(c));
+  const fits = !missing.length || (S.pendingTest && header.length >= 2);
+  const preview = lines.slice(0, Math.min(lines.length, comments + 4)).map(l =>
+    l.startsWith("#") ? `<span class="cm">${esc(l.length > 110 ? l.slice(0, 110) + "…" : l)}</span>` : esc(l)).join("\n");
+  const info = (CAT.sample_info || {})[S.sample];
+  box.innerHTML = `
+    ${info ? `<dl><dt>The bench</dt><dd>${esc(info[0])}</dd><dt>What looks off</dt><dd>${esc(info[1])}</dd></dl>` : ""}
+    <div class="facts"><span>${Math.max(data.length - 1, 0)} readings</span><span>columns ${header.map(h => `<code>${esc(h)}</code>`).join(", ") || "none found"}</span>
+      ${comments ? `<span class="bad">${comments} comment line${comments > 1 ? "s" : ""}: read ${comments > 1 ? "them" : "it"} before trusting the file</span>` : ""}
+      ${fits ? `<span class="ok">✓ matches this experiment</span>` : `<span class="bad">✕ this experiment needs ${missing.map(c => `<code>${esc(c)}</code>`).join(", ")}</span>`}</div>
+    <pre aria-label="First lines of the file">${preview}</pre>
+    ${info ? `<p style="margin:0">Press Analyse: the physics runs in the glovebox and PhysSandbox ranks the causes from the data alone. It isn't told the answer.</p>` : ""}`;
 }
 $("domains").addEventListener("click", e => {
   const b = e.target.closest("[data-domain]"); if (!b || S.steps.length) return;
