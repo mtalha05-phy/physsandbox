@@ -540,7 +540,11 @@ def planck_led(header, data, expected):
         m = np.ones(len(f), bool)
         m[i] = False
         p = np.polyfit(f[m], v[m], 1)
-        out = max(out, abs(float(v[i] - np.polyval(p, f[i]))) / prec)
+        # the left-out point is predicted from a line, which is itself uncertain
+        # (most at the ends of the range), so add that in quadrature
+        xm, sxx = f[m].mean(), float(np.sum((f[m] - f[m].mean()) ** 2))
+        pred_sd = prec * np.sqrt(1 / m.sum() + (f[i] - xm) ** 2 / sxx)
+        out = max(out, abs(float(v[i] - np.polyval(p, f[i]))) / float(np.hypot(prec, pred_sd)))
     fs = dense(f)
     return {
         "values": {
@@ -669,8 +673,12 @@ def spectral_lines(header, data, expected):
         for i in range(len(x)):
             m = np.ones(len(x), bool)
             m[i] = False
-            (Ri, di), _ = fit(model, x[m], lam[m], [R_exp, 0.0])
-            worst = max(worst, abs(float(lam[i] - model(x[i], Ri, di))) / prec)
+            pi, ci = curve_fit(model, x[m], lam[m], p0=[R_exp, 0.0], sigma=np.full(m.sum(), prec),
+                               absolute_sigma=True, maxfev=20000)
+            # prediction uncertainty at the left-out line (largest when it is extrapolated)
+            g = np.array([-1e9 / (pi[0] ** 2 * x[i]), 1.0])
+            pred_sd = float(np.sqrt(max(g @ ci @ g, 0)))
+            worst = max(worst, abs(float(lam[i] - model(x[i], *pi))) / float(np.hypot(prec, pred_sd)))
     ns = np.linspace(n.min(), n.max(), 120)
     xs = 0.25 - 1 / ns ** 2
     return {
