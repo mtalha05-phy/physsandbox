@@ -1,0 +1,113 @@
+# First- and second-year lab fundamentals. Merged into catalog.yaml by app/pipeline.py.
+experiments:
+  young_double_slit:
+    label: Young's double slit
+    domain: optics
+    blurb: Positions of the bright fringes from a laser through two slits, against fringe order, to measure the wavelength
+    columns: [order_m, position_mm]
+    model: "y_m = m λ L / d"
+    expected: [[wavelength_nm, "Laser wavelength (nm)", 632.8], [slit_separation_mm, "Slit separation d (mm)", 0.250], [screen_distance_m, "Slit-to-screen distance L (m)", 2.000], [precision_mm, "Fringe position reading precision (mm)", 0.3]]
+    samples:
+      - [young_screen_distance.csv, "Wavelength 8% low, line straight"]
+      - [young_missing_order.csv, "Outer fringes off the line"]
+      - [young_clean.csv, "Healthy measurement"]
+    followups: {young_tape_measure: young_screen_distance_tape.csv}
+    questions: ["Fit fringe position against order and report the wavelength"]
+
+  rlc_resonance:
+    label: Series RLC resonance
+    domain: electricity
+    blurb: Voltage across the resistor of a series RLC circuit against frequency, to measure the resonant frequency and Q
+    columns: [frequency_Hz, resistor_V]
+    model: "V_R = V R / √((R + R_L)² + (ωL − 1/ωC)²)"
+    expected: [[inductance_H, "Inductance L (H)", 0.010], [capacitance_F, "Capacitance C (F)", 1.0e-7], [resistor_ohm, "Resistor R (Ω)", 100], [coil_resistance_ohm, "Coil resistance R_L (Ω)", 18], [drive_V, "Input amplitude (V)", 2.0], [precision_pct, "Voltage reading precision (%)", 1.0]]
+    samples:
+      - [rlc_generator_loading.csv, "Peak low and broad, f₀ right"]
+      - [rlc_meter_bandwidth.csv, "Curve lopsided, low at high frequency"]
+      - [rlc_clean.csv, "Healthy measurement"]
+    followups: {rlc_watch_input: rlc_generator_loading_ch1.csv}
+    questions: ["Fit the resonance curve and report f0 and Q"]
+
+  stokes_viscosity:
+    label: Viscosity by Stokes' law (falling ball)
+    domain: mechanics
+    blurb: Steel balls timed falling through glycerol; terminal velocity against r² gives the viscosity
+    columns: [ball_diameter_mm, fall_time_s]
+    model: "v = 2r²g(ρ_s − ρ_l) / 9η, corrected for the tube wall"
+    expected: [[liquid_temperature_C, "Glycerol temperature (°C)", 20.0], [fall_distance_mm, "Distance between the marks (mm)", 300], [tube_diameter_mm, "Tube inner diameter (mm)", 50], [ball_density_kg_m3, "Ball density (kg/m³)", 7800], [timing_precision_s, "Timing precision (s)", 0.2], [diameter_precision_mm, "Micrometer reading precision (mm)", 0.003]]
+    samples:
+      - [stokes_warm_liquid.csv, "Viscosity 16% low, every ball alike"]
+      - [stokes_micrometer_zero.csv, "Small balls give a higher viscosity"]
+      - [stokes_clean.csv, "Healthy measurement"]
+    followups: {stokes_thermometer: stokes_warm_liquid_thermometer.csv}
+    questions: ["Fit terminal velocity against r squared and report the viscosity"]
+
+  lees_disc:
+    label: Thermal conductivity (Lee's disc)
+    domain: heat
+    blurb: Steady temperatures either side of a thin poor conductor, then the brass disc's cooling curve, to measure k
+    columns: [stage, time_s, steam_C, disc_C]
+    model: "k = m c (dT/dt)|T₂ · x / (A (T₁ − T₂))"
+    expected: [[conductivity_W_mK, "Expected conductivity k (W/m·K)", 0.19], [sample_thickness_mm, "Sample thickness x (mm)", 3.0], [disc_diameter_mm, "Disc diameter (mm)", 110], [disc_heat_capacity_J_K, "Brass disc heat capacity m·c (J/K)", 335], [precision_K, "Thermometer precision (K)", 0.1]]
+    samples:
+      - [leesdisc_thermometer_offset.csv, "Conductivity 10% low"]
+      - [leesdisc_top_bare.csv, "Conductivity almost twice the expected"]
+      - [leesdisc_clean.csv, "Healthy measurement"]
+    followups: {leesdisc_side_by_side: leesdisc_thermometer_offset_sidebyside.csv}
+    questions: ["Find the cooling rate at the steady disc temperature and report k"]
+
+sample_info:
+  young_clean.csv: ["A HeNe laser (632.8 nm) through a double slit (d = 0.250 mm, slits 0.040 mm wide) onto a screen 2.000 m away; bright-fringe centres marked and read off a ruler, orders −5 to +5.", "Nothing should look off: the spacing gives 632.8 nm."]
+  young_screen_distance.csv: ["The same laser and slide, orders −5 to +5, with L entered as 2.000 m.", "The fringes lie on a good straight line, but its slope gives a wavelength about 8% below the laser's 632.8 nm."]
+  young_missing_order.csv: ["The same laser and slide, fringes counted out to the 7th on each side.", "The fringes out to the 5th lie on a line; the ones numbered 6 and 7 sit a whole spacing further out, on both sides."]
+  young_screen_distance_tape.csv: ["Five steel-tape readings of the distance from the slide's slits to the screen.", "Is the distance the 2.000 m that was entered?"]
+  rlc_clean.csv: ["A 10 mH coil (18 Ω), a 100 nF capacitor and a 100 Ω resistor in series with a function generator; resistor voltage on a scope from 1.5 to 15 kHz, input held at 2.00 V.", "Nothing should look off: f₀ = 5.03 kHz and Q = 2.7, as the components give."]
+  rlc_generator_loading.csv: ["The same circuit, generator set to 2.00 V, resistor voltage on the scope from 1.5 to 15 kHz.", "The curve fits the resonance shape and peaks at the right frequency, but the peak is about 30% low and Q comes out 1.9, not 2.7."]
+  rlc_meter_bandwidth.csv: ["The same circuit, resistor voltage read on a handheld multimeter from 1.5 to 15 kHz, input held at 2.00 V.", "The curve is lopsided: it falls away too fast above the peak, no resonance curve fits it, and the peak sits below 5 kHz."]
+  rlc_generator_loading_ch1.csv: ["The voltage at the circuit's input, watched on CH1 while the sweep was repeated exactly as before.", "Did the input stay at 2.00 V across the sweep?"]
+  stokes_clean.csv: ["Six steel ball bearings (1–4 mm) timed falling 300 mm through glycerol in a tube 50 mm across, the first mark 15 cm below the surface; diameters read on a micrometer, glycerol at 20 °C.", "Nothing should look off: corrected for the wall, v rises as r² and every ball gives η = 1.41 Pa·s."]
+  stokes_warm_liquid.csv: ["The same balls, tube and marks, with the glycerol's temperature entered as 20 °C.", "Every ball gives the same viscosity, but it is about 16% below the table value for glycerol at 20 °C."]
+  stokes_micrometer_zero.csv: ["The same balls, tube and marks, glycerol at 20 °C.", "The smaller the ball, the higher the viscosity it gives: the small balls fall too slowly for their measured size."]
+  stokes_warm_liquid_thermometer.csv: ["A thermometer lowered into the glycerol in the tube, read at seven depths.", "Is the glycerol at the 20 °C that was entered?"]
+  leesdisc_clean.csv: ["A Perspex disc 3.0 mm thick between a steam chamber and a brass disc 110 mm across (m·c = 335 J/K): both thermocouples read once the temperatures looked steady (stage 1), then the brass disc's cooling curve with the sample back on top (stage 2).", "Nothing should look off: k = 0.19 W/m·K, the table value for Perspex."]
+  leesdisc_thermometer_offset.csv: ["The same apparatus and sample, the same two stages.", "The cooling curve looks normal, but k comes out about 10% below 0.19 W/m·K."]
+  leesdisc_top_bare.csv: ["The same apparatus and sample, the same two stages.", "The disc cools about twice as fast as the steady state implies: k comes out almost double 0.19 W/m·K."]
+  leesdisc_thermometer_offset_sidebyside.csv: ["Both thermocouples side by side in the steam chamber, read together eight times.", "Do the two thermometers read the same?"]
+
+labels:
+  fringe_wavelength_fit_nm: ["Wavelength from the fringes", "nm", 1]
+  fringe_wavelength_expected_nm: ["Laser wavelength, expected", "nm", 1]
+  fringe_spacing_mm: ["Fringe spacing, fitted", "mm", 1]
+  fringe_spacing_expected_mm: ["Fringe spacing, expected (λL/d)", "mm", 1]
+  slit_separation_implied_mm: ["Slit separation the fringes imply", "mm", 1]
+  outer_fringe_step_mm: ["Step at the outer fringes", "mm", 1]
+  slit_to_screen_measured_m: ["Slit-to-screen distance, tape", "m", 1]
+  slit_to_screen_entered_m: ["Slit-to-screen distance, entered", "m", 1]
+  resonant_frequency_fit_Hz: ["Resonant frequency f₀, fitted", "Hz"]
+  resonant_frequency_expected_Hz: ["f₀ from L and C", "Hz"]
+  quality_factor_fit: ["Quality factor Q, fitted", "", 1]
+  quality_factor_expected: ["Q from the components", "", 1]
+  peak_resistor_voltage_V: ["Peak resistor voltage", "V"]
+  peak_resistor_voltage_expected_V: ["Peak resistor voltage, expected", "V"]
+  series_resistance_from_peak_ohm: ["Series resistance the peak implies", "Ω", 1]
+  series_resistance_entered_ohm: ["Series resistance entered (R + R_L)", "Ω", 1]
+  input_lowest_V: ["Input, lowest", "V"]
+  input_highest_V: ["Input, highest", "V"]
+  input_set_V: ["Input amplitude entered", "V"]
+  viscosity_fit_Pa_s: ["Viscosity η, fitted", "Pa·s", 1]
+  viscosity_expected_Pa_s: ["Viscosity of glycerol at the entered temperature", "Pa·s", 1]
+  diameter_offset_um: ["Diameter offset (where √v reaches zero)", "µm", 1]
+  wall_correction_largest_ball_pct: ["Wall correction, largest ball", "%", 1]
+  reynolds_number_largest_ball: ["Reynolds number, largest ball", "", 1]
+  liquid_temperature_measured_C: ["Glycerol temperature, measured", "°C", 1]
+  liquid_temperature_entered_C: ["Glycerol temperature, entered", "°C", 1]
+  viscosity_at_measured_temperature_Pa_s: ["Glycerol viscosity at the measured temperature", "Pa·s", 1]
+  conductivity_fit_W_mK: ["Thermal conductivity k", "W/m·K", 1]
+  conductivity_expected_W_mK: ["Thermal conductivity, expected", "W/m·K", 1]
+  steam_side_temperature_C: ["Steam-side temperature T₁", "°C", 1]
+  disc_steady_temperature_C: ["Disc temperature at steady state T₂", "°C", 1]
+  temperature_drop_K: ["Temperature drop T₁ − T₂", "K", 1]
+  cooling_rate_at_T2_K_min: ["Cooling rate at T₂", "K/min", 1]
+  cooling_rate_needed_K_min: ["Cooling rate the expected k needs", "K/min", 1]
+  thermometer_difference_K: ["Disc thermometer − steam-side thermometer", "K", 1]
+  common_reading_C: ["Common reading (steam-side thermometer)", "°C", 1]

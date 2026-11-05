@@ -1,0 +1,350 @@
+# First- and second-year lab fundamentals: Young's double slit, series RLC
+# resonance, viscosity by Stokes' law (falling ball), thermal conductivity by
+# Lee's disc. Same format as faults.yaml; `fix` is what to do once a cause is
+# confirmed (PDF report). Test ids are global, so each carries its bench's prefix.
+experiments:
+
+  young_double_slit:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: lambda_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: outer_step_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the wavelength (or the slit separation) with its uncertainty.
+      screen_distance_wrong:
+        name: Slit-to-screen distance L measured from the wrong point (the laser or the slide holder, not the slits)
+        prior: 0.20
+        typical_size: "Measuring L from the front of the laser, 15 cm behind the slide, makes λ come out about 7.5% low, on a perfectly straight line"
+        conditions:
+          - {feature: lambda_error_pct, op: abs_gt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: outer_step_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: screen_distance_differs, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Measure L with a steel tape from the slits themselves to the screen, along the beam, and refit with that distance.
+      slit_separation_wrong:
+        name: Slit separation not the value on the slide's label
+        prior: 0.17
+        typical_size: "Photographic and etched slides are often 5–10% off their nominal separation, which scales λ by the same amount"
+        conditions:
+          - {feature: lambda_error_pct, op: abs_gt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: outer_step_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: screen_distance_differs, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Measure the slit pair's centre-to-centre separation under a travelling microscope and refit with that d.
+      missing_order_miscount:
+        name: Fringes past the envelope's dark band numbered wrongly (a hidden order skipped, or the dark band counted as a fringe)
+        prior: 0.13
+        typical_size: "With slits 0.04 mm wide and 0.25 mm apart, the 6th fringe falls in the single-slit envelope's dark band; numbering on past it one out puts every outer fringe a whole spacing off the line, on both sides"
+        conditions:
+          - {feature: outer_step_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Renumber the fringes beyond the dark band (the hidden order still counts; the dark band itself doesn't), or fit only the fringes inside the central envelope.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check that the screen is square to the beam and that every mark is the centre of a bright fringe, then repeat.
+    tests:
+      young_tape_measure:
+        name: Measure the slit-to-screen distance again with a steel tape, from the slide itself
+        minutes: 2
+        how: Hook a steel tape on the slide holder level with the slits and run it to the screen along the beam; take five readings.
+        adds: {feature: screen_distance_differs, from: screen_distance_differs, op: copy}
+        outcomes:
+          screen_distance_wrong: distance_differs
+          slit_separation_wrong: distance_matches
+          missing_order_miscount: distance_matches
+          no_fault: distance_matches
+        safety: Switch the laser off (or block it at the aperture) while you work next to the beam path, and keep the tape's shiny blade out of the beam.
+      young_travelling_microscope:
+        name: Measure the slit separation under a travelling microscope
+        minutes: 10
+        how: Take the slide out, focus a travelling microscope on the two slits and read the centre of each slit on the vernier, three times.
+        outcomes:
+          slit_separation_wrong: separation_differs
+          screen_distance_wrong: separation_matches
+          missing_order_miscount: separation_matches
+          no_fault: separation_matches
+        safety: Switch the laser off before taking the slide out; never look along the beam or into its reflection from the slide.
+      young_cover_one_slit:
+        name: Cover one slit and count the fringes inside the central envelope
+        minutes: 3
+        how: Cover one slit with card and mark where the single-slit pattern's first dark bands fall on the screen, then uncover it and count the bright fringes between those marks.
+        outcomes:
+          missing_order_miscount: a_fringe_hidden_in_dark_band
+          screen_distance_wrong: count_as_numbered
+          slit_separation_wrong: count_as_numbered
+          no_fault: count_as_numbered
+        safety: The laser is Class 2 or 3R. Never look into the beam or its reflections; watch the pattern on the screen.
+
+  rlc_resonance:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: f0_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: q_error_pct, op: abs_lt, value: 6, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record f₀ and Q with their uncertainties.
+      generator_loading:
+        name: Generator's 50 Ω output impedance pulling the drive down near resonance (input not held constant)
+        prior: 0.20
+        typical_size: "With 118 Ω in the circuit, the generator's 50 Ω lowers Q and the peak by about 30% if the amplitude is set once and left"
+        conditions:
+          - {feature: q_error_pct, op: "<", value: -10, p_true: 0.95, p_false: 0.02}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: input_sags, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Watch the circuit's input on CH1 and reset it to the same amplitude at every frequency (or record it and use V_R ÷ V_in), then refit.
+      coil_resistance_high:
+        name: Coil resistance left out of the sum, or higher at f₀ than its DC reading
+        prior: 0.17
+        typical_size: "A 10 mH coil is often 20–60 Ω at a few kHz; extra series resistance lowers Q and the peak together"
+        conditions:
+          - {feature: q_error_pct, op: "<", value: -10, p_true: 0.95, p_false: 0.02}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: input_sags, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Measure the coil's series resistance at the resonant frequency on an LCR meter and use R + R_coil(f₀) for the expected Q.
+      component_off_value:
+        name: Capacitor or inductor not at its marked value
+        prior: 0.12
+        typical_size: "Capacitors are often ±10–20%: one 12% low moves f₀ up by 6%"
+        conditions:
+          - {feature: f0_error_pct, op: abs_gt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+        fix: Measure C and L on an LCR meter and use the measured values for the expected f₀ and Q.
+      meter_bandwidth:
+        name: AC voltmeter reading low at high frequency (its bandwidth is too small)
+        prior: 0.13
+        typical_size: "Handheld multimeters are specified to about 1 kHz on AC; many read 20–50% low by 10 kHz, which skews the curve and drags f₀ down"
+        conditions:
+          - {feature: misfit_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Read V_R on the oscilloscope (or a true-RMS meter rated for the frequency range) and repeat the sweep.
+      core_losses:
+        name: Coil losses rising with frequency (iron or ferrite core)
+        prior: 0.08
+        typical_size: "Eddy-current losses in an iron core grow roughly as f², so the damping is heavier above f₀ than below it"
+        conditions:
+          - {feature: misfit_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Use an air-cored coil, or measure the coil's series resistance across the sweep on an LCR meter and model it.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the wiring order (the resistor at the earthy end, so the scope's ground is the generator's ground) and repeat the sweep.
+    tests:
+      rlc_watch_input:
+        name: Watch the circuit's input on CH1 through the sweep
+        minutes: 2
+        how: Put CH1 across the circuit's input (the generator's terminals) and repeat the sweep exactly as before, noting the input amplitude at each frequency.
+        adds: {feature: input_sags, from: input_sags, op: copy}
+        outcomes:
+          generator_loading: input_sags_at_resonance
+          coil_resistance_high: input_steady
+          component_off_value: input_steady
+          meter_bandwidth: input_steady
+          core_losses: input_steady
+          no_fault: input_steady
+      rlc_coil_lcr:
+        name: Measure the coil's series resistance at f₀ on an LCR meter
+        minutes: 5
+        how: Unclip the coil, set the LCR meter to series mode at 5 kHz (or the nearest test frequency) and read R_s and L.
+        outcomes:
+          coil_resistance_high: resistance_high
+          core_losses: resistance_high
+          generator_loading: resistance_as_entered
+          component_off_value: resistance_as_entered
+          meter_bandwidth: resistance_as_entered
+          no_fault: resistance_as_entered
+        safety: Switch the generator off before unclipping the coil; an iron-cored coil can kick back when its current is broken.
+      rlc_lcr_components:
+        name: Measure C and L on an LCR meter
+        minutes: 4
+        how: Take the capacitor and the coil out of the circuit and read each on an LCR meter at 1 kHz.
+        outcomes:
+          component_off_value: value_off_label
+          generator_loading: values_match
+          coil_resistance_high: values_match
+          meter_bandwidth: values_match
+          core_losses: values_match
+          no_fault: values_match
+        safety: Switch the generator off before taking components out of the circuit.
+      rlc_scope_vs_meter:
+        name: Read V_R at 12 kHz on the scope and on the meter
+        minutes: 3
+        how: At 12 kHz, read the resistor voltage on the oscilloscope (peak-to-peak ÷ 2√2 for RMS) and on the multimeter, and compare.
+        outcomes:
+          meter_bandwidth: meter_reads_low
+          core_losses: readings_agree
+          generator_loading: readings_agree
+          coil_resistance_high: readings_agree
+          component_off_value: readings_agree
+          no_fault: readings_agree
+
+  stokes_viscosity:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: eta_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: diameter_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the viscosity with its uncertainty and the liquid's temperature.
+      liquid_temperature:
+        name: Glycerol not at the temperature entered
+        prior: 0.20
+        typical_size: "Glycerol thins about 9% per °C near room temperature: at 22 °C, entered as 20 °C, η comes out 16% low"
+        conditions:
+          - {feature: eta_error_pct, op: abs_gt, value: 7, p_true: 0.95, p_false: 0.02}
+          - {feature: diameter_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.05}
+          - {feature: liquid_temperature_differs, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Enter the temperature measured in the glycerol itself (or let the tube settle to the room's temperature) and compare with η at that temperature.
+      water_absorbed:
+        name: Glycerol has absorbed water from the air
+        prior: 0.17
+        typical_size: "Glycerol is hygroscopic: each 1% of water lowers η by about 15%"
+        conditions:
+          - {feature: eta_error_pct, op: "<", value: -7, p_true: 0.95, p_false: 0.02}
+          - {feature: diameter_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.05}
+          - {feature: liquid_temperature_differs, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Check the water content with a refractometer, replace the glycerol (keep the tube stoppered), or compare with the table for the measured concentration.
+      micrometer_zero_error:
+        name: Ball diameters read on a micrometer that wasn't zeroed
+        prior: 0.14
+        typical_size: "A micrometer reading +0.05 mm with its anvils closed makes a 1 mm ball's r² 10% too large, so the smallest balls give the highest viscosity"
+        conditions:
+          - {feature: diameter_offset_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Read the micrometer with its anvils closed, subtract that zero reading from every diameter, and refit.
+      bubbles_on_small_balls:
+        name: Air bubbles clinging to the smallest balls (dropped in dry)
+        prior: 0.10
+        typical_size: "A bubble a few tenths of a millimetre across buoys a 1 mm ball enough to slow it by several %"
+        conditions:
+          - {feature: diameter_offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Wet each ball in glycerol before dropping it, release it just below the surface, and time the small balls again.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Drop every ball down the tube's axis (a centring funnel helps), check the marks' separation, and time each ball twice.
+    tests:
+      stokes_thermometer:
+        name: Read the glycerol's temperature with a thermometer in the tube
+        minutes: 2
+        how: Lower a thermometer into the glycerol and read it at several depths, waiting for each reading to settle.
+        adds: {feature: liquid_temperature_differs, from: liquid_temperature_differs, op: copy}
+        outcomes:
+          liquid_temperature: temperature_differs
+          water_absorbed: temperature_matches
+          micrometer_zero_error: temperature_matches
+          bubbles_on_small_balls: temperature_matches
+          no_fault: temperature_matches
+      stokes_refractometer:
+        name: Check the glycerol's water content on a refractometer
+        minutes: 5
+        how: Put a drop of the glycerol on an Abbe refractometer; pure glycerol reads n = 1.4740 at 20 °C, and each 1% of water lowers it by about 0.0013.
+        outcomes:
+          water_absorbed: water_found
+          liquid_temperature: pure
+          micrometer_zero_error: pure
+          bubbles_on_small_balls: pure
+          no_fault: pure
+        safety: Wipe glycerol spills up straight away; a glycerol-coated floor or bench is very slippery.
+      stokes_micrometer_zero:
+        name: Read the micrometer with its anvils closed
+        minutes: 1
+        how: Clean the anvils, close them gently with the ratchet and read the scale; it should read 0.000 mm.
+        outcomes:
+          micrometer_zero_error: zero_off
+          bubbles_on_small_balls: zero_reads_zero
+          liquid_temperature: zero_reads_zero
+          water_absorbed: zero_reads_zero
+          no_fault: zero_reads_zero
+      stokes_wetted_repeat:
+        name: Wet the two smallest balls in glycerol and time them again
+        minutes: 6
+        how: Dip each ball in glycerol, release it just below the surface down the tube's axis, and time it over the same marks.
+        outcomes:
+          bubbles_on_small_balls: small_balls_faster
+          micrometer_zero_error: times_unchanged
+          liquid_temperature: times_unchanged
+          water_absorbed: times_unchanged
+          no_fault: times_unchanged
+        safety: Recover the balls with a magnet on a rod, not by hand down the tube; tall glass tubes break easily when knocked.
+
+  lees_disc:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: k_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record k with its uncertainty and the sample's mean temperature.
+      thermometer_offset:
+        name: The two thermometers disagree (calibration offset between them)
+        prior: 0.20
+        typical_size: "T₁ − T₂ is only about 15 K, so a 1.8 K offset between the thermocouples moves k by about 11%"
+        conditions:
+          - {feature: k_error_pct, op: abs_gt, value: 6, p_true: 0.95, p_false: 0.02}
+          - {feature: k_error_pct, op: abs_lt, value: 25, p_true: 0.9, p_false: 0.1}
+          - {feature: thermometers_disagree, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Read both thermometers side by side in the steam (or a stirred bath), correct one by the measured difference, and recompute T₁ − T₂.
+      not_steady_state:
+        name: Steady state not reached (disc still warming when T₂ was read)
+        prior: 0.17
+        typical_size: "The disc settles with a time constant of about 8 minutes; reading T₂ 1.5 K short of its final value makes k about 12% low"
+        conditions:
+          - {feature: k_error_pct, op: "<", value: -6, p_true: 0.95, p_false: 0.02}
+          - {feature: k_error_pct, op: ">", value: -25, p_true: 0.9, p_false: 0.1}
+          - {feature: thermometers_disagree, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Log T₁ and T₂ every minute and take them only once neither has moved by 0.1 K for ten minutes, then redo the cooling run around the new T₂.
+      top_face_bare:
+        name: Disc cooled with its top face bare (sample not put back on top for the cooling run)
+        prior: 0.14
+        typical_size: "A bare top face roughly doubles the disc's heat loss, so k comes out 50–100% high"
+        conditions:
+          - {feature: k_error_pct, op: ">", value: 25, p_true: 0.95, p_false: 0.01}
+        fix: Repeat the cooling run with the sample (or an insulating disc like it) on top, or scale the cooling rate by the exposed areas, (r + 2h)/(2r + 2h).
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Measure the sample's thickness at several points, check the contact (a smear of heat-sink paste) and repeat.
+    tests:
+      leesdisc_side_by_side:
+        name: Read both thermometers side by side in the steam chamber
+        minutes: 3
+        how: Take the disc thermocouple out of the brass disc, put it next to the steam-side one in the steam chamber, and read both together eight times.
+        adds: {feature: thermometers_disagree, from: thermometers_disagree, op: copy}
+        outcomes:
+          thermometer_offset: thermometers_differ
+          not_steady_state: thermometers_agree
+          top_face_bare: thermometers_agree
+          no_fault: thermometers_agree
+        safety: Steam scalds. Turn the steam down while you move the thermocouple, keep your hand off the chamber's vent, and handle the hot brass with tongs or gloves.
+      leesdisc_keep_logging:
+        name: Log T₁ and T₂ every minute for ten more minutes
+        minutes: 10
+        how: Leave the steam on and the sample in place, and note both temperatures every minute.
+        outcomes:
+          not_steady_state: t2_still_rising
+          thermometer_offset: both_steady
+          top_face_bare: both_steady
+          no_fault: both_steady
+        safety: Steam scalds; keep the steam generator's water topped up so it doesn't boil dry, and keep the outlet tube pointing away from people.
+      leesdisc_recool_covered:
+        name: Repeat the cooling run with the sample back on top of the disc
+        minutes: 15
+        how: Reheat the brass disc about 8 K above T₂, put the sample (or an identical insulating disc) on top, and log the cooling every 30 s through T₂.
+        outcomes:
+          top_face_bare: cools_more_slowly
+          thermometer_offset: cooling_unchanged
+          not_steady_state: cooling_unchanged
+          no_fault: cooling_unchanged
+        safety: The brass disc is at 90 °C or more; move it only with tongs or heat-proof gloves.
