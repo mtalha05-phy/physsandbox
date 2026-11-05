@@ -1,0 +1,132 @@
+# Advanced-lab experiments: gamma attenuation, muon lifetime, Faraday rotation, B–H loop.
+# Merged into catalog.yaml by app/pipeline.py. The nuclear domain comes from graduate.yaml.
+experiments:
+  gamma_attenuation:
+    label: Gamma-ray attenuation in lead
+    domain: nuclear
+    blurb: Cs-137 count rate against the thickness of lead in the beam, to measure lead's attenuation coefficient at 662 keV
+    columns: [thickness_mm, counts]
+    model: "N = N₀ e^(−μx),  μ = (μ/ρ)·ρ"
+    expected:
+      - [mass_attenuation_cm2_g, "Mass attenuation coefficient of lead at 662 keV (cm²/g)", 0.110]
+      - [density_g_cm3, "Lead density (g/cm³)", 11.34]
+      - [count_time_s, "Count time per reading (s)", 300]
+      - [background_cps, "Background you subtracted (counts/s)", 0.5]
+    samples:
+      - [gamma_background.csv, "Counts level off behind thick lead"]
+      - [gamma_dead_time.csv, "Too few counts with little lead in"]
+      - [gamma_clean.csv, "Healthy attenuation"]
+    followups: {gamma_source_out_count: gamma_background_source_out.csv}
+    questions: ["Fit the attenuation and report μ/ρ and the half-value layer", "Check the thick end for a constant floor"]
+
+  muon_lifetime:
+    label: Muon lifetime
+    level: graduate
+    domain: nuclear
+    blurb: Time from a cosmic muon stopping in a scintillator to its decay electron, histogrammed, to measure the muon's lifetime
+    columns: [time_us, counts]
+    model: "N(t) = A e^(−t/τ) + B"
+    expected:
+      - [lifetime_us, "Expected lifetime in plastic scintillator, μ⁺ and μ⁻ together (µs)", 2.12]
+      - [fit_start_us, "Start the fit at (µs)", 1.0]
+    samples:
+      - [muon_light_leak.csv, "Flat background ten times the usual"]
+      - [muon_tdc_clock.csv, "Lifetime 10% long"]
+      - [muon_clean.csv, "Healthy decay curve"]
+    followups: {muon_dark_cloth_singles: muon_light_leak_covered.csv}
+    questions: ["Fit the decay curve with a flat background and report τ", "Compare τ with the free muon lifetime"]
+
+  faraday_rotation:
+    label: Faraday rotation
+    level: graduate
+    domain: optics
+    blurb: Rotation of a laser's polarisation in a glass rod against the magnetic field along it, to measure the Verdet constant
+    columns: [field_mT, rotation_deg]
+    model: "θ = V·B·L"
+    expected:
+      - [verdet_rad_per_T_m, "Verdet constant of the glass at your wavelength (rad/(T·m))", 23.0]
+      - [rod_length_mm, "Rod length L (mm)", 100]
+      - [precision_deg, "Rotation reading precision (°)", 0.05]
+      - [gaussmeter_precision_mT, "Gaussmeter precision (mT)", 0.2]
+    samples:
+      - [faraday_rot_nonuniform.csv, "Verdet constant 11% low"]
+      - [faraday_rot_zero_offset.csv, "Rotation not zero at zero field"]
+      - [faraday_rot_clean.csv, "Healthy measurement"]
+    followups: {faraday_rot_field_map: faraday_rot_nonuniform_map.csv}
+    questions: ["Fit θ against B and report the Verdet constant"]
+
+  hysteresis:
+    label: Magnetic hysteresis (B–H loop)
+    domain: magnetism
+    blurb: Flux density in a transformer core against the magnetising field around a full loop, for its coercivity, remanence and saturation
+    columns: [H_A_per_m, B_T]
+    model: "H = N₁I/ℓ,  B = Φ/(N₂A)"
+    expected:
+      - [coercivity_A_per_m, "Expected coercivity (A/m)", 45]
+      - [remanence_T, "Expected remanence (T)", 0.83]
+      - [tip_field_T, "Expected B at the loop tip (T)", 1.42]
+      - [search_turns, "Search-coil turns N₂ used to work out B", 100]
+      - [precision_T, "B reading precision (T)", 0.005]
+      - [precision_A_per_m, "H reading precision (A/m)", 2]
+    samples:
+      - [hysteresis_turns.csv, "Loop 12% too short"]
+      - [hysteresis_drift.csv, "Loop doesn't close"]
+      - [hysteresis_clean.csv, "Healthy loop"]
+    followups: {hysteresis_reference_coil: hysteresis_turns_reference.csv}
+    questions: ["Find the coercivity, remanence and loop area", "Check whether the loop closes"]
+
+sample_info:
+  gamma_clean.csv: ["A Cs-137 source and an end-window GM tube with lead sheets between them, added 5 mm at a time up to 50 mm, 300 s counts (about 200 /s with no lead in); a 0.5 /s background is subtracted.", "Nothing should look off: a straight line on a log scale with μ/ρ = 0.110 cm²/g (half-value layer 5.6 mm)."]
+  gamma_background.csv: ["The same source, lead sheets and GM tube, with the same 0.5 /s background subtracted.", "The thin end follows the expected line, but from about 30 mm of lead on the counts level off well above it."]
+  gamma_dead_time.csv: ["The same lead sheets and GM tube; this run's count rate with no lead in is about 2300 /s.", "Behind thick lead the points follow the expected slope, but with little or no lead in the count rate falls below the line through the rest, by nearly a quarter at 0 mm."]
+  gamma_background_source_out.csv: ["Five 60 s counts with the Cs-137 source back in its pot and out of the room, the tube and absorbers left as they were.", "Is the background what was subtracted in the run (0.5 /s)?"]
+  muon_clean.csv: ["Cosmic muons stopping in a plastic scintillator read by one photomultiplier; the timer logs the time to the next pulse, 0–20 µs in 0.5 µs bins, about a day and a half of counting.", "Nothing should look off: an exponential decay with τ = 2.12 µs on a small flat background."]
+  muon_light_leak.csv: ["The same detector, timer and counting time.", "The decay has the expected lifetime, but it sits on a flat background about ten times the usual, so τ is less precise."]
+  muon_tdc_clock.csv: ["The same detector, timer and counting time.", "A clean exponential on a normal background, but τ comes out near 2.33 µs, 10% above the expected 2.12 µs."]
+  muon_light_leak_covered.csv: ["The discriminator's singles rate in ten 10 s counts with the room lights on, then ten with the detector under a thick black cloth.", "Does the rate change when the detector is covered?"]
+  faraday_rot_clean.csv: ["A 100 mm SF-57 glass rod in a 200 mm solenoid, a red laser through polariser and analyser, the field read on a Hall probe at the coil centre, −60 to +60 mT.", "Nothing should look off: a straight line through zero with V = 23 rad/(T·m)."]
+  faraday_rot_nonuniform.csv: ["The same rod, coil, laser and probe.", "A straight line through zero, but its slope gives a Verdet constant about 11% low."]
+  faraday_rot_zero_offset.csv: ["The same rod, coil, laser and probe.", "The slope gives the expected Verdet constant, but the line crosses zero field at about +0.5° instead of 0°."]
+  faraday_rot_nonuniform_map.csv: ["The field along the rod at the run's top current, the Hall probe stepped through the bore in 10 mm steps from one end of the rod to the other.", "Is the field the same all along the rod?"]
+  hysteresis_clean.csv: ["A silicon-steel toroidal transformer core, magnetising field stepped from +800 to −800 A/m and back (H = N₁I/ℓ), B from a fluxmeter on a 100-turn search coil round the 1.20 cm² core.", "Nothing should look off: a closed loop with coercivity 45 A/m, remanence 0.83 T and 1.42 T at the tips."]
+  hysteresis_turns.csv: ["The same core, windings and fluxmeter.", "The loop closes and has the expected coercivity, but it is about 12% too short: 1.25 T at the tips and 0.72 T remanence."]
+  hysteresis_drift.csv: ["The same core, windings and fluxmeter.", "The loop's coercivity and height look right, but it doesn't close: it ends about 0.07 T above where it started."]
+  hysteresis_turns_reference.csv: ["Fluxmeter readings on reversing the magnetising current, five on the search coil, then five on a freshly wound 10-turn coil beside it.", "Is the ratio of the readings 100 ÷ 10, as the stated turns say?"]
+
+labels:
+  linear_attenuation_per_cm: ["Linear attenuation coefficient μ", "/cm", 1]
+  mass_attenuation_cm2_g: ["Mass attenuation μ/ρ", "cm²/g", 1]
+  accepted_mass_attenuation_cm2_g: ["Accepted μ/ρ at 662 keV", "cm²/g", 1]
+  half_value_layer_mm: ["Half-value layer", "mm", 1]
+  unattenuated_rate_cps: ["Count rate with no lead (from the fit)", "/s", 1]
+  count_floor_cps: ["Floor under the curve, after background", "/s", 1]
+  counting_loss_thinnest_pct: ["Counts lost with no lead in", "%", 1]
+  background_measured_cps: ["Background, source removed", "/s", 1]
+  background_subtracted_cps: ["Background subtracted in the run", "/s", 1]
+  lifetime_us: ["Muon lifetime τ", "µs", 1]
+  expected_lifetime_us: ["Expected τ in plastic scintillator", "µs", 1]
+  free_muon_lifetime_us: ["Free muon lifetime (for comparison)", "µs", 1]
+  decays_in_fit: ["Decays in the fit window", "", 1]
+  accidental_background_per_bin: ["Flat background per bin", "", 1]
+  accidental_fraction_pct: ["Share of counts that are background", "%", 1]
+  singles_open_cps: ["Singles rate, detector open", "/s", 1]
+  singles_covered_cps: ["Singles rate, under the cloth", "/s", 1]
+  covered_over_open: ["Covered ÷ open", "", 1]
+  verdet_rad_per_T_m: ["Verdet constant V", "rad/(T·m)", 1]
+  expected_verdet_rad_per_T_m: ["Expected V", "rad/(T·m)", 1]
+  rotation_per_mT_deg: ["Rotation per mT", "°/mT", 1]
+  rotation_at_zero_field_deg: ["Rotation at zero field", "°", 1]
+  field_at_probe_position_mT: ["Field at the probe's position", "mT", 1]
+  field_averaged_over_rod_mT: ["Field averaged along the rod", "mT", 1]
+  average_over_peak: ["Average ÷ field at the probe", "", 1]
+  coercivity_A_per_m: ["Coercivity H_c", "A/m", 1]
+  expected_coercivity_A_per_m: ["Expected H_c", "A/m", 1]
+  remanence_T: ["Remanence B_r", "T", 1]
+  expected_remanence_T: ["Expected B_r", "T", 1]
+  tip_field_T: ["B at the loop tip", "T", 1]
+  expected_tip_field_T: ["Expected B at the tip", "T", 1]
+  loop_closure_gap_T: ["Loop closure gap (end − start)", "T", 1]
+  loop_vertical_offset_T: ["Loop's vertical offset", "T", 1]
+  loss_per_cycle_J_per_m3: ["Hysteresis loss per cycle (loop area)", "J/m³", 1]
+  search_turns_measured: ["Search-coil turns, from the 10-turn comparison", "", 1]
+  search_turns_stated: ["Search-coil turns, as stated", "", 1]
