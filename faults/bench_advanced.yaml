@@ -1,0 +1,411 @@
+# Advanced-lab fault library: gamma attenuation, muon lifetime, Faraday rotation and the
+# B–H loop. Same format as faults.yaml; `fix` is what to do once a cause is confirmed (used
+# in the PDF report). Test ids are global, so they are specific to each experiment.
+experiments:
+
+  gamma_attenuation:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: mu_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: floor_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: deadtime_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record μ and μ/ρ with their uncertainties, and the half-value layer.
+      background_underestimated:
+        name: Background during the run higher than the figure subtracted
+        prior: 0.20
+        typical_size: "A source brought out on the next bench can lift a GM tube's background from 0.5 to 2 counts/s or more"
+        conditions:
+          - {feature: floor_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: mu_error_pct, op: abs_lt, value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: deadtime_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: background_above_stated, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Count the background for at least 5 minutes with the source in its pot and the room as it is during the run (other benches' sources out), subtract that rate, and refit.
+      scatter_round_absorber:
+        name: Gamma rays reaching the tube round the lead (no collimator or tube shield)
+        prior: 0.17
+        typical_size: "Without collimation, scatter off the bench, walls and source holder can add about 1% of the beam behind any thickness"
+        conditions:
+          - {feature: floor_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: mu_error_pct, op: abs_lt, value: 3, p_true: 0.9, p_false: 0.2}
+          - {feature: deadtime_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: background_above_stated, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Put the lead collimator on the source and a lead sleeve round the tube, so the only way to the detector is through the absorbers, then repeat the thick end.
+      counting_losses:
+        name: Counting losses at high rate (detector dead time) behind the thinnest absorbers
+        prior: 0.13
+        typical_size: "A GM tube with a 100 µs dead time loses about a quarter of the counts at 3000 /s"
+        conditions:
+          - {feature: deadtime_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Move the source back until the unattenuated rate is under about 100 /s, or correct each rate with n = m/(1 − mτ) using the dead time from the two-source method, then repeat the thin end.
+      thickness_wrong:
+        name: Absorber thicknesses not as recorded (nominal sheet sizes used)
+        prior: 0.10
+        typical_size: "Sheets sold as 5 mm are often 4.5–5.5 mm, and μ shifts by the same fraction"
+        conditions:
+          - {feature: mu_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: floor_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: deadtime_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+        fix: Measure every sheet with a micrometer in several places (or weigh it and divide by area × density), then refit with the measured thicknesses.
+      broad_beam_buildup:
+        name: Photons scattered inside the lead still counted (broad beam)
+        prior: 0.07
+        typical_size: "Without collimation, scattered photons building up in the lead make μ come out 10–20% low"
+        conditions:
+          - {feature: mu_error_pct, op: "<", value: -5, p_true: 0.95, p_false: 0.02}
+          - {feature: floor_sigma, op: abs_lt, value: 4, p_true: 0.8, p_false: 0.3}
+        fix: Collimate the source and the detector (narrow-beam geometry) so photons scattered in the lead miss the tube, then repeat.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the tube's plateau voltage, repeat a few thicknesses in random order, and compare counts point by point.
+    tests:
+      gamma_source_out_count:
+        name: Count with the source removed
+        minutes: 6
+        how: Put the Cs-137 source back in its lead pot and take it out of the room, leave the absorbers and tube as they were, and take five 60 s counts. Compare the rate with the background you subtracted.
+        adds: {feature: background_above_stated, from: background_above_stated, op: copy}
+        outcomes:
+          background_underestimated: background_high
+          scatter_round_absorber: background_as_subtracted
+          counting_losses: background_as_subtracted
+          thickness_wrong: background_as_subtracted
+          broad_beam_buildup: background_as_subtracted
+          no_fault: background_as_subtracted
+        safety: Move the source with tongs, never your fingers, and keep it in its pot whenever it's not in use. Lead is toxic; wear gloves or wash your hands after handling the sheets, and don't eat or drink at the bench. Follow your radiation safety officer's local rules (dosimeter, sign-out log).
+      gamma_add_collimator:
+        name: Fit the lead collimator and tube shield, then recount the thickest absorbers
+        minutes: 12
+        how: Put the lead collimator on the source and a lead sleeve round the tube, and recount 40, 45 and 50 mm. Gamma rays that went round the lead are blocked; the background is not.
+        outcomes:
+          scatter_round_absorber: thick_end_drops
+          background_underestimated: thick_end_unchanged
+          broad_beam_buildup: mu_rises
+          counting_losses: thick_end_unchanged
+          thickness_wrong: thick_end_unchanged
+          no_fault: thick_end_unchanged
+        safety: Handle the source with tongs and use the time, distance and shielding rule (work quickly, from arm's length, behind the lead). Lead bricks are heavy and toxic; wear gloves, wash your hands after, and follow your radiation safety officer's rules.
+      gamma_two_source_dead_time:
+        name: Measure the tube's dead time with the two-source method
+        minutes: 15
+        how: Count two split sources separately and together (n₁, n₂, n₁₂, each with background b). The dead time is τ ≈ (n₁ + n₂ − n₁₂ − b)/(2 n₁ n₂).
+        outcomes:
+          counting_losses: dead_time_large_at_this_rate
+          background_underestimated: losses_negligible
+          scatter_round_absorber: losses_negligible
+          thickness_wrong: losses_negligible
+          broad_beam_buildup: losses_negligible
+          no_fault: losses_negligible
+        safety: Handle sources with tongs, keep them in their pots when not in use, and follow your radiation safety officer's rules. The GM tube runs at several hundred volts; don't touch its connector with the counter on.
+      gamma_micrometer_sheets:
+        name: Measure the absorber sheets with a micrometer
+        minutes: 8
+        how: Measure each lead sheet in five places and compare the total with the thicknesses you recorded.
+        outcomes:
+          thickness_wrong: thicknesses_differ
+          background_underestimated: thicknesses_match
+          scatter_round_absorber: thicknesses_match
+          counting_losses: thicknesses_match
+          broad_beam_buildup: thicknesses_match
+          no_fault: thicknesses_match
+        safety: Lead is toxic; wear gloves or wash your hands after handling the sheets, and don't eat or drink at the bench.
+
+  muon_lifetime:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: tau_error_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: background_fraction, op: "<", value: 0.06, p_true: 0.95, p_false: 0.01}
+          - {feature: early_excess_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record τ with its uncertainty; it sits below the free lifetime because μ⁻ are captured by carbon nuclei.
+      light_leak:
+        name: Light leak in the scintillator's wrapping (room light making random pulses)
+        prior: 0.20
+        typical_size: "A pinhole in the black tape can triple the singles rate, and random stops go as its square"
+        conditions:
+          - {feature: background_fraction, op: ">", value: 0.10, p_true: 0.95, p_false: 0.01}
+          - {feature: tau_error_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: early_excess_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: singles_drop_when_covered, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Find the leak (the singles rate jumps when a torch passes over it), cover it with black tape, and repeat the run.
+      threshold_too_low:
+        name: Discriminator threshold too low (photomultiplier noise counted)
+        prior: 0.17
+        typical_size: "A threshold set into the photomultiplier's noise can triple the singles rate"
+        conditions:
+          - {feature: background_fraction, op: ">", value: 0.10, p_true: 0.95, p_false: 0.01}
+          - {feature: tau_error_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: early_excess_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: singles_drop_when_covered, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Raise the threshold to the start of the singles-rate plateau (or lower the photomultiplier voltage by 50–100 V) until the singles rate is back to normal, then repeat.
+      timer_clock_off:
+        name: Timer's time scale off (clock frequency not the one the software assumes)
+        prior: 0.15
+        typical_size: "An oscillator 10% fast logs every decay time, and so τ, 10% long"
+        conditions:
+          - {feature: tau_error_pct, op: abs_gt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: tau_error_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: background_fraction, op: "<", value: 0.06, p_true: 0.9, p_false: 0.3}
+          - {feature: early_excess_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+        fix: Time a pulse pair of known spacing (checked on an oscilloscope), set the right clock frequency in the software or rescale the time axis by true ÷ logged, and refit.
+      afterpulsing:
+        name: Photomultiplier afterpulses counted as early decays
+        prior: 0.12
+        typical_size: "Ion afterpulses 0.1–1 µs after a muon's pulse pile up in the first bins"
+        conditions:
+          - {feature: early_excess_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Keep the fit starting at 1 µs or later, and lower the photomultiplier voltage or add a short veto after each start so an afterpulse can't stop the timer.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Look at the raw pulses on an oscilloscope and check the start and stop discriminators fire once per pulse.
+    tests:
+      muon_dark_cloth_singles:
+        name: Read the singles rate with the detector open, then under a black cloth
+        minutes: 2
+        how: Read the discriminator's count rate in ten 10 s counts with the room lights on, then cover the detector completely with a thick black cloth (or turn the lights off) and take ten more.
+        adds: {feature: singles_drop_when_covered, from: singles_drop_when_covered, op: copy}
+        outcomes:
+          light_leak: rate_drops
+          threshold_too_low: rate_unchanged
+          timer_clock_off: rate_unchanged
+          afterpulsing: rate_unchanged
+          no_fault: rate_unchanged
+        safety: The photomultiplier runs at 1–2 kV. Leave its housing closed and its high-voltage cable connected while it is on, and turn the voltage down before uncovering any part of the tube.
+      muon_threshold_scan:
+        name: Step the discriminator threshold up and read the singles rate
+        minutes: 6
+        how: Raise the threshold in five steps from its present setting and read the singles rate at each. Noise falls away steeply into a plateau of real muons; light-leak pulses are bright and stay.
+        outcomes:
+          threshold_too_low: rate_falls_to_plateau
+          light_leak: rate_stays_high
+          timer_clock_off: plateau_normal
+          afterpulsing: plateau_normal
+          no_fault: plateau_normal
+        safety: The photomultiplier runs at 1–2 kV. Adjust the threshold on the discriminator, not inside the photomultiplier base, and keep the housing closed.
+      muon_tdc_pulser:
+        name: Time a calibrated pulse pair on the timer
+        minutes: 5
+        how: Feed the timer two pulses from a pulse generator with a delay set and checked on an oscilloscope (say 5.00 µs), and compare the logged interval with it.
+        outcomes:
+          timer_clock_off: interval_logged_long
+          light_leak: interval_right
+          threshold_too_low: interval_right
+          afterpulsing: interval_right
+          no_fault: interval_right
+        safety: Unplug the photomultiplier's signal cable from the timer only, never the high-voltage cable, and turn the high voltage down first if your setup shares a connector panel.
+      muon_led_afterpulse:
+        name: Flash an LED into the photomultiplier and histogram what follows
+        minutes: 8
+        how: Drive the detector's LED port with short flashes and histogram the time to the next pulse. Afterpulses show as a bump 0.1–1 µs after each flash.
+        outcomes:
+          afterpulsing: afterpulses_seen
+          light_leak: no_afterpulses
+          threshold_too_low: no_afterpulses
+          timer_clock_off: no_afterpulses
+          no_fault: no_afterpulses
+        safety: The photomultiplier runs at 1–2 kV. Use the housing's LED port; don't open the housing with the high voltage on.
+
+  faraday_rotation:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: verdet_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
+          - {feature: zero_offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the Verdet constant with its uncertainty and the wavelength it was measured at.
+      field_nonuniform:
+        name: Field not uniform along the rod (rod off-centre or sticking out of the coil)
+        prior: 0.20
+        typical_size: "A 100 mm rod slid 5 cm along a 200 mm coil sees a field about 10% below the centre reading"
+        conditions:
+          - {feature: verdet_error_pct, op: "<", value: -5, p_true: 0.95, p_false: 0.02}
+          - {feature: zero_offset_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: field_falls_off_along_rod, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Centre the rod in the coil and repeat, or use the field averaged along the rod (from the field map) in place of the centre reading, and refit.
+      probe_gain_error:
+        name: Field reading high or low (Hall probe or gaussmeter calibration)
+        prior: 0.17
+        typical_size: "An uncalibrated Hall probe can read 5–10% off"
+        conditions:
+          - {feature: verdet_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: zero_offset_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: field_falls_off_along_rod, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Calibrate the gaussmeter in a reference magnet (or against a calibrated probe), rescale the field readings, and refit.
+      analyser_zero_offset:
+        name: Analyser zero misread (extinction at zero field set wrong)
+        prior: 0.15
+        typical_size: "Extinction found on one side of a shallow minimum is easily 0.3–1° off"
+        conditions:
+          - {feature: zero_offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: verdet_error_pct, op: abs_lt, value: 3, p_true: 0.9, p_false: 0.2}
+        fix: Switch the field off, find extinction again by bracketing the minimum from both sides, and subtract that angle from every reading.
+      probe_zero_offset:
+        name: Gaussmeter not zeroed (field reads non-zero at zero current)
+        prior: 0.12
+        typical_size: "A probe zeroed near the coil or in the lab's field can read a few mT at zero current"
+        conditions:
+          - {feature: zero_offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: verdet_error_pct, op: abs_lt, value: 3, p_true: 0.9, p_false: 0.2}
+        fix: Zero the probe in its zero-gauss chamber, subtract the offset from every field reading, and refit.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the laser's wavelength and polarisation, and repeat a few fields in random order with the field reversed.
+    tests:
+      faraday_rot_field_map:
+        name: Map the field along the rod with the Hall probe
+        minutes: 4
+        how: Hold the current at the run's top setting and step the probe through the bore in 10 mm steps from one end of the rod to the other. The field the rod sees is the average along its length.
+        adds: {feature: field_falls_off_along_rod, from: field_falls_off_along_rod, op: copy}
+        outcomes:
+          field_nonuniform: field_falls_off
+          probe_gain_error: field_uniform
+          analyser_zero_offset: field_uniform
+          probe_zero_offset: field_uniform
+          no_fault: field_uniform
+        safety: The coil gets hot at high current; don't touch the winding, and turn the current down before unplugging it (it is inductive and can arc). Block the laser beam while your hands are near the bore.
+      faraday_rot_reference_magnet:
+        name: Check the gaussmeter in a reference magnet
+        minutes: 6
+        how: Fetch the calibrated reference magnet (or a second, calibrated probe) and compare the gaussmeter's reading with its stated field.
+        outcomes:
+          probe_gain_error: reads_off
+          probe_zero_offset: reads_offset
+          field_nonuniform: reads_right
+          analyser_zero_offset: reads_right
+          no_fault: reads_right
+        safety: Keep the reference magnet away from watches, cards and the coil; strong magnets can pinch fingers when they snap to steel.
+      faraday_rot_extinction_recheck:
+        name: Switch the field off and find extinction again
+        minutes: 2
+        how: With no current in the coil, bracket the transmission minimum by approaching it from both sides and take the midpoint. Compare it with the zero you used.
+        outcomes:
+          analyser_zero_offset: zero_moved
+          probe_zero_offset: zero_same
+          field_nonuniform: zero_same
+          probe_gain_error: zero_same
+          no_fault: zero_same
+        safety: Keep the laser beam below eye level and never look along it, even through the analyser. Follow your laser safety officer's rules for the laser's class.
+      faraday_rot_zero_gauss:
+        name: Read the gaussmeter in its zero-gauss chamber
+        minutes: 2
+        how: Put the probe in the zero-gauss chamber and read it. It should read 0.0 mT.
+        outcomes:
+          probe_zero_offset: reads_nonzero
+          analyser_zero_offset: reads_zero
+          field_nonuniform: reads_zero
+          probe_gain_error: reads_zero
+          no_fault: reads_zero
+        safety: The Hall probe's tip is fragile; slide it in without bending it.
+
+  hysteresis:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: b_scale_error_pct, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: coercivity_error_pct, op: abs_lt, value: 8, p_true: 0.95, p_false: 0.01}
+          - {feature: closure_gap_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the coercivity, remanence, tip field and the loss per cycle (the loop's area).
+      search_turns_wrong:
+        name: Search coil's turns not as stated
+        prior: 0.20
+        typical_size: "A rewound search coil with 88 turns instead of 100 makes every B 12% low"
+        conditions:
+          - {feature: b_scale_error_pct, op: abs_gt, value: 6, p_true: 0.95, p_false: 0.02}
+          - {feature: scale_mismatch_pct, op: abs_lt, value: 5, p_true: 0.9, p_false: 0.2}
+          - {feature: coercivity_error_pct, op: abs_lt, value: 8, p_true: 0.9, p_false: 0.2}
+          - {feature: closure_gap_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: search_turns_off, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Use the turns found from the 10-turn comparison (N₂ = 10 × the ratio), recompute B = Φ/(N₂A), and refit.
+      core_area_wrong:
+        name: Core cross-section wrong (outside size used, tape and lamination gaps included)
+        prior: 0.17
+        typical_size: "A taped toroid's outside dimensions can overstate the iron's area by 10–20%"
+        conditions:
+          - {feature: b_scale_error_pct, op: abs_gt, value: 6, p_true: 0.95, p_false: 0.02}
+          - {feature: scale_mismatch_pct, op: abs_lt, value: 5, p_true: 0.9, p_false: 0.2}
+          - {feature: coercivity_error_pct, op: abs_lt, value: 8, p_true: 0.9, p_false: 0.2}
+          - {feature: closure_gap_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: search_turns_off, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Use the iron's own cross-section (the lamination stack's width × height × a stacking factor of about 0.95, or the datasheet's effective area), recompute B, and refit.
+      fluxmeter_drift:
+        name: Fluxmeter (integrator) drifting during the loop
+        prior: 0.13
+        typical_size: "An integrator offset of a few µV creeps by a few hundredths of a tesla over a slow loop"
+        conditions:
+          - {feature: closure_gap_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Null the fluxmeter's drift with the search coil connected (until the reading holds still for a minute), then trace the loop again, more quickly.
+      not_demagnetised:
+        name: Fluxmeter zeroed with the core still magnetised (not demagnetised first)
+        prior: 0.10
+        typical_size: "Zeroing on a magnetised core shifts the whole loop up or down by as much as the remanence"
+        conditions:
+          - {feature: offset_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: closure_gap_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.05}
+        fix: Demagnetise the core (reduce an alternating current slowly to zero), zero the fluxmeter, take the initial curve up to the top field, then trace the loop.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the H calibration (magnetising turns, mean path length, current reading) and the core for an air gap or damage.
+    tests:
+      hysteresis_reference_coil:
+        name: Compare the search coil with a freshly wound 10-turn coil
+        minutes: 4
+        how: Wind 10 turns of insulated wire round the core beside the search coil. Reverse the magnetising current from +I to −I five times reading the fluxmeter on the search coil, then five times on the 10-turn coil. The ratio of the readings is N₂ ÷ 10.
+        adds: {feature: search_turns_off, from: search_turns_off, op: copy}
+        outcomes:
+          search_turns_wrong: ratio_off
+          core_area_wrong: ratio_as_stated
+          fluxmeter_drift: ratio_as_stated
+          not_demagnetised: ratio_as_stated
+          no_fault: ratio_as_stated
+        safety: Turn the magnetising current to zero before winding or reconnecting anything; the winding is inductive and breaking its current can give a shock or an arc. The winding can be hot after a long run.
+      hysteresis_core_callipers:
+        name: Measure the core's iron cross-section
+        minutes: 5
+        how: Measure the lamination stack's width and height with callipers where it is bare (or read the datasheet's effective area), allow for the stacking factor, and compare with the area you used.
+        outcomes:
+          core_area_wrong: area_smaller
+          search_turns_wrong: area_as_used
+          fluxmeter_drift: area_as_used
+          not_demagnetised: area_as_used
+          no_fault: area_as_used
+        safety: Turn the magnetising current to zero first; the winding is inductive and can be hot after a long run.
+      hysteresis_drift_hold:
+        name: Hold the current at zero for a minute and watch the fluxmeter
+        minutes: 2
+        how: Set the magnetising current to zero and leave everything still. The reading should stay put; drift shows as a steady creep.
+        outcomes:
+          fluxmeter_drift: reading_creeps
+          search_turns_wrong: reading_steady
+          core_area_wrong: reading_steady
+          not_demagnetised: reading_steady
+          no_fault: reading_steady
+      hysteresis_demag_repeat:
+        name: Demagnetise, re-zero and trace the loop again
+        minutes: 10
+        how: Reduce an alternating current through the magnetising winding slowly to zero, zero the fluxmeter, take the initial curve to the top field, then trace the loop.
+        outcomes:
+          not_demagnetised: loop_centred
+          fluxmeter_drift: loop_still_open
+          search_turns_wrong: loop_unchanged
+          core_area_wrong: loop_unchanged
+          no_fault: loop_unchanged
+        safety: Turn the current down slowly rather than switching it off; the winding is inductive and can arc.
