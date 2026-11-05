@@ -1,0 +1,17 @@
+datasets:
+  - {file: nmr_pulse_misset.csv, experiment: nmr_echo, truth: pulse_misset, status: investigating}
+  - {file: nmr_pulse_misset_nutation.csv, after: nmr_pulse_misset.csv, test: nutation_sweep, experiment: nmr_echo, truth: pulse_misset, status: confirmed}
+  - {file: nmr_diffusion.csv, experiment: nmr_echo, truth: diffusion_gradient}
+  - {file: nmr_clean.csv, experiment: nmr_echo, truth: no_fault, status: clear}
+  - {file: sc_lag.csv, experiment: sc_transition, truth: thermometer_lag, status: investigating}
+  - {file: sc_lag_warming.csv, after: sc_lag.csv, test: warming_sweep, experiment: sc_transition, truth: thermometer_lag, status: confirmed}
+  - {file: sc_thermal_emf.csv, experiment: sc_transition, truth: thermal_emf}
+  - {file: sc_clean.csv, experiment: sc_transition, truth: no_fault, status: clear}
+  - {file: compton_gain.csv, experiment: compton, truth: mca_gain_error, status: investigating}
+  - {file: compton_gain_calibration.csv, after: compton_gain.csv, test: mca_line_calibration, experiment: compton, truth: mca_gain_error, status: confirmed}
+  - {file: compton_backscatter.csv, experiment: compton, truth: backscatter_peak}
+  - {file: compton_clean.csv, experiment: compton, truth: no_fault, status: clear}
+  - {file: rb_current_scale.csv, experiment: optical_pumping, truth: ammeter_gain_error, status: investigating}
+  - {file: rb_current_scale_refmeter.csv, after: rb_current_scale.csv, test: reference_ammeter_series, experiment: optical_pumping, truth: ammeter_gain_error, status: confirmed}
+  - {file: rb_residual_field.csv, experiment: optical_pumping, truth: residual_field}
+  - {file: rb_clean.csv, experiment: optical_pumping, truth: no_fault, status: clear}
