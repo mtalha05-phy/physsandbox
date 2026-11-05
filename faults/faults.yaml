@@ -18,6 +18,7 @@ experiments:
           - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
           - {feature: offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the fitted resistance with its uncertainty.
       thermoelectric_offset:
         name: Thermoelectric (thermal EMF) offset at a contact
         prior: 0.20
@@ -28,6 +29,7 @@ experiments:
           - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.9, p_false: 0.2}
           - {feature: offset_survives_reversal, op: is, value: true, p_true: 0.99, p_false: 0.5}
           - {feature: offset_only_on_sample, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Clean the oxidised contact or use copper-to-copper clamps, let the joints settle to the same temperature, and average sweeps with the current reversed to cancel what remains.
       meter_zero_offset:
         name: Voltmeter zero offset
         prior: 0.10
@@ -37,6 +39,7 @@ experiments:
           - {feature: slope_error_pct, op: abs_lt, value: 2, p_true: 0.9, p_false: 0.2}
           - {feature: offset_survives_reversal, op: is, value: true, p_true: 0.99, p_false: 0.5}
           - {feature: offset_only_on_sample, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Zero the voltmeter with its input shorted (its null or REL function) before the sweep, or subtract the shorted reading from every point.
       calibration_gain_error:
         name: Calibration (gain) error in meter or current source
         prior: 0.15
@@ -44,6 +47,7 @@ experiments:
           - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
           - {feature: slope_error_pct, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.05}
           - {feature: offset_sigma, op: "<", value: 4, p_true: 0.8, p_false: 0.1}
+        fix: Measure a calibrated reference resistor, correct every reading by the ratio you find, and send the meter or current source for calibration.
       lead_resistance:
         name: Lead or contact resistance included (2-wire style error)
         prior: 0.15
@@ -51,17 +55,20 @@ experiments:
           - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
           - {feature: slope_error_pct, op: ">", value: 2, p_true: 0.95, p_false: 0.05}
           - {feature: offset_sigma, op: "<", value: 4, p_true: 0.8, p_false: 0.1}
+        fix: Rewire so the voltage sense leads clip onto the resistor inside the current leads (true four-wire), then repeat the sweep.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Repeat the sweep with fresh contacts and a second voltmeter, and look at the residuals point by point.
       self_heating:
         name: Sample self-heating at high current
         prior: 0.10
         typical_size: "Copper's resistance rises 0.39% per °C; a shunt run hot can warm by 10 °C or more"
         conditions:
           - {feature: curvature_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.005}
+        fix: Use a lower current or short current pulses, heat-sink the sample, and fit only the low-current points.
 
     tests:
       low_current_repeat:
@@ -125,6 +132,7 @@ experiments:
         conditions:
           - {feature: mains_snr, op: "<", value: 10, p_true: 0.95, p_false: 0.01}
           - {feature: signal_at_expected_freq, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Nothing to fix. Record the signal frequency and amplitude.
       ground_loop:
         name: Ground loop picking up mains hum
         prior: 0.20
@@ -134,6 +142,7 @@ experiments:
           - {feature: odd_harmonics_present, op: is, value: true, p_true: 0.8, p_false: 0.3}
           - {feature: hum_gone_after_fix, op: is, value: true, p_true: 0.9, p_false: 0.1}
           - {feature: hum_dropped_after_twist, op: is, value: true, p_true: 0.2, p_false: 0.8}
+        fix: Connect every instrument to one ground point (never lift a safety earth), or use a differential probe if the hum stays.
       magnetic_pickup:
         name: Magnetic (inductive) pickup from a nearby transformer or cable loop
         prior: 0.10
@@ -142,16 +151,19 @@ experiments:
           - {feature: odd_harmonics_present, op: is, value: true, p_true: 0.5, p_false: 0.5}
           - {feature: hum_gone_after_fix, op: is, value: true, p_true: 0.15, p_false: 0.85}
           - {feature: hum_dropped_after_twist, op: is, value: true, p_true: 0.9, p_false: 0.1}
+        fix: Twist the signal leads together, shrink the loop they enclose, and move them away from transformers and mains cables.
       aliasing:
         name: Aliasing (sample rate too low for the signal)
         prior: 0.10
         conditions:
           - {feature: signal_at_expected_freq, op: is, value: false, p_true: 0.95, p_false: 0.02}
+        fix: Raise the sample rate to at least ten times the highest signal frequency, or add a low-pass anti-aliasing filter before the input.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Re-record with short shielded leads and a second scope channel on the same signal, and compare the two spectra.
 
     tests:
       single_point_ground:
@@ -191,6 +203,7 @@ experiments:
         conditions:
           - {feature: offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: gain_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the fitted coil constant with its uncertainty.
       ambient_field:
         name: Earth's field or nearby steel adding to the coil field
         prior: 0.22
@@ -199,6 +212,7 @@ experiments:
           - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: gain_error_pct, op: abs_lt, value: 3, p_true: 0.9, p_false: 0.2}
           - {feature: offset_gone_in_shield, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Subtract the zero-current reading taken at the same probe position from every point, and move steel and laptops away from the coils.
       probe_zero_offset:
         name: Hall probe zero offset (probe not zeroed)
         prior: 0.12
@@ -207,12 +221,14 @@ experiments:
           - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: gain_error_pct, op: abs_lt, value: 3, p_true: 0.9, p_false: 0.2}
           - {feature: offset_gone_in_shield, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Zero the Hall probe inside a zero-gauss chamber before the run, or subtract its zero-current reading from every point.
       probe_gain_error:
         name: Hall probe gain (sensitivity) calibration error
         prior: 0.15
         conditions:
           - {feature: gain_error_pct, op: abs_gt, value: 3, p_true: 0.95, p_false: 0.02}
           - {feature: offset_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.2}
+        fix: Calibrate the probe against a reference magnetometer and scale every reading by the ratio, or swap in a calibrated probe.
       coil_geometry:
         name: Coil spacing or radius not at the Helmholtz condition
         prior: 0.12
@@ -220,11 +236,13 @@ experiments:
         conditions:
           - {feature: gain_error_pct, op: abs_gt, value: 3, p_true: 0.9, p_false: 0.02}
           - {feature: offset_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.2}
+        fix: Set the coil spacing equal to the coil radius, measured between the centres of the windings, and repeat the sweep.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Repeat the sweep with a second Hall probe, checking its zero before and after, and compare point by point.
     tests:
       zero_gauss_chamber:
         name: Read the probe at zero current, in the open and inside a zero-gauss chamber
@@ -267,6 +285,7 @@ experiments:
           - {feature: centre_offset_mm, op: abs_lt, value: 0.15, p_true: 0.95, p_false: 0.01}
           - {feature: peak_ratio, op: ">", value: 0.85, p_true: 0.95, p_false: 0.02}
           - {feature: flat_top, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Nothing to fix. Record the beam centre and radius.
       misalignment:
         name: Detector or beam steering misaligned
         prior: 0.22
@@ -274,6 +293,7 @@ experiments:
           - {feature: centre_offset_mm, op: abs_gt, value: 0.15, p_true: 0.95, p_false: 0.02}
           - {feature: peak_ratio, op: ">", value: 0.85, p_true: 0.85, p_false: 0.3}
           - {feature: centre_stable, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Re-centre the beam on the detector with the steering mirrors, at low power and with eyewear on, then rescan.
       pointing_drift:
         name: Laser pointing drift during warm-up
         prior: 0.12
@@ -282,22 +302,26 @@ experiments:
           - {feature: centre_offset_mm, op: abs_gt, value: 0.15, p_true: 0.9, p_false: 0.02}
           - {feature: peak_ratio, op: ">", value: 0.85, p_true: 0.85, p_false: 0.3}
           - {feature: centre_stable, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Let the laser warm up for 15 to 30 minutes before scanning, and recheck the beam centre at the end of the run.
       low_power:
         name: Low laser power or a dirty optic in the path
         prior: 0.14
         conditions:
           - {feature: peak_ratio, op: "<", value: 0.85, p_true: 0.95, p_false: 0.02}
           - {feature: centre_offset_mm, op: abs_lt, value: 0.15, p_true: 0.9, p_false: 0.2}
+        fix: Clean or replace the dirty optic and check the output on a power meter; if the laser itself is low, report it to whoever looks after it.
       detector_saturation:
         name: Photodetector saturating at the beam centre
         prior: 0.08
         conditions:
           - {feature: flat_top, op: is, value: true, p_true: 0.95, p_false: 0.03}
+        fix: Add a neutral-density filter or lower the detector gain so the peak sits well below the detector's maximum, then rescan.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Re-centre the beam and detector, rescan slowly, and look at the residuals around the peak.
     tests:
       repeat_scan_after_warmup:
         name: Repeat the scan after the laser has warmed up for 15 minutes
@@ -339,6 +363,7 @@ experiments:
         conditions:
           - {feature: offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: gain_ratio, op: abs_dev1_lt, value: 0.05, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the ratio of measured to predicted EMF.
       amplifier_offset:
         name: Amplifier input offset voltage
         prior: 0.18
@@ -347,6 +372,7 @@ experiments:
           - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: gain_ratio, op: abs_dev1_lt, value: 0.05, p_true: 0.9, p_false: 0.2}
           - {feature: offset_with_input_shorted, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Null the amplifier offset with its trim while the input is shorted, or subtract the shorted-input reading from the trace.
       ground_offset:
         name: Ground potential difference between coil circuit and recorder
         prior: 0.14
@@ -354,28 +380,33 @@ experiments:
           - {feature: offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: gain_ratio, op: abs_dev1_lt, value: 0.05, p_true: 0.9, p_false: 0.2}
           - {feature: offset_with_input_shorted, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Connect the coil circuit and the recorder to one common ground point, then re-record.
       turns_mismatch:
         name: Coil has fewer turns than specified, or a shorted winding
         prior: 0.14
         conditions:
           - {feature: gain_ratio, op: abs_dev1_gt, value: 0.05, p_true: 0.95, p_false: 0.02}
           - {feature: polarity_reversed, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Find the real number of turns (count them or infer it from the inductance) and use it in the prediction, or replace a coil with a shorted winding.
       flux_sensor_error:
         name: Flux sensor calibration error
         prior: 0.10
         conditions:
           - {feature: gain_ratio, op: abs_dev1_gt, value: 0.05, p_true: 0.9, p_false: 0.02}
           - {feature: polarity_reversed, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Recalibrate the flux sensor against a known field and recompute the predicted EMF.
       polarity_reversed:
         name: Coil leads connected the wrong way round
         prior: 0.08
         conditions:
           - {feature: polarity_reversed, op: is, value: true, p_true: 0.95, p_false: 0.01}
+        fix: Swap the coil leads at the amplifier input and re-record.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Re-record with the magnet moving at a steady speed and check the coil, amplifier and recorder one at a time.
     tests:
       short_amplifier_input:
         name: Hold the magnet still, then short the amplifier input
@@ -419,6 +450,7 @@ experiments:
         conditions:
           - {feature: background_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: alpha_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the absorption coefficient with its uncertainty.
       stray_light:
         name: Room light leaking into the detector
         prior: 0.22
@@ -426,6 +458,7 @@ experiments:
           - {feature: background_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: alpha_error_pct, op: abs_lt, value: 5, p_true: 0.85, p_false: 0.3}
           - {feature: background_gone_enclosed, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Close the enclosure lid, switch off the room lights or shroud the detector, and rescan.
       detector_dark_offset:
         name: Detector dark-current or amplifier offset
         prior: 0.14
@@ -433,23 +466,27 @@ experiments:
           - {feature: background_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: alpha_error_pct, op: abs_lt, value: 5, p_true: 0.85, p_false: 0.3}
           - {feature: background_gone_enclosed, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Read the detector with the beam blocked and subtract that dark level from every point before fitting.
       concentration_error:
         name: Sample concentration higher than labelled
         prior: 0.14
         conditions:
           - {feature: alpha_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
           - {feature: background_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.3}
+        fix: Remake the solution by weighing the solute, or check it against a standard, and refit with the true concentration.
       path_length_error:
         name: Cuvette path length different from assumed
         prior: 0.10
         conditions:
           - {feature: alpha_error_pct, op: abs_gt, value: 5, p_true: 0.9, p_false: 0.02}
           - {feature: background_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.3}
+        fix: Measure the cuvette or slab thickness with calipers and refit with the measured path length.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Rescan with a fresh sample and a reference absorbance standard, and compare the two.
     tests:
       enclosure_rescan:
         name: Repeat the scan with the room lights off and the lid closed
@@ -490,6 +527,7 @@ experiments:
         conditions:
           - {feature: extinction_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: angle_offset_deg, op: abs_lt, value: 2, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record I₀ and the angle of maximum transmission.
       room_light:
         name: Room light reaching the detector
         prior: 0.20
@@ -497,6 +535,7 @@ experiments:
           - {feature: extinction_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: angle_offset_deg, op: abs_lt, value: 2, p_true: 0.85, p_false: 0.3}
           - {feature: light_with_beam_blocked, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Shield the detector from room light (lights off or a tube over the detector), or subtract the beam-blocked reading.
       leaky_polariser:
         name: Worn or low-extinction polariser
         prior: 0.14
@@ -505,17 +544,20 @@ experiments:
           - {feature: extinction_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: angle_offset_deg, op: abs_lt, value: 2, p_true: 0.85, p_false: 0.3}
           - {feature: light_with_beam_blocked, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Replace the worn polariser with one of known extinction ratio and rescan.
       analyser_zero_offset:
         name: Analyser scale not zeroed to the polariser axis
         prior: 0.18
         conditions:
           - {feature: angle_offset_deg, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.02}
           - {feature: extinction_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.3}
+        fix: Find the transmission minimum by hand, re-zero the analyser scale 90° from it, and refit.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Rescan with fresh polarisers and the detector shielded, and compare the two scans.
     tests:
       block_beam_reading:
         name: Read the detector at the crossed position, then with the laser beam blocked
@@ -554,6 +596,7 @@ experiments:
         conditions:
           - {feature: asymptote_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: tau_ratio, op: abs_dev1_lt, value: 0.3, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the cooling time constant with its uncertainty.
       cjc_offset:
         name: Thermocouple cold-junction compensation error
         prior: 0.20
@@ -562,6 +605,7 @@ experiments:
           - {feature: asymptote_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: tau_ratio, op: abs_dev1_lt, value: 0.3, p_true: 0.9, p_false: 0.2}
           - {feature: offset_at_ice_point, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Check the thermocouple in ice water and subtract that offset from every reading, and keep the meter's cold junction away from warm air.
       room_not_at_assumed:
         name: The surroundings aren't at the room temperature you assumed
         prior: 0.16
@@ -569,17 +613,20 @@ experiments:
           - {feature: asymptote_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: tau_ratio, op: abs_dev1_lt, value: 0.3, p_true: 0.9, p_false: 0.2}
           - {feature: offset_at_ice_point, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Measure the air temperature beside the sample with a second thermometer and use it as the room temperature in the fit.
       poor_thermal_contact:
         name: Poor thermal contact between thermocouple and sample
         prior: 0.14
         conditions:
           - {feature: tau_ratio, op: abs_dev1_gt, value: 0.3, p_true: 0.95, p_false: 0.05}
           - {feature: asymptote_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.3}
+        fix: Tape the junction to the sample with a dab of thermal paste and repeat the run.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Repeat with a second thermocouple on the sample and compare the two cooling curves.
     tests:
       ice_point_check:
         name: Put the thermocouple in an ice-water bath for two minutes
@@ -618,6 +665,7 @@ experiments:
         conditions:
           - {feature: final_ratio, op: abs_dev1_lt, value: 0.05, p_true: 0.95, p_false: 0.01}
           - {feature: tau_ratio, op: abs_dev1_lt, value: 0.15, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the time constant with its uncertainty.
       probe_loading:
         name: Oscilloscope probe loading the circuit (x1 probe, 1 MΩ)
         prior: 0.18
@@ -626,6 +674,7 @@ experiments:
           - {feature: final_ratio, op: "<", value: 0.95, p_true: 0.95, p_false: 0.02}
           - {feature: tau_ratio, op: "<", value: 0.85, p_true: 0.9, p_false: 0.1}
           - {feature: loading_reduced_with_x10, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Switch the probe to ×10 (10 MΩ) or buffer the capacitor voltage, then repeat the measurement.
       capacitor_leakage:
         name: Leaky capacitor
         prior: 0.12
@@ -633,6 +682,7 @@ experiments:
           - {feature: final_ratio, op: "<", value: 0.95, p_true: 0.95, p_false: 0.02}
           - {feature: tau_ratio, op: "<", value: 0.85, p_true: 0.9, p_false: 0.1}
           - {feature: loading_reduced_with_x10, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Replace the leaky capacitor (a film capacitor leaks far less than an electrolytic) and repeat.
       capacitor_tolerance:
         name: Capacitor value outside its tolerance
         prior: 0.18
@@ -640,17 +690,20 @@ experiments:
         conditions:
           - {feature: tau_ratio, op: abs_dev1_gt, value: 0.15, p_true: 0.95, p_false: 0.02}
           - {feature: final_ratio, op: abs_dev1_lt, value: 0.05, p_true: 0.9, p_false: 0.02}
+        fix: Measure the capacitor on an LCR meter and use the measured value in the prediction, or fit a tighter-tolerance part.
       supply_low:
         name: Supply voltage lower than set
         prior: 0.10
         conditions:
           - {feature: final_ratio, op: "<", value: 0.95, p_true: 0.95, p_false: 0.02}
           - {feature: tau_ratio, op: abs_dev1_lt, value: 0.15, p_true: 0.9, p_false: 0.05}
+        fix: Set the supply with a multimeter at the circuit rather than by the supply's dial, then repeat.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Repeat with a resistor and capacitor measured on an LCR meter and a ×10 probe, and compare.
     tests:
       x10_probe_repeat:
         name: Repeat the measurement with a x10 (10 MΩ) probe
@@ -691,6 +744,7 @@ experiments:
         conditions:
           - {feature: g_error_pct, op: abs_lt, value: 1.5, p_true: 0.95, p_false: 0.01}
           - {feature: length_offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record g with its uncertainty.
       large_amplitude:
         name: Too large a release angle
         prior: 0.18
@@ -699,6 +753,7 @@ experiments:
           - {feature: g_error_pct, op: "<", value: -1.5, p_true: 0.95, p_false: 0.03}
           - {feature: length_offset_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: g_fixed_at_small_amplitude, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Release from 5° or less, or apply the finite-amplitude correction, and retime.
       timer_scale:
         name: Timer running fast or slow
         prior: 0.15
@@ -706,6 +761,7 @@ experiments:
           - {feature: g_error_pct, op: abs_gt, value: 1.5, p_true: 0.95, p_false: 0.03}
           - {feature: length_offset_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: g_fixed_at_small_amplitude, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Check the timer against a reference clock and correct every period by the ratio, or time with a light gate.
       length_to_wrong_point:
         name: Length measured to the top of the bob, not its centre
         prior: 0.20
@@ -713,16 +769,19 @@ experiments:
         conditions:
           - {feature: length_offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: g_error_pct, op: abs_lt, value: 1.5, p_true: 0.9, p_false: 0.1}
+        fix: Measure the length to the centre of the bob, or take g from the slope of T² against L, which ignores the offset.
       miscounted_swings:
         name: Miscounted swings
         prior: 0.07
         conditions:
           - {feature: g_error_pct, op: abs_gt, value: 8, p_true: 0.95, p_false: 0.01}
+        fix: Time 20 swings with a second person counting aloud, or use a light gate, and retime the odd lengths.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Retime each length three times from a small release angle and look at the spread.
     tests:
       small_amplitude_repeat:
         name: Repeat three lengths released from 5° or less
@@ -763,6 +822,7 @@ experiments:
         conditions:
           - {feature: k_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
           - {feature: zero_force_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the spring constant with its uncertainty.
       hanger_mass_omitted:
         name: Hanger's mass left out of the loads
         prior: 0.20
@@ -771,6 +831,7 @@ experiments:
           - {feature: zero_force_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: offset_gone_with_hanger, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Weigh the hanger, add its mass to every load, and refit.
       ruler_zero_offset:
         name: Ruler zero read in the wrong place
         prior: 0.18
@@ -778,11 +839,13 @@ experiments:
           - {feature: zero_force_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
           - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: offset_gone_with_hanger, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Read the pointer with only the hanger attached and measure every extension from that point.
       past_elastic_limit:
         name: Spring loaded past its elastic limit
         prior: 0.12
         conditions:
           - {feature: curvature_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Replace the overstretched spring and keep loads within the linear range of the new one.
       wrong_spring:
         name: A spring with a different constant than expected
         prior: 0.10
@@ -790,11 +853,13 @@ experiments:
           - {feature: k_error_pct, op: abs_gt, value: 10, p_true: 0.95, p_false: 0.02}
           - {feature: zero_force_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: curvature_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+        fix: Check the spring's label or part number and use the right expected k, or swap in the intended spring.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Load and unload a fresh spring, reading the pointer both ways, and compare the two runs.
     tests:
       include_hanger_repeat:
         name: Weigh the hanger and add its mass to every load
@@ -835,6 +900,7 @@ experiments:
         conditions:
           - {feature: rs_excess_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
           - {feature: no_forward_current, op: is, value: false, p_true: 0.99, p_false: 0.01}
+        fix: Nothing to fix. Record the ideality factor and series resistance.
       meter_burden:
         name: Voltmeter across diode and ammeter (ammeter burden voltage)
         prior: 0.20
@@ -842,22 +908,26 @@ experiments:
         conditions:
           - {feature: rs_excess_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
           - {feature: droop_gone_after_rewire, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Move the voltmeter leads onto the diode's own legs so the ammeter's voltage drop is left out, then re-sweep.
       bulk_series_resistance:
         name: High series resistance in the diode itself (damaged or wrong part)
         prior: 0.15
         conditions:
           - {feature: rs_excess_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
           - {feature: droop_gone_after_rewire, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Replace the diode with a known-good part of the same type and repeat the sweep.
       reversed_diode:
         name: Diode connected the wrong way round
         prior: 0.10
         conditions:
           - {feature: no_forward_current, op: is, value: true, p_true: 0.98, p_false: 0.001}
+        fix: Turn the diode round so its cathode band faces the negative side, and repeat.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Repeat with a known-good diode and the voltmeter directly across it, and compare the two curves.
     tests:
       voltmeter_on_diode:
         name: Move the voltmeter leads onto the diode's own legs
@@ -895,6 +965,7 @@ experiments:
         conditions:
           - {feature: wavelength_error_pct, op: abs_lt, value: 1, p_true: 0.95, p_false: 0.01}
           - {feature: angle_zero_sigma, op: "<", value: 5, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the wavelength with its uncertainty.
       angle_zero_offset:
         name: Spectrometer angle zero misread
         prior: 0.20
@@ -902,6 +973,7 @@ experiments:
         conditions:
           - {feature: angle_zero_sigma, op: ">", value: 6, p_true: 0.95, p_false: 0.02}
           - {feature: wavelength_error_pct, op: abs_lt, value: 1, p_true: 0.9, p_false: 0.1}
+        fix: Re-zero the vernier on the straight-through beam, or average the left and right angles for each order, and refit.
       grating_density_wrong:
         name: A grating with a different line density than assumed
         prior: 0.17
@@ -910,6 +982,7 @@ experiments:
           - {feature: wavelength_error_pct, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.02}
           - {feature: angle_zero_sigma, op: "<", value: 5, p_true: 0.9, p_false: 0.2}
           - {feature: grating_confirmed_wrong, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Read the line density off the grating's mount, or calibrate it with a HeNe line, and refit with the right value.
       laser_not_stated_wavelength:
         name: A laser wavelength different from its label
         prior: 0.15
@@ -917,11 +990,13 @@ experiments:
           - {feature: wavelength_error_pct, op: abs_gt, value: 2, p_true: 0.95, p_false: 0.02}
           - {feature: angle_zero_sigma, op: "<", value: 5, p_true: 0.9, p_false: 0.2}
           - {feature: grating_confirmed_wrong, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Calibrate the spectrometer with a known reference line and quote the measured laser wavelength, not the label.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Repeat with a HeNe reference line, reading orders on both sides, and compare the angles.
     tests:
       reference_line_check:
         name: Repeat with a source of known wavelength (HeNe 632.8 nm)
@@ -951,6 +1026,7 @@ experiments:
         conditions:
           - {feature: density_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
           - {feature: zero_offset_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the carrier density with its uncertainty.
       contact_misalignment:
         name: Hall contacts not exactly opposite each other
         prior: 0.20
@@ -959,6 +1035,7 @@ experiments:
           - {feature: density_error_pct, op: abs_gt, value: 10, p_true: 0.95, p_false: 0.03}
           - {feature: zero_offset_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: misalignment_found, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Average the readings taken with the field forward and reversed, which cancels the misalignment voltage, or remake the contacts exactly opposite each other.
       field_lower_than_set:
         name: Magnetic field lower than the value you set
         prior: 0.16
@@ -966,17 +1043,20 @@ experiments:
           - {feature: density_error_pct, op: ">", value: 10, p_true: 0.95, p_false: 0.02}
           - {feature: zero_offset_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
           - {feature: misalignment_found, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Measure the field in the gap with a gaussmeter and use the measured value in the analysis.
       thermoelectric_contact_offset:
         name: Thermoelectric voltage at the contacts
         prior: 0.15
         conditions:
           - {feature: zero_offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
           - {feature: density_error_pct, op: abs_lt, value: 5, p_true: 0.9, p_false: 0.1}
+        fix: Let the contacts reach a steady temperature, then reverse the sample current and average the two readings.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
         prior: 0.05
         conditions: []
         flat_likelihood: 0.01
+        fix: Repeat with the current and the field each reversed, and measure the field with a gaussmeter.
     tests:
       reverse_field:
         name: Repeat with the magnetic field reversed

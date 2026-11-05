@@ -5,12 +5,11 @@ import time
 from collections import defaultdict, deque
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
-from fastapi.responses import FileResponse
+from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import agent, ledger
+from . import agent, ledger, report
 from .pipeline import CATALOG, EXPERIMENTS, analyse
 from .sandbox import MODE, RUNTIME, WALLS, image_digest, read_log, run_job
 from .summariser import summarise
@@ -23,7 +22,7 @@ MAX_UPLOAD = 1_000_000          # bytes
 # Per-visitor limits on the public demo: (requests, seconds). The model calls
 # cost inference credit, so they get the tightest limits.
 LIMITS = {"/api/agent": (8, 300), "/api/model-check": (4, 60), "/api/analyse": (40, 300),
-          "/api/containment": (20, 300)}
+          "/api/containment": (20, 300), "/api/report": (20, 300)}
 _hits = defaultdict(deque)
 
 
@@ -92,6 +91,19 @@ def analyse_upload(file: UploadFile = File(...), experiment: str = Form(...),
         return analyse(raw, experiment, json.loads(expected), json.loads(context) if context else None)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
+
+
+@app.post("/api/report")
+def investigation_report(payload: dict = Body(...)):
+    """PDF of one investigation. The body is the browser's copy of it and is
+    treated as untrusted (see app/report.py)."""
+    try:
+        pdf, filename = report.build(payload)
+    except report.ReportError as e:
+        raise HTTPException(400, str(e)) from e
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"',
+                             "Cache-Control": "no-store"})
 
 
 @app.post("/api/agent")

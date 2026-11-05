@@ -252,6 +252,7 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
 .tour button.primary { background: var(--surface); color: var(--ink); border-color: var(--surface); font-weight: 600; }
 .tour button:disabled { opacity: .5; cursor: progress; }
 .record { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; font-size: 14px; color: var(--muted); }
+.record-btns { display: flex; flex-wrap: wrap; gap: 8px; }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--surface);
          padding: 10px 16px; border-radius: 10px; font-size: 14px; box-shadow: var(--shadow); opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.show { opacity: 1; }
@@ -560,7 +561,9 @@ async function runAnalyse() {
     const res = await r.json();
     if (!r.ok || res.error) { toast(res.error || res.detail || "The analysis failed."); jobEnd(res); return; }
     S.steps.push({ file: S.sample || S.fileLabel, test: S.pendingTest, causes: res.causes, receipt: res.receipt,
-                   values: res.values, status: res.status, next: res.next_tests[0], expected: res.expected, walls: res.walls });
+                   values: res.values, rows: valueRows(res.values), status: res.status, next: res.next_tests[0],
+                   expected: res.expected, walls: res.walls, plot: res.plot,
+                   explanation: res.explanation, explained_by: res.explained_by });
     S.last = res; S.pendingTest = null; S.sample = null; S.file = null;
     $("file-name").textContent = "or drop it here";
     $("drop").classList.remove("followup"); $("followup-note").hidden = true; renderSamples();
@@ -587,6 +590,13 @@ function renderAll(res) {
   if (!TOUR.on) $("s2").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 }
 
+// [label, "value ± uncertainty"] pairs, formatted the way this page shows them
+function valueRows(values) {
+  return Object.entries(values || {}).filter(([k, v]) => LABELS[k] && typeof v.value !== "object").map(([k, v]) => {
+    const [label, unit, isPlain] = LABELS[k];
+    return [label, fmt(v.value, unit, isPlain) + (v.uncertainty != null ? ` ± ${fmt(v.uncertainty, unit, isPlain, 2)}` : "")];
+  });
+}
 function renderMeasured(res) {
   const vals = Object.entries(res.values).filter(([k]) => LABELS[k]);
   const tiles = vals.map(([k, v]) => {
@@ -668,9 +678,10 @@ function renderCauses(res) {
       <div class="pct">${pct(c.probability)}</div>
       <div class="track" aria-hidden="true"><div class="fill" style="width:${prev ? (prev[c.id] || 0) * 100 : 0}%" data-w="${c.probability * 100}"></div>${prev ? `<div class="ghost" style="left:calc(${(prev[c.id] || 0) * 100}% - 1px)"></div>` : ""}</div>
     </div>`).join("");
-  html += `<div class="record"><button class="btn secondary small" id="record">Download investigation record</button><span>Every step with its data hash and receipt, ready for your lab notebook.</span></div>`;
+  html += `<div class="record"><span class="record-btns"><button class="btn small" id="record-pdf">Download PDF report</button><button class="btn secondary small" id="record">Download investigation record</button></span><span>Every step with its chart, data hash and receipt, ready for your lab notebook.</span></div>`;
   $("s3-body").innerHTML = html;
   $("record").addEventListener("click", downloadRecord);
+  $("record-pdf").addEventListener("click", downloadPdf);
   requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll("#s3-body .fill").forEach(f => f.style.width = f.dataset.w + "%")));
 }
 const TEST_NAMES = {};
@@ -863,6 +874,34 @@ function downloadRecord() {
   a.download = `physsandbox-${S.experiment}-${new Date().toISOString().slice(0, 10)}.md`;
   a.click(); URL.revokeObjectURL(a.href);
   toast("Investigation record downloaded");
+}
+
+async function downloadPdf() {
+  if (!S.steps.length) return toast("Analyse a measurement first.");
+  const body = { experiment: S.experiment, expected: S.steps[S.steps.length - 1].expected || {},
+    steps: S.steps.map(st => ({ file: st.file, test: st.test, status: st.status, causes: st.causes, next: st.next,
+      values: st.rows, plot: st.plot, explanation: st.explanation, explained_by: st.explained_by,
+      receipt: st.receipt && { seq: st.receipt.seq, time: st.receipt.time, hash: st.receipt.hash, prev: st.receipt.prev,
+        mac: st.receipt.mac, input_sha256: st.receipt.input_sha256, mode: st.receipt.mode,
+        walls_measured: st.receipt.walls_measured, walls_host_verified: st.receipt.walls_host_verified } })) };
+  busy("record-pdf", true, "Building PDF…");
+  try {
+    const r = await fetch("/api/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) {
+      let msg = r.status === 429 ? "Too many reports just now. Try again in a minute." : "Couldn't build the PDF report.";
+      try { const j = await r.json(); if (typeof j.detail === "string") msg = j.detail; } catch { }
+      return toast(msg);
+    }
+    const blob = await r.blob();
+    const name = (/filename="([^"]+)"/.exec(r.headers.get("Content-Disposition") || "") || [])[1]
+      || `physsandbox-${S.experiment}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast("PDF report downloaded");
+  } catch { toast("Couldn't reach the server. Check your connection and try again."); }
+  finally { if ($("record-pdf")) busy("record-pdf", false, "Download PDF report"); }
 }
 
 /* ---------- guided tour ---------- */
