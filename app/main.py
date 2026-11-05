@@ -78,7 +78,8 @@ def status():
         "mode": MODE, "runtime": RUNTIME, "walls": WALLS, "image": image_digest(),
         "model": agent.MODEL if agent.model_configured() else None,
         "experiments": EXPERIMENTS, "catalog": CATALOG, "samples": SAMPLES,
-        "ledger": ledger.verify(),
+        "ledger": ledger.verify(),          # includes head_record: keep a copy to detect rollback
+        "public_key": "/api/ledger/public-key",
     }
 
 
@@ -166,15 +167,35 @@ def containment_log():
 
 
 @app.get("/api/ledger")
-def ledger_entries(limit: int = 20):
+def ledger_entries(limit: int = 20, start: int = 0):
+    """The latest receipts (or `limit` receipts from #start), with the signed
+    genesis and head records. Save it and check it with
+    tools/verify_receipts.py and the public key below."""
     limit = max(1, min(int(limit), 100))
-    return {"receipts": ledger.entries()[-limit:], "verify": ledger.verify()}
+    items = ledger.entries()
+    if start > 0:
+        items = [e for e in items if isinstance(e.get("seq"), int) and e["seq"] >= start][:limit]
+    else:
+        items = items[-limit:]
+    return {"receipts": items, "genesis": ledger.genesis(), "head_record": ledger.head_record(),
+            "verify": ledger.verify(), "public_key": "/api/ledger/public-key",
+            "window": {"start": start if start > 0 else None, "limit": limit}}
+
+
+@app.get("/api/ledger/public-key")
+def ledger_public_key(format: str = "json"):
+    """The notebook's Ed25519 public key: anyone can check the receipts with it."""
+    key = ledger.public_key()
+    if format == "pem":
+        return Response(key["pem"], media_type="text/plain; charset=utf-8",
+                        headers={"Content-Disposition": f'inline; filename="physsandbox-notebook-{key["key_id"]}.pem"'})
+    return key
 
 
 @app.get("/api/ledger/tamper-demo")
 def ledger_tamper_demo():
-    """Edits a copy of the notebook as an attacker without the key would, and
-    shows the check failing. The real notebook is untouched."""
+    """Edits a copy of the notebook as an attacker without the private key
+    would, and shows the check failing. The real notebook is untouched."""
     return ledger.tamper_demo()
 
 

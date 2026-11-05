@@ -68,14 +68,14 @@ The Helmholtz, laser-alignment, Faraday and Beer-Lambert experiments, and their 
 1. **A closed troubleshooting loop.** PhysSandbox ranks the likely causes, picks the bench test with the most information per minute, then folds in only the *outcome* of the test you ran. On the demo data the leading cause goes from 64% to 92% and is confirmed.
 2. **An agent whose code we assume is hostile.** A model on Vultr Serverless Inference writes Python to answer your questions. A static scan highlights risky lines, but nothing relies on it: the glovebox is the safeguard.
 3. **Containment receipts that don't take the code's word for it.** Every job probes its own walls (kernel, network interfaces, DNS, outbound connections, disk, user, visible secrets) *before any untrusted code runs* and writes that first; agent code is mounted read-only but not yet executed. Agent code then runs in a separate child process; the runner itself is made non-dumpable, so the child can't reach into the runner's report through `/proc`. The child can shape its own output but not the probe, and only short text fields of its output are kept (no payloads, capped length); the host also reads at most 2 MB from any container. The host then checks the container's real configuration and exit state with `docker inspect` (runtime, network mode, read-only root, memory, capabilities, user, OOM kill). Kills (memory, time) come only from Docker's record and the host's timer. What the code *tried* (reach the internet, write to disk, print a fake receipt) comes from the code's own output and is labelled that way; the wall that stopped it is the part the host verifies. The **Forge its own receipt** button runs code that prints a fake all-green receipt and tries to write into the runner's report; it can't succeed by design, and the attempt is flagged.
-4. **A signed, tamper-evident lab notebook.** Receipts are hash-chained and every one is signed with HMAC-SHA256; a signed head record (count and last hash) is rewritten on each append. Stripping signatures, editing an entry and rebuilding the hashes, or deleting entries off the end all fail "Check for tampering". **Tamper with a copy** shows it: it edits a copy of the notebook the way an attacker without the key would, and the check catches it. The key sits outside the repository and every sandbox (`~/.physsandbox/ledger.key`, mode 0600) but on the same VM, so root on the host could still forge; for that threat, every downloaded investigation record carries its receipts' hashes and signatures to keep elsewhere.
+4. **A lab notebook you can check without trusting us.** Receipts are hash-chained and each one is signed with Ed25519, as are the notebook's start (a genesis record with its creation time) and a head record (count and last hash) rewritten on each append. The public key is published at `/api/ledger/public-key`, so anyone can check every signature with a short standalone script, `tools/verify_receipts.py`, instead of taking the server's word. Stripping signatures, editing an entry and rebuilding the hashes, or deleting entries off the end all fail. **Tamper with a copy** shows it: it edits a copy of the notebook the way an attacker without the private key would, and the check catches it. Rolling the notebook back to an older copy, or wiping it, can't be caught from the notebook alone; the signed head in every downloaded record catches it from outside ([threat model](#the-lab-notebook-check-it-yourself)).
 5. **An agent that repairs its own code, sealed.** If the model's script fails in the box, the sandbox's error goes back to the model and it tries again (up to three attempts, each in a fresh container with its own receipt).
 
 ## Try it in 90 seconds
 
 Open the demo and press **Take the 90-second tour**. It walks through a real investigation (resistor reads high → offset found → bench test → cause confirmed), a break-out attempt stopped by the network wall, a poisoned file whose hidden instruction reaches the model and is contained, and the tamper check on the lab notebook. Every step runs live in the sandbox.
 
-Every investigation can be downloaded as a **PDF report** in one click: the outcome, the fix for the confirmed cause, and for every step the data chart with its fit, the measured values with uncertainties, the likely causes, the recommended test with how to do it and its safety note, plus each sandbox receipt with its signature, checked against the server's own lab notebook. A markdown record is available too.
+Every investigation can be downloaded as a **PDF report** in one click: the outcome, the fix for the confirmed cause, and for every step the data chart with its fit, the measured values with uncertainties, the likely causes, the recommended test with how to do it and its safety note, plus each sandbox receipt with its signature, checked against the server's own lab notebook. A markdown record is available too; it ends with the lab notebook's signed head, to keep.
 
 Adding an experiment group needs no edits to existing code: a physics module (`sandbox/tools/bench_<group>.py`), a fault library (`faults/bench_<group>.yaml`), a catalogue file (`app/catalog.d/<group>.yaml`), a data generator (`data/gen_<group>.py`) and its evaluation cases (`data/manifest.d/<group>.yaml`). Five of the groups were built that way in parallel.
 
@@ -101,6 +101,52 @@ The public demo is also protected from its visitors: at most two sandboxes run a
 **Development mode** (`SANDBOX_MODE=local`, for working on the physics) has no isolation, so it refuses the break-out demos and agent-written code outright, and every receipt, record and report made in it says "not isolated".
 
 **Known limits.** The app runs as root on the VM because it drives Docker, and Docker access is root-equivalent; a dedicated non-root user in the `docker` group would not change that, so the boundary we rely on is gVisor plus the container flags. Network attempts are detected from the code's own error messages; logging `connect` calls in gVisor (`runsc --strace`) would give host-side evidence of the attempt as well.
+
+## The lab notebook: check it yourself
+
+Every job's receipt goes into the lab notebook (`receipts.jsonl`, one JSON record per line):
+
+- **Genesis** (`seq` 0, `kind: "genesis"`): written when the notebook is created, with its start time and a random notebook id. Receipt #1 chains to it.
+- **Receipts** (`seq` 1, 2, …): hashes of the job's input, code and output, the walls measured inside the box and checked by the host, the outcome, and `prev`, the hash of the record before it.
+- **Head** (`kind: "head"`, its own file, rewritten on every append): `count`, `last_hash`, and the genesis record's hash, time and id.
+
+Every record carries three more fields:
+
+| Field | What it is |
+| --- | --- |
+| `hash` | SHA-256 of the record's canonical JSON: every field except `hash` and `sig`, keys sorted, no spaces (`json.dumps(sort_keys=True, separators=(",", ":"))`), 64 hex characters |
+| `key_id` | the first 16 hex characters of SHA-256 of the raw 32-byte public key; it is inside the hashed part, so it is signed too |
+| `sig` | Ed25519 signature over the ASCII text of `hash`, hex-encoded (128 characters) |
+
+The private key is made on first use at `~/.physsandbox/ledger_ed25519.pem` (mode 0600, outside the repository and every sandbox; `LEDGER_SIGNING_KEY_FILE` moves it). The public key is at `GET /api/ledger/public-key` (JSON with the PEM and `key_id`; add `?format=pem` for the bare PEM).
+
+To check the notebook without trusting the server (Python 3.8+ and `pip install cryptography`, nothing else):
+
+```bash
+curl -s 'https://HOST/api/ledger?limit=100' -o export.json
+curl -s 'https://HOST/api/ledger/public-key?format=pem' -o notebook.pem
+python tools/verify_receipts.py export.json notebook.pem
+# Later: has anything changed since the head you kept?
+python tools/verify_receipts.py export.json notebook.pem --expect-head physsandbox-record.md
+```
+
+The script recomputes every hash, checks every signature and link from the genesis record through the receipts to the head, and ignores the server's own verdict in the export. It exits 0 if everything checks out, 1 if it finds tampering, a rollback or a wipe, and 2 if the export doesn't cover the check. `--expect-head` takes any head you saved earlier: a downloaded investigation record (`.md`), a saved `/api/status` or `/api/ledger` response, a head record on its own, or `COUNT:HASH`. An export holds the latest 100 receipts; to compare with an older head, export from it with `/api/ledger?start=COUNT&limit=100`.
+
+**Threat model: what is caught, and what needs a copy of the head kept elsewhere.**
+
+| What someone does to the notebook | Caught? |
+| --- | --- |
+| Edits a receipt | Yes: it no longer matches its hash |
+| Edits a receipt and rebuilds every hash after it | Yes: the signatures no longer match, and only the private key can make new ones |
+| Strips the signatures | Yes: unsigned records are rejected |
+| Deletes receipts off the end | Yes: the signed head records how many there were |
+| Deletes or edits the head | Yes. The next job then starts a new notebook (the old files are archived beside it, not deleted), with a new start time |
+| Restores an older copy of both files (rollback) | **Not from the notebook alone**: an older notebook is still a valid notebook, and "Check for tampering" says intact. Caught with an earlier head kept elsewhere: the count went down, or receipt #count no longer has that head's hash |
+| Deletes both files (wipe) | The next job starts a new notebook with a new start time, shown as "Notebook started …" in the Lab notebook panel. With an earlier head, the script reports a different notebook |
+| Replaces the signing key | Every old signature fails, and the new notebook's `key_id` differs from the one in your saved record and public key |
+| Gets root on the VM and reads the private key | Can sign a new history. An earlier head kept elsewhere still catches any change to the receipts up to it, because its hash covers all of them; receipts after it rest on trusting the server |
+
+So the notebook proves on its own that nothing in it was edited, removed or added out of order; to prove it was not rolled back or replaced, you need a head from earlier. Every downloaded investigation record ends with the signed head at the time of download (the record's own receipts are in the chain behind it), and `/api/status` and `/api/ledger` include it as `head_record`. Keep one where the server can't reach it, for example in your email.
 
 ## Vultr services used
 
@@ -167,6 +213,7 @@ faults/     fault libraries, next-test catalogue and a fix for every fault (YAML
 data/       seeded dataset generators (generate*.py, gen_*.py) and ground truth (manifest.yaml, manifest.d/)
 eval/       evaluation of the full troubleshooting loop
 static/     single-page interface
+tools/      verify_receipts.py: checks a lab notebook export with its public key, without trusting the server
 deploy/     Vultr VM setup script
 ```
 
