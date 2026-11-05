@@ -38,8 +38,11 @@ def _template(result):
         return ("Your data match what you expected within uncertainty. "
                 "There is nothing to chase here.")
     if status == "confirmed":
+        if result.get("test_run"):
+            return (f"Cause confirmed: {top['name']} ({top['probability']:.0%}). "
+                    "The test you ran ruled out the alternatives.")
         return (f"Cause confirmed: {top['name']} ({top['probability']:.0%}). "
-                "The test you ran ruled out the alternatives.")
+                "The data alone separate it from the alternatives, so no bench test is needed first.")
     if not result["next_tests"]:
         return f"Most likely: {top['name'].lower()} ({top['probability']:.0%})."
     test = result["next_tests"][0]
