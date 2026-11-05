@@ -214,7 +214,8 @@ experiments:
         typical_size: "A constant shift shows up as an offset the Rydberg formula can't absorb"
         conditions:
           - {feature: line_offset_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
-          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+          # a calibration offset moves every line alike; it doesn't leave one line on its own
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
         fix: Recalibrate with a reference lamp, or subtract the fitted offset, and quote it in the result.
       unknown_cause:
         name: Unknown cause (none of the above fits well)
