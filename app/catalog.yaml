@@ -15,7 +15,7 @@ experiments:
     domain: electricity
     blurb: Four-wire V–I sweep of a milliohm resistor or shunt
     columns: [current_A, voltage_V]
-    model: "V = R·I"
+    model: "V = I·R"
     expected: [[resistance_ohm, "Expected resistance (Ω)", 0.010]]
     samples:
       - [r_offset_1.csv, "Resistor reads high at low current"]
@@ -23,7 +23,7 @@ experiments:
       - [r_clean.csv, "Healthy resistor"]
       - [inject_1.csv, "Same data, poisoned file", "contains a hidden instruction"]
     followups: {zero_current_reading: r_offset_1_zero.csv, current_reversal: r_offset_1_followup.csv}
-    questions: ["Fit V = R·I + V0 and report the offset", "Check the residuals for curvature"]
+    questions: ["Fit V = I·R + V0 and report the offset", "Check the residuals for curvature"]
 
   rc_charging:
     label: RC charging curve
@@ -197,7 +197,7 @@ experiments:
     domain: mechanics
     blurb: Extension against hanging mass, to measure the spring constant
     columns: [mass_kg, extension_m]
-    model: "mg = k·x"
+    model: "F = mg = k·x"
     expected: [[spring_constant_N_per_m, "Expected spring constant (N/m)", 25.0]]
     samples:
       - [hooke_hanger.csv, "Force line misses the origin"]
