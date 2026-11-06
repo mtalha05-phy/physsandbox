@@ -3,11 +3,17 @@ datasets:
   - {file: michelson_miscount_recount.csv, after: michelson_miscount.csv, test: slow_recount, experiment: michelson, truth: fringe_miscount, status: confirmed}
   - {file: michelson_backlash.csv, experiment: michelson, truth: screw_backlash}
   - {file: michelson_clean.csv, experiment: michelson, truth: no_fault, status: clear}
+  - {file: michelson_partner.csv, experiment: michelson, truth: lever_scale_error, step1_top: fringe_miscount}
+  - {file: michelson_partner_slow_recount.csv, after: michelson_partner.csv, test: slow_recount, experiment: michelson, truth: lever_scale_error, partner: true}
   - {file: sound_warm_air.csv, experiment: resonance_tube, truth: air_temperature}
   - {file: sound_warm_air_thermometer.csv, after: sound_warm_air.csv, test: tube_thermometer, experiment: resonance_tube, truth: air_temperature, status: confirmed}
   - {file: sound_ruler_zero.csv, experiment: resonance_tube, truth: length_zero_wrong}
   - {file: sound_clean.csv, experiment: resonance_tube, truth: no_fault, status: clear}
+  - {file: sound_partner.csv, experiment: resonance_tube, truth: generator_frequency, step1_top: air_temperature}
+  - {file: sound_partner_tube_thermometer.csv, after: sound_partner.csv, test: tube_thermometer, experiment: resonance_tube, truth: generator_frequency, partner: true}
   - {file: stefan_ammeter_zero.csv, experiment: stefan_lamp, truth: ammeter_zero_offset}
   - {file: stefan_ammeter_open.csv, after: stefan_ammeter_zero.csv, test: ammeter_open_circuit, experiment: stefan_lamp, truth: ammeter_zero_offset, status: confirmed}
   - {file: stefan_supply_voltage.csv, experiment: stefan_lamp, truth: voltage_at_supply}
   - {file: stefan_clean.csv, experiment: stefan_lamp, truth: no_fault, status: clear}
+  - {file: stefan_partner.csv, experiment: stefan_lamp, truth: support_conduction, step1_top: ammeter_zero_offset}
+  - {file: stefan_partner_ammeter_open_circuit.csv, after: stefan_partner.csv, test: ammeter_open_circuit, experiment: stefan_lamp, truth: support_conduction, partner: true}

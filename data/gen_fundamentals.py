@@ -184,4 +184,88 @@ write("leesdisc_thermometer_offset_sidebyside.csv", ["reading", "steam_C", "disc
 # cooling run done with the brass disc's top face bare (sample not put back on top)
 write("leesdisc_top_bare.csv", hdr, *lee(top_bare=True), fmt=fm)
 
+# --- Partner cases: the lower-prior fault of each ambiguous pair ----------------------
+# Each first measurement above that has a follow-up can't tell its fault from a second one
+# that moves the result the same way, so the data alone favour the more common one. Here
+# the truth is that other fault, and the recommended test has to find it.
+# Own random stream, so every dataset above is unchanged.
+rng = np.random.default_rng(4503)
+
+
+# Young's double slit: L = 2.000 m is right, but this slide's slits are 0.270 mm apart, not the
+# 0.250 mm on its label, so the fringes are 7.4% closer together than λL/d predicts
+def slide(orders, d):
+    y = 2.000 * np.tan(np.arcsin(orders * LAM / d)) * 1e3
+    return 147.3 + y + rng.normal(0, 0.15, y.size)
+
+
+write("young_partner.csv", ["order_m", "position_mm"], orders, slide(orders, 0.270e-3), fmt=["{:.0f}", "{:.1f}"])
+# follow-up: five steel-tape readings from the slide itself to the screen
+write("young_partner_young_tape_measure.csv", ["reading", "slit_to_screen_m"], np.arange(1, 6),
+      2.000 + rng.normal(0, 0.0008, 5), fmt=["{:.0f}", "{:.3f}"])
+# RLC: the input is reset to 2.00 V at every frequency, but the 10 mH coil on this bench is
+# wound with finer wire than the one on the bench sheet: 52 Ω in series, not the 18 Ω entered,
+# so Q and the peak both come out 22% low
+w = 2 * np.pi * fr
+Z = R_ + 52.0 + 1j * (w * L_ - 1 / (w * C_))
+write("rlc_partner.csv", ["frequency_Hz", "resistor_V"], fr,
+      2.0 / np.abs(Z) * R_ * (1 + rng.normal(0, 0.004, fr.size)), fmt=["{:.0f}", "{:.4f}"])
+# follow-up: CH1 on the circuit's input through the same sweep, reset to 2.00 V at each step as before
+write("rlc_partner_rlc_watch_input.csv", ["frequency_Hz", "input_V"], fr,
+      2.0 * (1 + rng.normal(0, 0.004, fr.size)), fmt=["{:.0f}", "{:.4f}"])
+
+
+# Stokes: the glycerol is at the 20 °C entered, but the stock bottle was left unstoppered and
+# has taken up 1.1% water, which thins it by 17% (and lowers its density by 0.3%)
+def drops_wet(water_pct, t_c=20.0):
+    eta = eta_glycerol(t_c, water_pct)
+    rho_l = 1 / ((1 - water_pct / 100) / (1261.0 - 0.65 * (t_c - 20)) + (water_pct / 100) / 998.2)
+    d = (balls + rng.normal(0, 0.001, balls.size)) / 1e3
+    v_st = 2 * (d / 2) ** 2 * G * (RHO_S - rho_l) / (9 * eta)
+    a = 3 * rho_l * d / (16 * eta)
+    v = (np.sqrt(1 + 4 * a * v_st) - 1) / (2 * a) * faxen(d / D_TUBE)
+    t = H_FALL / v + rng.normal(0, 0.08, d.size)
+    return 1e3 * d + rng.normal(0, 0.002, d.size), t
+
+
+write("stokes_partner.csv", ["ball_diameter_mm", "fall_time_s"], *drops_wet(1.1), fmt=["{:.3f}", "{:.2f}"])
+# follow-up: a thermometer lowered into the tube at seven depths
+write("stokes_partner_stokes_thermometer.csv", ["depth_cm", "liquid_temperature_C"], depth,
+      20.1 - 0.2 * depth / 65 + rng.normal(0, 0.05, depth.size), fmt=["{:.0f}", "{:.1f}"])
+
+
+# Lee's disc: the thermocouples agree, but T₂ was read 27 minutes after the steam went on, while
+# the disc was still 1.5 K short of steady and rising by 0.2 K a minute (time constant about 7 min);
+# the cooling run was then taken through that reading
+def warm_up_time(T_read, dt=1.0):
+    """Seconds for the disc to warm from room temperature to T_read once the steam is on."""
+    T, t = T_AIR, 0.0
+    while T < T_read:
+        T += dt * (K_PMMA * A_D / X_S * (T_STEAM - T) - disc_loss(T)) / MC
+        t += dt
+    return t
+
+
+def cooling_about(Tc, span=8.0, every=30.0):
+    """As cooling_run, through Tc rather than the steady T₂."""
+    Tg = np.linspace(Tc + span + 0.5, Tc - span - 3, 4000)
+    rate = disc_loss(Tg) / MC
+    tg = np.concatenate([[0], np.cumsum(-np.diff(Tg) / (0.5 * (rate[1:] + rate[:-1])))])
+    t0 = np.interp(Tc + span, Tg[::-1], tg[::-1])
+    t1 = np.interp(Tc - span, Tg[::-1], tg[::-1])
+    ts = np.arange(0, t1 - t0 + 1e-6, every)
+    return ts, np.interp(ts + t0, tg, Tg)
+
+
+T2_read = T2 - 1.5
+tc, Tc = cooling_about(T2_read)
+t = np.r_[30 * round(warm_up_time(T2_read) / 30), tc]
+write("leesdisc_partner.csv", ["stage", "time_s", "steam_C", "disc_C"], np.r_[1, 2 * np.ones(tc.size)], t,
+      np.round(T_STEAM + rng.normal(0, 0.05, t.size), 1), np.round(np.r_[T2_read, Tc] + rng.normal(0, 0.05, t.size), 1),
+      fmt=["{:.0f}", "{:.0f}", "{:.1f}", "{:.1f}"])
+# follow-up: both thermocouples side by side in the steam chamber, eight readings
+write("leesdisc_partner_leesdisc_side_by_side.csv", ["reading", "steam_C", "disc_C"], np.arange(1, 9),
+      np.round(T_STEAM + rng.normal(0, 0.05, 8), 1), np.round(T_STEAM + rng.normal(0, 0.05, 8), 1),
+      fmt=["{:.0f}", "{:.1f}", "{:.1f}"])
+
 print(f"Wrote fundamentals datasets to {OUT}")

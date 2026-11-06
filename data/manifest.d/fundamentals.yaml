@@ -3,15 +3,23 @@ datasets:
   - {file: young_screen_distance_tape.csv, after: young_screen_distance.csv, test: young_tape_measure, experiment: young_double_slit, truth: screen_distance_wrong, status: confirmed}
   - {file: young_missing_order.csv, experiment: young_double_slit, truth: missing_order_miscount}
   - {file: young_clean.csv, experiment: young_double_slit, truth: no_fault, status: clear}
+  - {file: young_partner.csv, experiment: young_double_slit, truth: slit_separation_wrong, step1_top: screen_distance_wrong}
+  - {file: young_partner_young_tape_measure.csv, after: young_partner.csv, test: young_tape_measure, experiment: young_double_slit, truth: slit_separation_wrong, partner: true}
   - {file: rlc_generator_loading.csv, experiment: rlc_resonance, truth: generator_loading}
   - {file: rlc_generator_loading_ch1.csv, after: rlc_generator_loading.csv, test: rlc_watch_input, experiment: rlc_resonance, truth: generator_loading, status: confirmed}
   - {file: rlc_meter_bandwidth.csv, experiment: rlc_resonance, truth: meter_bandwidth}
   - {file: rlc_clean.csv, experiment: rlc_resonance, truth: no_fault, status: clear}
+  - {file: rlc_partner.csv, experiment: rlc_resonance, truth: coil_resistance_high, step1_top: generator_loading}
+  - {file: rlc_partner_rlc_watch_input.csv, after: rlc_partner.csv, test: rlc_watch_input, experiment: rlc_resonance, truth: coil_resistance_high, partner: true}
   - {file: stokes_warm_liquid.csv, experiment: stokes_viscosity, truth: liquid_temperature}
   - {file: stokes_warm_liquid_thermometer.csv, after: stokes_warm_liquid.csv, test: stokes_thermometer, experiment: stokes_viscosity, truth: liquid_temperature, status: confirmed}
   - {file: stokes_micrometer_zero.csv, experiment: stokes_viscosity, truth: micrometer_zero_error}
   - {file: stokes_clean.csv, experiment: stokes_viscosity, truth: no_fault, status: clear}
+  - {file: stokes_partner.csv, experiment: stokes_viscosity, truth: water_absorbed, step1_top: liquid_temperature}
+  - {file: stokes_partner_stokes_thermometer.csv, after: stokes_partner.csv, test: stokes_thermometer, experiment: stokes_viscosity, truth: water_absorbed, partner: true}
   - {file: leesdisc_thermometer_offset.csv, experiment: lees_disc, truth: thermometer_offset}
   - {file: leesdisc_thermometer_offset_sidebyside.csv, after: leesdisc_thermometer_offset.csv, test: leesdisc_side_by_side, experiment: lees_disc, truth: thermometer_offset, status: confirmed}
   - {file: leesdisc_top_bare.csv, experiment: lees_disc, truth: top_face_bare}
   - {file: leesdisc_clean.csv, experiment: lees_disc, truth: no_fault, status: clear}
+  - {file: leesdisc_partner.csv, experiment: lees_disc, truth: not_steady_state, step1_top: thermometer_offset}
+  - {file: leesdisc_partner_leesdisc_side_by_side.csv, after: leesdisc_partner.csv, test: leesdisc_side_by_side, experiment: lees_disc, truth: not_steady_state, partner: true}
