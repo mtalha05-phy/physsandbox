@@ -143,4 +143,38 @@ g = np.r_[np.zeros(5), np.ones(5)]
 fl = np.r_[dphi(88) + rng.normal(0, 0.02, 5), dphi(10) + rng.normal(0, 0.02, 5)]
 write("hysteresis_turns_reference.csv", ["coil", "flux_mWb"], g, fl, fmt="{:.4g}")
 
+# --- Partner cases: the lower-prior fault of each ambiguous pair ----------------------
+# Each first measurement above that has a follow-up can't tell its fault from a second one
+# that moves the result the same way, so the data alone favour the more common one. Here
+# the truth is that other fault, and the recommended test has to find it.
+# Own random stream, so every dataset above is unchanged.
+rng = np.random.default_rng(4504)
+# Gamma: the background stays at the 0.5 /s subtracted, but with no collimator or tube shield
+# gamma rays scattered off the bench and source holder reach the tube round the lead: 2.0 /s,
+# 1% of the beam, behind every thickness
+write("gamma_partner.csv", ["thickness_mm", "counts"], X, gamma(extra=2.0), fmt="{:.0f}")
+# follow-up: five 60 s counts with the source back in its lead pot, the bench otherwise as in the run
+write("gamma_partner_gamma_source_out_count.csv", ["count_time_s", "counts_source_removed"], np.full(5, 60.0),
+      rng.poisson(BG * 60, 5), fmt="{:.0f}")
+# Muon: the wrapping is light-tight, but the discriminator threshold sits in the photomultiplier's
+# noise: singles rise from 15 /s to 45 /s whether the room is lit or not, and accidentals ninefold
+write("muon_partner.csv", ["time_us", "counts"], TC, muon(bg=108.0), fmt="{:.4g}")
+# follow-up: ten 10 s singles readings with the room lights on, then ten under a black cloth
+write("muon_partner_muon_dark_cloth_singles.csv", ["covered", "singles_rate_Hz"], np.r_[np.zeros(10), np.ones(10)],
+      rng.poisson(45.0 * 10, 20) / 10, fmt="{:.4g}")
+# Faraday rotation: the rod is centred in the coil, but the Hall probe reads 9% high (never
+# calibrated), so every field is overstated and V comes out 8% low
+write("faraday_rot_partner.csv", ["field_mT", "rotation_deg"], *faraday_rot(probe_gain=1.09), fmt="{:.4g}")
+# follow-up: field mapped along the centred rod at the run's top current, probe in 10 mm steps
+write("faraday_rot_partner_faraday_rot_field_map.csv", ["position_mm", "field_mT"], pos,
+      1.09 * 60.0 * bz(pos - L_ROD / 2) + rng.normal(0, 0.1, pos.size), fmt="{:.4g}")
+# Hysteresis: the search coil has its 100 turns, but B was worked out with the taped core's
+# outside cross-section, 1.20 cm², while the iron itself is 1.05 cm², so every B comes out 12.5% low
+write("hysteresis_partner.csv", ["H_A_per_m", "B_T"], *loop(scale=1.05 / 1.20), fmt="{:.4g}")
+# follow-up: five current reversals read on the search coil, then five on a freshly wound
+# 10-turn coil (flux-linkage change 2·N·B·A at the 1.42 T tip, through 1.05 cm² of iron)
+dphi_iron = lambda n: 2 * n * 1.42 * 1.05e-4 * 1e3     # mWb-turns
+write("hysteresis_partner_hysteresis_reference_coil.csv", ["coil", "flux_mWb"], np.r_[np.zeros(5), np.ones(5)],
+      np.r_[dphi_iron(100) + rng.normal(0, 0.02, 5), dphi_iron(10) + rng.normal(0, 0.02, 5)], fmt="{:.4g}")
+
 print(f"Wrote advanced-lab datasets to {OUT}")

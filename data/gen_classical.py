@@ -93,4 +93,30 @@ write("stefan_ammeter_open.csv", ["reading", "open_circuit_A"], np.arange(1, 11)
 # voltmeter across the supply terminals: the leads and ammeter (1.5 Ω) count as lamp
 write("stefan_supply_voltage.csv", hdr, *lamp(r_series=1.5), fmt=fm)
 
+# --- Partner cases: the lower-prior fault of each ambiguous pair ----------------------
+# Each first measurement above that has a follow-up can't tell its fault from a second one
+# that moves the result the same way, so the data alone favour the more common one. Here
+# the truth is that other fault, and the recommended test has to find it.
+# Own random stream, so every dataset above is unchanged.
+rng = np.random.default_rng(4502)
+# Michelson: every fringe counted, but the lever is really 10.3:1, not the 10:1 engraved on it,
+# so the travel worked out from the micrometer is 3% more than the mirror moved
+write("michelson_partner.csv", ["micrometer_um", "fringes"], read(1.03 * nf * LAM / 2), nf, fmt=["{:.2f}", "{:.0f}"])
+# follow-up: the same travel counted again, slowly, turning one way only (the lever is unchanged)
+write("michelson_partner_slow_recount.csv", ["micrometer_um", "fringes", "recount"], read(1.03 * nf * LAM / 2), nf,
+      np.ones(nf.size), fmt=["{:.2f}", "{:.0f}", "{:.0f}"])
+# Speed of sound: air at the 20 °C entered, but the generator's dial reads 3% high, so each tone
+# is really f/1.03 and every resonance length is 3% longer than v/4f predicts
+write("sound_partner.csv", ["frequency_Hz", "resonance_length_m"], fr,
+      vs(20.0) / (4 * fr / 1.03) - 0.3 * D + rng.normal(0, 0.0007, fr.size), fmt=["{:.0f}", "{:.4f}"])
+# follow-up: a thermometer lowered down the tube; water and air have settled to the room's 20 °C
+write("sound_partner_tube_thermometer.csv", ["depth_cm", "air_temperature_C"], depth,
+      20.2 - 0.4 * depth / 65 + rng.normal(0, 0.2, depth.size), fmt=["{:.0f}", "{:.1f}"])
+# Stefan-Boltzmann: the ammeter is zeroed, but this lamp's thicker support and lead-in wires
+# conduct 70 µW/K away: about a fifth of the power at 1.5 V, under 3% at 12 V
+write("stefan_partner.csv", ["voltage_V", "current_A"], *lamp(g=7e-5), fmt=["{:.4f}", "{:.5f}"])
+# follow-up: ten readings of the ammeter with the lamp circuit open (it flickers by a digit or so)
+write("stefan_partner_ammeter_open_circuit.csv", ["reading", "open_circuit_A"], np.arange(1, 11),
+      np.round(rng.normal(0, 0.0002, 10), 4) + 0.0, fmt=["{:.0f}", "{:.4f}"])
+
 print(f"Wrote classical datasets to {OUT}")

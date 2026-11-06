@@ -104,4 +104,46 @@ write("millikan_evaporation.csv", hdr, drop, q_evap, fmt="{:.4g}")
 # follow-up: calliper readings of the spacer ring at eight places
 write("millikan_spacing_callipers.csv", ["plate_spacing_mm"], 6.70 + rng.normal(0, 0.01, 8), fmt="{:.4g}")
 
+# --- Partner cases: the lower-prior fault of each ambiguous pair ----------------------
+# Each first measurement above that has a follow-up can't tell its fault from a second one
+# that scales the result the same way, so the data alone favour the more common one. Here
+# the truth is that other fault, and the recommended test has to find it.
+# Own random stream, so every dataset above is unchanged.
+rng = np.random.default_rng(4501)
+# Electron diffraction: L = 135 mm is right, but the supply meter reads 15% high, so the
+# tube really runs at V/1.15 and λ, and both spacings, come out about 7% small
+write("ediff_partner.csv", ["voltage_kV", "ring", "diameter_mm"], kv, ring,
+      diam(kv / 1.15, d_true) + noise(), fmt="{:.4g}")
+# follow-up: foil-to-screen distance measured with a steel rule, eight readings
+write("ediff_partner_measure_camera_length.csv", ["camera_length_mm"], 135.0 + rng.normal(0, 0.4, 8),
+      fmt="{:.4g}")
+
+
+# Zeeman: the gaussmeter is right, but this bench's étalon is air-spaced (4 mm spacers,
+# optical thickness 4.00 mm) while the solid étalon's figures were entered (3 mm, n = 1.457,
+# 4.37 mm), so every splitting comes out 8.5% small
+def air_etalon_rows(B_T, gap=4.0e-3):
+    rows = []
+    for b in B_T:
+        dnu = MU_B * b / (H * CL)
+        lo, hi = NU0 - dnu, NU0 + dnu
+        N1 = np.floor(2 * gap * lo)
+        r = [F_LENS * np.tan(np.arccos(n / (2 * gap * nu))) for nu, n in ((lo, N1), (hi, N1), (lo, N1 - 1), (hi, N1 - 1))]
+        rows.append(np.array(r) + rng.normal(0, 0.006, 4))
+    return np.array(rows)
+
+
+z = air_etalon_rows(fields / 1e3)
+write("zeeman_partner.csv", ["field_mT", "r1_inner_mm", "r1_outer_mm", "r2_inner_mm", "r2_outer_mm"],
+      read_B(fields), *z.T, fmt="{:.5g}")
+# follow-up: magnet current stepped, lab gaussmeter against a calibrated one at the lamp position
+write("zeeman_partner_calibrated_gaussmeter.csv", ["current_A", "field_lab_mT", "field_reference_mT"],
+      cur, b_ref + rng.normal(0, 1.0, cur.size), b_ref + rng.normal(0, 0.5, cur.size), fmt="{:.5g}")
+# Millikan: the 7.60 mm spacing is right, but the plate-voltage meter reads 10% high, so every
+# charge (q ∝ 1/V) comes out 9% low, still in whole steps
+write("millikan_partner.csv", ["drop", "charge_1e19C"], drop, charge(1 / 1.10), fmt="{:.4g}")
+# follow-up: calliper readings of the spacer ring at eight places
+write("millikan_partner_calliper_plate_spacing.csv", ["plate_spacing_mm"], 7.60 + rng.normal(0, 0.01, 8),
+      fmt="{:.4g}")
+
 print(f"Wrote atomic-physics datasets to {OUT}")

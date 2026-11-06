@@ -3,15 +3,23 @@ datasets:
   - {file: gamma_background_source_out.csv, after: gamma_background.csv, test: gamma_source_out_count, experiment: gamma_attenuation, truth: background_underestimated, status: confirmed}
   - {file: gamma_dead_time.csv, experiment: gamma_attenuation, truth: counting_losses}
   - {file: gamma_clean.csv, experiment: gamma_attenuation, truth: no_fault, status: clear}
+  - {file: gamma_partner.csv, experiment: gamma_attenuation, truth: scatter_round_absorber, step1_top: background_underestimated}
+  - {file: gamma_partner_gamma_source_out_count.csv, after: gamma_partner.csv, test: gamma_source_out_count, experiment: gamma_attenuation, truth: scatter_round_absorber, partner: true}
   - {file: muon_light_leak.csv, experiment: muon_lifetime, truth: light_leak, status: investigating}
   - {file: muon_light_leak_covered.csv, after: muon_light_leak.csv, test: muon_dark_cloth_singles, experiment: muon_lifetime, truth: light_leak, status: confirmed}
   - {file: muon_tdc_clock.csv, experiment: muon_lifetime, truth: timer_clock_off}
   - {file: muon_clean.csv, experiment: muon_lifetime, truth: no_fault, status: clear}
+  - {file: muon_partner.csv, experiment: muon_lifetime, truth: threshold_too_low, step1_top: light_leak}
+  - {file: muon_partner_muon_dark_cloth_singles.csv, after: muon_partner.csv, test: muon_dark_cloth_singles, experiment: muon_lifetime, truth: threshold_too_low, partner: true}
   - {file: faraday_rot_nonuniform.csv, experiment: faraday_rotation, truth: field_nonuniform, status: investigating}
   - {file: faraday_rot_nonuniform_map.csv, after: faraday_rot_nonuniform.csv, test: faraday_rot_field_map, experiment: faraday_rotation, truth: field_nonuniform, status: confirmed}
   - {file: faraday_rot_zero_offset.csv, experiment: faraday_rotation, truth: analyser_zero_offset}
   - {file: faraday_rot_clean.csv, experiment: faraday_rotation, truth: no_fault, status: clear}
+  - {file: faraday_rot_partner.csv, experiment: faraday_rotation, truth: probe_gain_error, step1_top: field_nonuniform}
+  - {file: faraday_rot_partner_faraday_rot_field_map.csv, after: faraday_rot_partner.csv, test: faraday_rot_field_map, experiment: faraday_rotation, truth: probe_gain_error, partner: true}
   - {file: hysteresis_turns.csv, experiment: hysteresis, truth: search_turns_wrong, status: investigating}
   - {file: hysteresis_turns_reference.csv, after: hysteresis_turns.csv, test: hysteresis_reference_coil, experiment: hysteresis, truth: search_turns_wrong, status: confirmed}
   - {file: hysteresis_drift.csv, experiment: hysteresis, truth: fluxmeter_drift}
   - {file: hysteresis_clean.csv, experiment: hysteresis, truth: no_fault, status: clear}
+  - {file: hysteresis_partner.csv, experiment: hysteresis, truth: core_area_wrong, step1_top: search_turns_wrong}
+  - {file: hysteresis_partner_hysteresis_reference_coil.csv, after: hysteresis_partner.csv, test: hysteresis_reference_coil, experiment: hysteresis, truth: core_area_wrong, partner: true}
