@@ -1,0 +1,497 @@
+# Optics, semiconductor and thermocouple bench: thin-lens focal length, Brewster's angle,
+# band gap of germanium, type K thermocouple calibration. Same format as faults.yaml; `fix`
+# is what to do once a cause is confirmed (used in the PDF report). Test ids are global, so
+# they are specific to each experiment.
+experiments:
+
+  thin_lens:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: slope_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: f_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the focal length with its uncertainty, beside the value marked on the lens.
+      lens_holder_offset:
+        name: Lens position read at the holder's index mark, which is off the lens itself
+        prior: 0.20
+        typical_size: "An index mark 1.2 cm from the glass makes every u 1.2 cm long and every v 1.2 cm short; the slope of 1/v against 1/u becomes about −(1 + δ/f)², −1.25 for a 10 cm lens"
+        conditions:
+          - {feature: slope_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: f_error_pct, op: abs_lt, value: 5, p_true: 0.9, p_false: 0.1}
+          - {feature: lens_index_offset_found, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: lens_slope_flips, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Read u and v from the lens's own mid-plane (or add the measured index offset to every v and take it off every u), then refit.
+      lens_principal_planes:
+        name: Thick or compound lens (its principal planes are not at the middle of its mount)
+        prior: 0.15
+        typical_size: "A 1.5 cm thick plano-convex lens has both principal planes towards its curved face, about 0.5 cm off centre on average, which tilts the line by about 10%"
+        conditions:
+          - {feature: slope_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: f_error_pct, op: abs_lt, value: 5, p_true: 0.9, p_false: 0.1}
+          - {feature: lens_index_offset_found, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: lens_slope_flips, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Use Bessel's displacement method, which needs only how far the lens moves between the two sharp images and not where its middle is, or change to a thin lens. Turning the lens round and averaging the two lines also takes out most of the tilt.
+      lens_focus_by_eye:
+        name: Image judged sharp by eye in one go (the depth of focus spreads the image distances)
+        prior: 0.15
+        typical_size: "With a dim image on a ground-glass screen and a 3 cm aperture, the image looks sharp over about ±8% of v: ±4 cm at v = 50 cm"
+        conditions:
+          - {feature: misfit_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: slope_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+        fix: For each image, move the screen in until the image just blurs and out until it blurs again, and record the midpoint; a brighter object or a darker room makes the blur easier to see.
+      lens_wrong_focal_length:
+        name: Wrong lens picked up (its focal length is not the one entered)
+        prior: 0.15
+        typical_size: "A +8 D lens (12.5 cm) looks just like a +10 D one (10 cm): f comes out 25% long on a perfectly straight line"
+        conditions:
+          - {feature: f_error_pct, op: abs_gt, value: 6, p_true: 0.95, p_false: 0.02}
+          - {feature: f_error_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.05}
+          - {feature: slope_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: lens_focal_length_off, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Check the lens's marking against the set and fetch the one you meant (or enter the focal length of the lens you used), then repeat.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check that the object is the illuminated cross-wire itself (not the lamp's front plate), that the bench scale is continuous, and repeat a few points in random order.
+    tests:
+      lens_index_check:
+        name: Check the holder's index mark against the lens itself
+        minutes: 2
+        how: Slide the holder to five places along the bench and at each read the bench scale at the holder's index mark and at the lens's own mid-plane, sighting across the glass with a set square.
+        adds: {feature: lens_index_offset_found, from: lens_index_offset_found, op: copy}
+        outcomes:
+          lens_holder_offset: index_off_the_lens
+          lens_principal_planes: index_at_the_lens
+          lens_focus_by_eye: index_at_the_lens
+          lens_wrong_focal_length: index_at_the_lens
+          no_fault: index_at_the_lens
+        safety: The object lamp's housing gets hot enough to burn; keep your hands clear of it while you sight across the lens. Hold lenses by their mounts, as chipped glass edges cut.
+      lens_reverse_repeat:
+        name: Turn the lens round in its holder and repeat four points
+        minutes: 6
+        how: Take four object distances as in the run, then turn the lens round in the same holder and take the same four again, logging a lens_reversed column (0, then 1). A thick lens's principal planes swap sides when it is turned round; a misplaced index mark does not move.
+        adds: {feature: lens_slope_flips, from: lens_slope_flips, op: copy}
+        outcomes:
+          lens_principal_planes: tilt_reverses
+          lens_holder_offset: tilt_unchanged
+          lens_focus_by_eye: tilt_unchanged
+          lens_wrong_focal_length: tilt_unchanged
+          no_fault: tilt_unchanged
+        safety: Let the object lamp cool, or work round it, before reaching past it to the lens holder; hold the lens by its rim, as chipped glass edges cut.
+      lens_distant_object:
+        name: Focus a distant object and measure f from the lens itself
+        minutes: 3
+        how: Aim the lens at a window frame or a lamp at least 5 m away, focus its image on the screen and measure from the lens's mid-plane to the screen with a ruler. Repeat five times, noting the object's distance.
+        adds: {feature: lens_focal_length_off, from: lens_focal_length_off, op: copy}
+        outcomes:
+          lens_wrong_focal_length: focal_length_off
+          lens_holder_offset: focal_length_as_marked
+          lens_principal_planes: focal_length_as_marked
+          lens_focus_by_eye: focal_length_as_marked
+          no_fault: focal_length_as_marked
+        safety: Never use the Sun as the distant object. The lens focuses it to a spot that can blind you or set the screen alight; use a window frame or a lamp across the room.
+
+  brewster:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: brewster_shift_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: s_fraction_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: low_ratio_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: high_ratio_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record Brewster's angle and n = tan θ_B with their uncertainties, and the wavelength.
+      brewster_polariser_misset:
+        name: Polariser not set exactly for p (some s-polarised light in the beam)
+        prior: 0.20
+        typical_size: "A polariser 5° off p lets sin²5° = 0.8% of the light through as s, which reflects 15% at Brewster's angle: about 1.2 µW of a 1 mW beam where there should be almost none"
+        conditions:
+          - {feature: s_fraction_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: brewster_shift_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: brewster_polariser_off_p, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: At Brewster's angle, turn the polariser for the deepest minimum and lock it there (that is exact p), then repeat the sweep.
+      brewster_polariser_extinction:
+        name: Polariser's extinction too poor (it passes some of the crossed polarisation)
+        prior: 0.15
+        typical_size: "An old or heat-faded sheet polariser can pass 1% of the crossed polarisation: about 1.5 µW at the minimum from a 1 mW beam, whichever way it is turned"
+        conditions:
+          - {feature: s_fraction_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: brewster_shift_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: brewster_polariser_off_p, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: brewster_extinction_poor, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Replace the sheet with a better polariser (a Glan–Taylor or Glan–Thompson prism, or a fresh high-extinction sheet) and repeat the sweep.
+      brewster_stage_zero:
+        name: Rotation stage's zero not at normal incidence (every angle offset)
+        prior: 0.17
+        typical_size: "A stage zeroed by eye against the plate's edge is easily 1–3° out; 2° puts Brewster's angle at 58.6° and makes tan θ_B 1.64 instead of 1.515"
+        conditions:
+          - {feature: brewster_shift_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: low_ratio_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: s_fraction_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: brewster_stage_zero_off, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Find normal incidence by sending the front-face reflection straight back into the laser's exit aperture, take that reading as zero, and subtract it from every angle.
+      brewster_wrong_glass:
+        name: Glass not the type entered (its refractive index differs)
+        prior: 0.08
+        typical_size: "Flint (n ≈ 1.62) and crown (n ≈ 1.515) plates look alike; flint puts Brewster's angle 1.7° higher and reflects about a third more near normal incidence"
+        conditions:
+          - {feature: brewster_shift_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: low_ratio, op: abs_dev1_gt, value: 0.1, p_true: 0.95, p_false: 0.05}
+          - {feature: s_fraction_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: brewster_stage_zero_off, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Identify the glass (its label, or n measured by refraction through the plate) and enter its refractive index at the laser's wavelength.
+      brewster_back_reflection:
+        name: Back-face reflection reaching the detector too (a second spot beside the first)
+        prior: 0.12
+        typical_size: "With the iris open, the spot from the plate's back face nearly doubles the reflected power at small angles; at Brewster's angle both vanish, so the minimum stays put"
+        conditions:
+          - {feature: low_ratio, op: ">", value: 1.3, p_true: 0.95, p_false: 0.01}
+          - {feature: brewster_shift_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: s_fraction_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: brewster_ghost_found, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Close the iris in front of the detector round the front-face spot only (or use a thicker block, or a wedge, so the second spot lands well clear), then repeat.
+      brewster_detector_saturation:
+        name: Detector saturating at the brightest angles
+        prior: 0.14
+        typical_size: "A photodiode on too high a gain, or with too large a load resistor, reads the bright grazing-incidence beam low: 280 µW instead of 490 µW at 85°"
+        conditions:
+          - {feature: high_ratio_sigma, op: "<", value: -5, p_true: 0.95, p_false: 0.01}
+          - {feature: low_ratio_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: brewster_shift_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: s_fraction_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: brewster_detector_saturates, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Put a calibrated ND filter in front of the detector (or turn its gain down) for the bright angles, correct by the filter's measured transmission, and refit.
+      brewster_beam_walkoff:
+        name: Reflected beam walking off the detector at large angles (plate's face off the stage's axis)
+        prior: 0.12
+        typical_size: "A plate face 2–3 mm off the rotation axis moves the reflected beam by up to twice that near grazing incidence, partly off a 10 mm photodiode"
+        conditions:
+          - {feature: high_ratio_sigma, op: "<", value: -5, p_true: 0.95, p_false: 0.01}
+          - {feature: low_ratio_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: brewster_shift_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: s_fraction_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: brewster_detector_saturates, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Move the plate so its front face sits on the stage's rotation axis (the spot then stays put on the detector as the stage turns), then repeat the large angles.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the incident power again with the same meter, look at the reflected spot on a card at each angle, and repeat the sweep in the opposite direction.
+    tests:
+      brewster_rotate_polariser:
+        name: At the minimum, turn the polariser either side of its setting
+        minutes: 3
+        how: Leave the stage at the angle of the minimum and turn the polariser from −10° to +10° about its setting in 2° steps, reading the reflected power at each. Exact p gives the deepest minimum.
+        adds: {feature: brewster_polariser_off_p, from: brewster_polariser_off_p, op: copy}
+        outcomes:
+          brewster_polariser_misset: deeper_minimum_beside_the_setting
+          brewster_polariser_extinction: minimum_at_setting_floor_stays
+          brewster_stage_zero: minimum_at_setting
+          brewster_wrong_glass: minimum_at_setting
+          brewster_back_reflection: minimum_at_setting
+          brewster_detector_saturation: minimum_at_setting
+          brewster_beam_walkoff: minimum_at_setting
+          no_fault: minimum_at_setting
+        safety: The laser is Class 2 or 3R. Keep the beam below eye level, never look into the direct beam or its reflections off the plate, and take off watches and rings before working near it.
+      brewster_crossed_polarisers:
+        name: Check the polariser's extinction with a second polariser
+        minutes: 5
+        how: Put a good analyser (a Glan–Taylor prism if you have one) after the polariser, read the power with it parallel, then turn it for the darkest reading. Take five readings each way, logging analyser_crossed (0, then 1).
+        adds: {feature: brewster_extinction_poor, from: brewster_extinction_poor, op: copy}
+        outcomes:
+          brewster_polariser_extinction: light_leaks_when_crossed
+          brewster_polariser_misset: dark_when_crossed
+          brewster_stage_zero: dark_when_crossed
+          brewster_wrong_glass: dark_when_crossed
+          brewster_back_reflection: dark_when_crossed
+          brewster_detector_saturation: dark_when_crossed
+          brewster_beam_walkoff: dark_when_crossed
+          no_fault: dark_when_crossed
+        safety: The laser is Class 2 or 3R; never look into the direct beam, and block it at the laser while you place the analyser. Hold prisms and polariser sheets by their mounts, as their edges are sharp.
+      brewster_retroreflect_zero:
+        name: Find normal incidence by sending the reflection back into the laser
+        minutes: 2
+        how: Turn the stage until the reflection from the plate's front face goes straight back into the laser's exit aperture (watch the spot on a card with a hole for the beam) and read the stage. Repeat five times.
+        adds: {feature: brewster_stage_zero_off, from: brewster_stage_zero_off, op: copy}
+        outcomes:
+          brewster_stage_zero: zero_off
+          brewster_wrong_glass: zero_right
+          brewster_polariser_misset: zero_right
+          brewster_polariser_extinction: zero_right
+          brewster_back_reflection: zero_right
+          brewster_detector_saturation: zero_right
+          brewster_beam_walkoff: zero_right
+          no_fault: zero_right
+        safety: This sends the reflection back along the beam towards you as well as the laser. Watch it on a card held beside the aperture, never by eye, and keep your head above beam height.
+      brewster_nd_filter:
+        name: Repeat a faint and the brightest angles with an ND filter in front of the detector
+        minutes: 5
+        how: At 30° and at 75°, 80° and 85°, read the power without and then with an ND 1.0 filter in front of the detector, logging nd_filter (0, then 1). A linear detector gives the same ratio at every angle; the faint angle calibrates the filter.
+        adds: {feature: brewster_detector_saturates, from: brewster_detector_saturates, op: copy}
+        outcomes:
+          brewster_detector_saturation: ratio_climbs_with_power
+          brewster_beam_walkoff: ratio_constant
+          brewster_polariser_misset: ratio_constant
+          brewster_polariser_extinction: ratio_constant
+          brewster_stage_zero: ratio_constant
+          brewster_wrong_glass: ratio_constant
+          brewster_back_reflection: ratio_constant
+          no_fault: ratio_constant
+        safety: The laser is Class 2 or 3R. Near grazing incidence the reflection leaves the plate almost along the bench, so keep your eyes above beam height and block stray reflections with a card.
+      brewster_iris_check:
+        name: Close the iris round the main spot and repeat three small angles
+        minutes: 3
+        how: At 20°, 30° and 40°, read the power with the iris open, then closed down round the front-face spot only (check on a card that the second, fainter spot is blocked), logging iris_closed (0, then 1).
+        adds: {feature: brewster_ghost_found, from: brewster_ghost_found, op: copy}
+        outcomes:
+          brewster_back_reflection: reading_drops
+          brewster_polariser_misset: reading_unchanged
+          brewster_polariser_extinction: reading_unchanged
+          brewster_stage_zero: reading_unchanged
+          brewster_wrong_glass: reading_unchanged
+          brewster_detector_saturation: reading_unchanged
+          brewster_beam_walkoff: reading_unchanged
+          no_fault: reading_unchanged
+        safety: The laser is Class 2 or 3R; never look into the direct beam or along the reflected one, and keep watches and rings out of the beam while you adjust the iris.
+
+  band_gap:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: eg_error_pct, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: curvature_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record Eg with its uncertainty and the temperature range of the fit. The simple model leaves out the mobility's and the gap's own temperature dependence, which shift Eg by a few per cent.
+      bandgap_thermometer_lag:
+        name: Sample lagging the oven's thermometer while it heats
+        prior: 0.20
+        typical_size: "Heating at 10 K/min with the bar on its board two minutes behind the thermometer puts the sample 20 K cooler than the reading, and Eg comes out about 9% high"
+        conditions:
+          - {feature: eg_error_pct, op: ">", value: 6, p_true: 0.95, p_false: 0.02}
+          - {feature: curvature_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: bandgap_sweeps_disagree, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: bandgap_thermometer_reads_off, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Heat more slowly (2 K/min or less) or hold each temperature until R stops changing, put the thermometer against the sample's board, and quote Eg from the mean of a heating and a cooling sweep.
+      bandgap_thermometer_high:
+        name: Oven thermometer reading high (two-wire lead resistance or calibration)
+        prior: 0.15
+        typical_size: "A Pt100 read two-wire adds 2.6 K for every ohm of lead, and an uncalibrated sensor can be several kelvin out; reading 20 K high makes Eg about 9% high, just like a lag"
+        conditions:
+          - {feature: eg_error_pct, op: ">", value: 6, p_true: 0.95, p_false: 0.02}
+          - {feature: curvature_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: bandgap_sweeps_disagree, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: bandgap_thermometer_reads_off, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Read the Pt100 four-wire, or calibrate the oven thermometer against a reference thermometer at two steady temperatures and correct every reading, then refit.
+      bandgap_extrinsic_region:
+        name: Readings taken below the intrinsic region (impurity carriers at the cold end)
+        prior: 0.15
+        typical_size: "In 'undoped' germanium the residual impurities still supply carriers below about 320–340 K, so R stops rising as fast on cooling and the cold end bends below the line"
+        conditions:
+          - {feature: curvature_sigma, op: "<", value: -5, p_true: 0.95, p_false: 0.01}
+          - {feature: eg_error_pct, op: "<", value: -5, p_true: 0.9, p_false: 0.2}
+          - {feature: bandgap_resistance_depends_on_current, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Fit only the straight, hot part of the plot (above the bend), or take readings further up, and quote Eg from that range.
+      bandgap_self_heating:
+        name: Sample current too high (the bar heats itself)
+        prior: 0.12
+        typical_size: "20 mA through the bar (190 Ω at 340 K) puts 76 mW into it, enough to warm it a few kelvin at the cold end, where R is largest; the cold end bends down and Eg comes out low"
+        conditions:
+          - {feature: curvature_sigma, op: "<", value: -5, p_true: 0.95, p_false: 0.01}
+          - {feature: eg_error_pct, op: "<", value: -5, p_true: 0.9, p_false: 0.2}
+          - {feature: bandgap_resistance_depends_on_current, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Turn the current down until halving it no longer changes R (1 mA or less for this bar), then repeat the sweep.
+      bandgap_contact_resistance:
+        name: Contacts degraded (a resistance in series with the bar)
+        prior: 0.15
+        typical_size: "3 Ω of bad solder joints is under 2% of the reading at 340 K (190 Ω) but over a third at 450 K (8 Ω), so the hot end flattens and Eg comes out 10–15% low"
+        conditions:
+          - {feature: curvature_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: eg_error_pct, op: "<", value: -5, p_true: 0.9, p_false: 0.2}
+          - {feature: bandgap_contact_resistance_found, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Measure four-terminal (current through the end contacts, voltage across the inner pair) or remake the contacts, then repeat the hot end.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the sample's identity (germanium or silicon) and its rated temperature, the current source's setting, and repeat the sweep slowly.
+    tests:
+      bandgap_cooling_run:
+        name: Keep logging as the oven cools back down
+        minutes: 10
+        how: After the heating sweep, ramp the oven down at a similar rate and read R at the same thermometer readings on the way down, logging a cooling column (0 heating, 1 cooling). A sample lagging the thermometer sits on opposite sides of it going up and coming down.
+        adds: {feature: bandgap_sweeps_disagree, from: bandgap_sweeps_disagree, op: copy}
+        outcomes:
+          bandgap_thermometer_lag: sweeps_disagree
+          bandgap_thermometer_high: sweeps_agree
+          bandgap_extrinsic_region: sweeps_agree
+          bandgap_self_heating: sweeps_agree
+          bandgap_contact_resistance: sweeps_agree
+          no_fault: sweeps_agree
+        safety: The oven and the sample board reach 180 °C. Don't touch them or the leads' clips while hot, let the board cool before handling it, and keep below the sample's rated temperature.
+      bandgap_reference_thermometer:
+        name: Compare the oven thermometer with a calibrated one at a steady temperature
+        minutes: 15
+        how: Hold the oven at 400 K with a calibrated thermometer against the sample's board, wait until both readings stop drifting (about ten minutes), then take six readings of each.
+        adds: {feature: bandgap_thermometer_reads_off, from: bandgap_thermometer_reads_off, op: copy}
+        outcomes:
+          bandgap_thermometer_high: thermometer_reads_high
+          bandgap_thermometer_lag: readings_agree_when_steady
+          bandgap_extrinsic_region: readings_agree
+          bandgap_self_heating: readings_agree
+          bandgap_contact_resistance: readings_agree
+          no_fault: readings_agree
+        safety: The oven is at 127 °C during the check; put the reference probe in with the oven's tongs or holder, not your fingers, and close the lid before reading.
+      bandgap_half_current:
+        name: Repeat the three coldest temperatures at half the current
+        minutes: 6
+        how: At the three coldest temperatures, read R at the run's current and again at half of it, letting each reading settle, and log the current in a current_mA column.
+        adds: {feature: bandgap_resistance_depends_on_current, from: bandgap_resistance_depends_on_current, op: copy}
+        outcomes:
+          bandgap_self_heating: resistance_rises_at_lower_current
+          bandgap_extrinsic_region: resistance_unchanged
+          bandgap_thermometer_lag: resistance_unchanged
+          bandgap_thermometer_high: resistance_unchanged
+          bandgap_contact_resistance: resistance_unchanged
+          no_fault: resistance_unchanged
+        safety: The oven and board are hot; change the current at the source, not by unclipping leads, and keep the bar below its rated temperature (an intrinsic semiconductor's falling R lets a high current run away).
+      bandgap_four_terminal:
+        name: Read the hot end four-terminal as well
+        minutes: 5
+        how: At the four hottest temperatures, read R across the end (current) contacts as in the run and across the inner (voltage) contacts, at the same current, logging both.
+        adds: {feature: bandgap_contact_resistance_found, from: bandgap_contact_resistance_found, op: copy}
+        outcomes:
+          bandgap_contact_resistance: two_terminal_reads_higher
+          bandgap_thermometer_lag: readings_agree
+          bandgap_thermometer_high: readings_agree
+          bandgap_extrinsic_region: readings_agree
+          bandgap_self_heating: readings_agree
+          no_fault: readings_agree
+        safety: The board is at up to 180 °C at the hot end; move the voltage clips with insulated tweezers or let it cool first.
+
+  thermocouple:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: emf_gain, op: abs_dev1_lt, value: 0.02, p_true: 0.95, p_false: 0.01}
+          - {feature: offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the Seebeck coefficient with its uncertainty and the residuals from the type K table as the thermocouple's calibration.
+      tc_reference_not_at_ice:
+        name: Reference junction not at 0 °C (ice melted, or the junction out of the ice)
+        prior: 0.20
+        typical_size: "Each kelvin the reference sits above 0 °C takes about 39 µV off every reading; ice melted to 8 °C water makes them all 0.32 mV low"
+        conditions:
+          - {feature: offset_sigma, op: "<", value: -5, p_true: 0.95, p_false: 0.02}
+          - {feature: emf_gain, op: abs_dev1_lt, value: 0.03, p_true: 0.9, p_false: 0.1}
+          - {feature: thermocouple_reference_warm, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: thermocouple_meter_offset, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Refill the flask with crushed ice and a little water, stir, push the reference junction well down into it and check a thermometer there reads 0 °C, then repeat.
+      tc_meter_zero_offset:
+        name: Voltmeter zero offset on its millivolt range
+        prior: 0.15
+        typical_size: "A meter not zeroed on its 200 mV range can read 0.1–0.3 mV with its input shorted, which shifts every emf by the same amount"
+        conditions:
+          - {feature: offset_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: emf_gain, op: abs_dev1_lt, value: 0.03, p_true: 0.9, p_false: 0.1}
+          - {feature: thermocouple_meter_offset, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: thermocouple_reference_warm, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Zero the meter with its input shorted (or subtract the shorted reading from every emf), then refit.
+      tc_wrong_type:
+        name: Wrong thermocouple type (a type J, iron–constantan, read as type K)
+        prior: 0.12
+        typical_size: "Type J gives about 54 µV/K over 25–200 °C against type K's 41, so every emf is 28–32% high and the curve's shape differs too"
+        conditions:
+          - {feature: emf_gain, op: ">", value: 1.15, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: ">", value: 5, p_true: 0.9, p_false: 0.1}
+          - {feature: thermocouple_legs_not_type_k, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Identify the thermocouple from its colours and the magnet test, then fit it against its own reference table (or fetch a type K) and repeat.
+      tc_polarity_reversed:
+        name: Thermocouple legs connected the wrong way round (the emf comes out negative)
+        prior: 0.10
+        typical_size: "Swapping the legs at the meter or at the reference junction flips the sign: −4.1 mV at 100 °C instead of +4.1 mV"
+        conditions:
+          - {feature: emf_gain, op: "<", value: -0.5, p_true: 0.95, p_false: 0.01}
+          - {feature: thermocouple_legs_not_type_k, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Reconnect so the magnetic (alumel, negative) leg goes through the reference junction to the meter's − terminal, then repeat.
+      tc_poor_contact:
+        name: Hot junction not in good thermal contact with the bath (reads low at high temperature)
+        prior: 0.13
+        typical_size: "A bead touching the beaker wall or barely under the oil can sit 5% of the way back towards room temperature: 9 K low at 200 °C"
+        conditions:
+          - {feature: emf_gain, op: "<", value: 0.97, p_true: 0.95, p_false: 0.01}
+          - {feature: thermocouple_emf_rises_when_deeper, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Tie the junction to the thermometer's bulb with fine wire, push both well under the stirred oil away from the walls, and let each reading settle before taking it.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the bath thermometer against the ice point and the steam point, and look for a joint of a third metal in either leg (a screw terminal or a solder joint away from the junctions).
+    tests:
+      tc_ice_bath_check:
+        name: Read a thermometer in the reference flask
+        minutes: 1
+        how: Stir the reference flask and read a thermometer held beside the reference junction, six times a few seconds apart. Crushed ice with a little water reads 0.0 °C.
+        adds: {feature: thermocouple_reference_warm, from: thermocouple_reference_warm, op: copy}
+        outcomes:
+          tc_reference_not_at_ice: reads_above_0C
+          tc_meter_zero_offset: reads_0C
+          tc_wrong_type: reads_0C
+          tc_polarity_reversed: reads_0C
+          tc_poor_contact: reads_0C
+          no_fault: reads_0C
+        safety: The oil bath on the hot plate reaches 200 °C. Keep the ice flask and your arms clear of it, never let water or ice get into the hot oil (it spits violently), and wear safety glasses.
+      tc_short_meter:
+        name: Short the voltmeter's input and read it
+        minutes: 2
+        how: Disconnect the thermocouple leads, join the meter's input terminals with a short copper wire, and take ten readings on the same range as the run.
+        adds: {feature: thermocouple_meter_offset, from: thermocouple_meter_offset, op: copy}
+        outcomes:
+          tc_meter_zero_offset: reads_offset
+          tc_reference_not_at_ice: reads_zero
+          tc_wrong_type: reads_zero
+          tc_polarity_reversed: reads_zero
+          tc_poor_contact: reads_zero
+          no_fault: reads_zero
+        safety: Lift the thermocouple out of the hot oil before unplugging it and lay it on a heat-proof mat, not on the bench or across its own leads.
+      tc_magnet_test:
+        name: Check the wire colours and test each leg with a magnet
+        minutes: 2
+        how: Note the colours, then hold a small magnet against each leg in three places. In type K the negative leg (alumel) is pulled and the positive (chromel) is not. Log leg as +1 for the leg on the meter's + terminal and −1 for the other, and magnetic as 1 or 0.
+        adds: {feature: thermocouple_legs_not_type_k, from: thermocouple_legs_not_type_k, op: copy}
+        outcomes:
+          tc_wrong_type: positive_leg_magnetic
+          tc_polarity_reversed: positive_leg_magnetic
+          tc_reference_not_at_ice: negative_leg_magnetic
+          tc_meter_zero_offset: negative_leg_magnetic
+          tc_poor_contact: negative_leg_magnetic
+          no_fault: negative_leg_magnetic
+        safety: Test the legs only once the probe has cooled; the sheath and wires stay hot for a while after leaving 200 °C oil.
+      tc_deeper_immersion:
+        name: Push the hot junction deeper into the stirred oil and repeat the top temperatures
+        minutes: 5
+        how: At the three hottest settings, read the emf as before, then with the junction tied against the thermometer bulb well under the oil (log deeper, 0 then 1), letting each reading settle.
+        adds: {feature: thermocouple_emf_rises_when_deeper, from: thermocouple_emf_rises_when_deeper, op: copy}
+        outcomes:
+          tc_poor_contact: emf_rises
+          tc_reference_not_at_ice: emf_unchanged
+          tc_meter_zero_offset: emf_unchanged
+          tc_wrong_type: emf_unchanged
+          tc_polarity_reversed: emf_unchanged
+          no_fault: emf_unchanged
+        safety: Oil at 200 °C burns. Move the junction with tongs or a clamp, wear heat-resistant gloves and safety glasses, and keep water away from the bath.
