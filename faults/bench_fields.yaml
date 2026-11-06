@@ -1,0 +1,424 @@
+# Fields and scattering bench: e/m of the electron (fine-beam tube), electron spin
+# resonance of DPPH, Rutherford scattering, X-ray Bragg diffraction from NaCl. Same
+# format as faults.yaml; `fix` is what to do once a cause is confirmed (used in the PDF
+# report). Test ids are global, so they are specific to each experiment.
+experiments:
+
+  e_over_m:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: em_error_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: voltage_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record e/m with its uncertainty and the coil constant used.
+      radius_parallax:
+        name: Beam diameter read with parallax (scale not in the plane of the beam)
+        prior: 0.20
+        typical_size: "A scale a few cm in front of the beam, read without lining up the eye, makes every diameter about 5% small and e/m about 10% high"
+        conditions:
+          - {feature: em_error_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: voltage_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: reread_em_ok, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Read every diameter on the mirror scale with each edge of the beam lined up with its own reflection (or use the tube's internal marks), then refit.
+      em_coil_constant_wrong:
+        name: Coil constant wrong (turns, radius or spacing of the Helmholtz pair)
+        prior: 0.17
+        typical_size: "Using another pair's data (130 turns and 150 mm for coils of 124 turns and 147.5 mm) puts B 3% high in the analysis and e/m 6% low"
+        conditions:
+          - {feature: em_error_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: voltage_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: reread_em_ok, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: coil_constant_off, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Take N and R from the label on these coils and set their spacing equal to R (or use the constant measured with the Hall probe), then refit.
+      earth_field_axial:
+        name: Earth's field along the coil axis not cancelled
+        prior: 0.12
+        typical_size: "The UK's horizontal field is about 19 µT; along the coil axis it changes B by 1–3% at these currents and e/m by 2–6%"
+        conditions:
+          - {feature: em_error_sigma, op: ">", value: 5, p_true: 0.8, p_false: 0.05}
+          - {feature: em_error_pct, op: abs_lt, value: 6, p_true: 0.95, p_false: 0.05}
+          - {feature: voltage_offset_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: reread_em_ok, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: turning_changes_current, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Turn the apparatus so the coil axis points east–west (or average every current taken facing both ways), then repeat.
+      wehnelt_in_voltage:
+        name: Voltmeter reads the supply, not the anode–cathode voltage (Wehnelt bias counted in)
+        prior: 0.15
+        typical_size: "With a 25 V bias counted in, e/m comes out about 33% high at 100 V but only 9% high at 300 V"
+        conditions:
+          - {feature: voltage_offset_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: voltmeter_reads_extra, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Connect the voltmeter straight across the tube's anode and cathode sockets (or subtract the Wehnelt voltage from every reading), then refit.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the beam closes on itself in a flat circle (a spiral means the tube is turned in its holder, so the beam isn't at right angles to the field) and that both coils carry the current in the same direction, then repeat.
+    tests:
+      em_mirror_reread:
+        name: Re-read the diameters on a mirror scale
+        minutes: 5
+        how: Put the mirror scale behind the tube, line each edge of the beam up with its own reflection before reading it, and repeat the same voltages and currents.
+        adds: {feature: reread_em_ok, from: reread_em_ok, op: copy}
+        outcomes:
+          radius_parallax: em_now_right
+          em_coil_constant_wrong: still_off
+          earth_field_axial: still_off
+          wehnelt_in_voltage: still_off
+          no_fault: em_now_right
+        safety: The anode runs at up to 300 V. Leave the connections alone while the supply is on and switch off before moving anything near the tube's sockets. The tube is evacuated glass; don't knock it or lean on it.
+      em_hall_probe_coils:
+        name: Measure the coil constant with a calibrated Hall probe
+        minutes: 10
+        how: With the anode supply off, zero a calibrated Hall probe in its zero-gauss chamber, put it at the centre of the coils and read the field at five currents from 0.5 to 2.5 A.
+        adds: {feature: coil_constant_off, from: coil_constant_off, op: copy}
+        outcomes:
+          em_coil_constant_wrong: constant_differs
+          radius_parallax: constant_matches
+          earth_field_axial: constant_matches
+          wehnelt_in_voltage: constant_matches
+          no_fault: constant_matches
+        safety: Switch the 300 V anode supply off before reaching into the coils. The coils get warm at 2–3 A; keep within their rated current and turn it down between readings.
+      em_turn_apparatus:
+        name: Turn the apparatus round and reset the beam to the same diameter
+        minutes: 6
+        how: At 100 V, set the current that puts the beam on the 10 cm diameter five times; then turn the whole base round to face the other way and do the same. The Earth's field along the axis changes sign, so the current needed changes if that field matters.
+        adds: {feature: turning_changes_current, from: turning_changes_current, op: copy}
+        outcomes:
+          earth_field_axial: current_changes
+          radius_parallax: current_same
+          em_coil_constant_wrong: current_same
+          wehnelt_in_voltage: current_same
+          no_fault: current_same
+        safety: Switch the supplies off before turning the base, so no lead pulls out of a 300 V socket, and carry the tube on its base, never by the glass.
+      em_voltmeter_at_sockets:
+        name: Read the voltage across the tube's own anode and cathode sockets
+        minutes: 3
+        how: At one setting, read the voltmeter as it was wired for the run five times; switch off, move its leads to the tube's anode and cathode sockets, switch on and read it five times again.
+        adds: {feature: voltmeter_reads_extra, from: voltmeter_reads_extra, op: copy}
+        outcomes:
+          wehnelt_in_voltage: reading_drops
+          radius_parallax: reading_same
+          em_coil_constant_wrong: reading_same
+          earth_field_axial: reading_same
+          no_fault: reading_same
+        safety: Move the leads only with the supply switched off; the anode is at up to 300 V. Use shrouded 4 mm leads rated for the voltage.
+
+  esr:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: g_error_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: field_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record g with its uncertainty (DPPH gives 2.0036).
+      esr_field_zero_offset:
+        name: Field zero offset (Hall probe not zeroed, or a residual field along the coils)
+        prior: 0.20
+        typical_size: "A gaussmeter left 0.1 mT off zero shifts every resonance by 0.1 mT; the slope, and so g, is unchanged"
+        conditions:
+          - {feature: field_offset_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: g_error_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
+          - {feature: reversal_shift_found, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: phase_shift_found, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Zero the Hall probe in its zero-gauss chamber (or take each resonance as the mean of the forward and reversed field magnitudes), then refit.
+      esr_phase_misset:
+        name: Resonance read off the edge of the line (modulation phase not set)
+        prior: 0.17
+        typical_size: "With the phase off, the up- and down-sweep signals don't coincide and the peak read sits about half a line width (0.1 mT) to one side"
+        conditions:
+          - {feature: field_offset_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: g_error_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
+          - {feature: reversal_shift_found, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: phase_shift_found, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Turn the phase shifter until the up- and down-sweep signals lie on top of each other (or null the quadrature on the lock-in), read the centre of the line, and repeat.
+      esr_field_scale:
+        name: Field calibration off (coil constant or gaussmeter range)
+        prior: 0.15
+        typical_size: "A coil constant 4% too high puts every field 4% high and g about 4% low (1.93 instead of 2.004)"
+        conditions:
+          - {feature: g_error_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: field_offset_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
+          - {feature: field_scale_off, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Calibrate the field at the sample against a calibrated Hall probe (or recompute the coil constant from N, R and the spacing), then refit.
+      esr_counter_misread:
+        name: RF frequency misread at one point (counter digits or range)
+        prior: 0.10
+        typical_size: "Two digits swapped (68.4 for 64.8 MHz) put one point 0.13 mT off the line"
+        conditions:
+          - {feature: outlier_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: recheck_outlier_gone, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Set the RF to that point again, read the counter carefully (gate time and range), and refit with the corrected frequency.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check that the sample sits at the centre of the coils, that the line is not saturated (lower the RF level), and read the resonance at a few frequencies again.
+    tests:
+      esr_field_reversal:
+        name: Reverse the field and read the resonances again
+        minutes: 4
+        how: Swap the leads of the Helmholtz coils so the field points the other way, and read the resonance field at the same frequencies, noting the magnitudes. A field zero offset adds on one side and subtracts on the other; a reading bias does not.
+        adds: {feature: reversal_shift_found, from: reversal_shift_found, op: copy}
+        outcomes:
+          esr_field_zero_offset: resonances_shift
+          esr_phase_misset: resonances_same
+          esr_field_scale: resonances_same
+          esr_counter_misread: resonances_same
+          no_fault: resonances_same
+        safety: Turn the coil current to zero before swapping the leads; the coils are inductive and can spark at the plug. Keep the RF level low and don't touch the RF coil or its leads while the oscillator is on.
+      esr_set_phase:
+        name: Set the modulation phase and re-read the resonances
+        minutes: 6
+        how: At one frequency, turn the phase shifter until the signals of the up- and down-sweep lie on top of each other (or null the quadrature on the lock-in), then read the resonance at five frequencies as before and again with the phase set.
+        adds: {feature: phase_shift_found, from: phase_shift_found, op: copy}
+        outcomes:
+          esr_phase_misset: resonance_moves
+          esr_field_zero_offset: resonance_same
+          esr_field_scale: resonance_same
+          esr_counter_misread: resonance_same
+          no_fault: resonance_same
+        safety: Keep the RF level low and your hands off the RF coil while the oscillator is on; switch it off before touching the sample holder.
+      esr_calibrated_probe:
+        name: Compare the field with a calibrated Hall probe at the sample
+        minutes: 10
+        how: Take the sample out, zero a calibrated Hall probe in its zero-gauss chamber and put it where the sample sat; at six coil currents compare its reading with the field used in the run.
+        adds: {feature: field_scale_off, from: field_scale_off, op: copy}
+        outcomes:
+          esr_field_scale: scale_differs
+          esr_field_zero_offset: offset_only
+          esr_phase_misset: probe_agrees
+          esr_counter_misread: probe_agrees
+          no_fault: probe_agrees
+        safety: Switch the RF oscillator off before reaching into the coils, and keep the coil current within its rating; the coils get warm.
+      esr_recheck_counter:
+        name: Read the frequency counter again at every point
+        minutes: 5
+        how: Set the RF to each frequency in turn, read the counter with its gate at 1 s and its range noted, and read the resonance field again.
+        adds: {feature: recheck_outlier_gone, from: recheck_outlier_gone, op: copy}
+        outcomes:
+          esr_counter_misread: odd_point_gone
+          esr_field_zero_offset: unchanged
+          esr_phase_misset: unchanged
+          esr_field_scale: unchanged
+          no_fault: unchanged
+        safety: Change between RF plug-in coils only with the oscillator switched off, and don't touch the coil while it's on.
+
+  rutherford:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: angle_shift_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: floor_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record the 1/sin⁴(θ/2) fit and the exponent with their uncertainties.
+      ruth_angle_zero:
+        name: Detector angle zero misset (scale zero not on the beam axis)
+        prior: 0.20
+        typical_size: "A zero 1.5° off makes the 10° point count about 90% fast if the angles read high (or 40% slow if they read low)"
+        conditions:
+          - {feature: angle_shift_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: floor_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: sides_asymmetric, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: small_angle_excess_gone, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Find the true zero as the midpoint of equal count rates either side of the beam, correct every angle by it, and refit.
+      ruth_thick_foil:
+        name: Foil too thick (multiple scattering spreads the beam into the small angles)
+        prior: 0.17
+        typical_size: "A foil several µm thick spreads the alphas over a few degrees, so the 10–15° rates come out tens of per cent fast, the same on both sides"
+        conditions:
+          - {feature: angle_shift_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: floor_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: sides_asymmetric, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: small_angle_excess_gone, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Fit the thinnest gold foil (about 2 µm, checked against its label) and repeat the small angles, or fit only angles beyond about 20°.
+      ruth_source_leakage:
+        name: Background counts from alphas leaking round the collimator
+        prior: 0.15
+        typical_size: "Two or three counts a minute reaching the detector directly swamp the 50° rate (about two a minute)"
+        conditions:
+          - {feature: floor_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: leak_without_foil, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Reseat the source in its collimator (slit against the foil, nothing round the edge), count with the foil out to check the leak has gone, then repeat the large angles.
+      ruth_poor_vacuum:
+        name: Chamber not pumped down (gas in the alphas' path)
+        prior: 0.12
+        typical_size: "Left at a few hundred millibar, the alphas lose 2–3 MeV in the gas; many fall below the discriminator and the rate drops to a fraction of the lab sheet's at every angle"
+        conditions:
+          - {feature: rate_ratio, op: "<", value: 0.6, p_true: 0.9, p_false: 0.01}
+          - {feature: pressure_high, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Check the seal and the vent valve, pump the chamber below a few mbar (read it on the gauge) and repeat.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the discriminator threshold against the pulse-height spectrum of the alpha peak and that the foil is centred on the beam, then repeat a few angles.
+    tests:
+      ruth_both_sides:
+        name: Count at equal angles on both sides of the beam
+        minutes: 10
+        how: Count for one minute at −10°, −15°, +10° and +15° and for two at −20° and +20°, as read. With the zero right each pair agrees; a zero error makes one side fast and the other slow.
+        adds: {feature: sides_asymmetric, from: sides_asymmetric, op: copy}
+        outcomes:
+          ruth_angle_zero: sides_differ
+          ruth_thick_foil: sides_agree
+          ruth_source_leakage: sides_agree
+          ruth_poor_vacuum: sides_agree
+          no_fault: sides_agree
+        safety: The Am-241 source is sealed and stays inside the closed chamber; turn the detector from outside and don't open the chamber while counting. If the source ever has to come out, handle it only with tongs and put it straight into its shielded container.
+      ruth_thin_foil:
+        name: Fit a thin foil and recount the small angles
+        minutes: 30
+        how: Vent the chamber, swap in the thinnest gold foil (about 2 µm, checked against its label), pump down below a few mbar and count at 10°, 15° and 20° for the same live times.
+        adds: {feature: small_angle_excess_gone, from: small_angle_excess_gone, op: copy}
+        outcomes:
+          ruth_thick_foil: excess_gone
+          ruth_angle_zero: excess_stays
+          ruth_source_leakage: unchanged
+          ruth_poor_vacuum: unchanged
+          no_fault: unchanged
+        safety: Handle the sealed Am-241 source only with tongs and keep it in its shielded container while the chamber is open; never touch its face or the foil, and wash your hands afterwards. Vent the chamber slowly so the foil doesn't tear.
+      ruth_foil_out_count:
+        name: Count with the foil removed
+        minutes: 30
+        how: Vent the chamber, take the gold foil out of its holder, pump down and count at 30° for 20 minutes. With no foil nothing should scatter into the detector.
+        adds: {feature: leak_without_foil, from: leak_without_foil, op: copy}
+        outcomes:
+          ruth_source_leakage: counts_remain
+          ruth_angle_zero: no_counts
+          ruth_thick_foil: no_counts
+          ruth_poor_vacuum: no_counts
+          no_fault: no_counts
+        safety: Handle the sealed Am-241 source only with tongs and keep it in its shielded container while the chamber is open; never touch its face, and follow your radiation safety officer's rules. Vent the chamber slowly.
+      ruth_pressure_gauge:
+        name: Read the chamber's vacuum gauge
+        minutes: 1
+        how: Read the Pirani gauge on the chamber a few times with the pump running. The working pressure should be below a few mbar.
+        adds: {feature: pressure_high, from: pressure_high, op: copy}
+        outcomes:
+          ruth_poor_vacuum: pressure_high
+          ruth_angle_zero: pressure_low
+          ruth_thick_foil: pressure_low
+          ruth_source_leakage: pressure_low
+          no_fault: pressure_low
+        safety: Keep the chamber closed and the source inside it while you check the vacuum, and keep clear of the rotary pump's belt and exhaust.
+
+  bragg_xray:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: d_error_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: zero_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record d with its uncertainty (NaCl (200), 282.0 pm).
+      bragg_goniometer_zero:
+        name: Goniometer zero misset (every angle read from a wrong zero)
+        prior: 0.20
+        typical_size: "A zero 0.5° off makes d from the first order about 7% small but from the fourth only 1.5% small, so the orders disagree"
+        conditions:
+          - {feature: zero_offset_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
+          - {feature: d_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.05}
+          - {feature: direct_beam_off_zero, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: rocking_peak_off, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Set the goniometer zero on the direct beam (detector peak at 0°, crystal parallel to the beam), or subtract the fitted zero from every angle, and refit.
+      bragg_coupling_slipped:
+        name: Crystal not at the 2:1 coupled position (turned in its holder)
+        prior: 0.17
+        typical_size: "A crystal turned 0.5° in its holder shifts every peak by 0.5° and lowers it, as the reflected beam lands off the centre of the detector slit"
+        conditions:
+          - {feature: zero_offset_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
+          - {feature: d_error_pct, op: abs_lt, value: 3, p_true: 0.95, p_false: 0.05}
+          - {feature: direct_beam_off_zero, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: rocking_peak_off, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Reclamp the crystal flat against its holder's stop, set the crystal zero with the detector on a known peak (rocking curve), and repeat the scan in coupled mode.
+      bragg_kbeta_peak:
+        name: Kβ peak taken for Kα at one order
+        prior: 0.12
+        typical_size: "Mo Kβ (63.3 pm) sits just below each Kα peak; at the third order it is 2.5° lower"
+        conditions:
+          - {feature: outlier_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: odd_point_matches_kbeta, op: is, value: true, p_true: 0.9, p_false: 0.05}
+          - {feature: odd_peak_suppressed, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: At that order, take the stronger, higher-angle peak of the pair (the one that stays with the zirconium filter in), and refit.
+      bragg_wrong_crystal:
+        name: Wrong crystal in the holder (not NaCl)
+        prior: 0.10
+        typical_size: "A LiF crystal (d = 201.4 pm) in the NaCl box gives a d 29% small, consistent from order to order"
+        conditions:
+          - {feature: d_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: zero_offset_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.05}
+          - {feature: crystals_differ, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Fit the labelled NaCl crystal (or use the d of the crystal that was in) and repeat the scan.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the anode (Mo or Cu) against the wavelength used, the crystal face against the holder, and repeat the scan in coupled mode.
+    tests:
+      bragg_direct_beam_scan:
+        name: Scan the detector through the direct beam with the crystal removed
+        minutes: 5
+        how: Take the crystal out, put the attenuator in, turn the emission current to its lowest setting and scan the detector alone from −1.5° to +3° in 0.1° steps. The beam should peak at 0°; a goniometer zero error δ puts it at 2δ on the detector scale.
+        adds: {feature: direct_beam_off_zero, from: direct_beam_off_zero, op: copy}
+        outcomes:
+          bragg_goniometer_zero: beam_off_zero
+          bragg_coupling_slipped: beam_at_zero
+          bragg_kbeta_peak: beam_at_zero
+          bragg_wrong_crystal: beam_at_zero
+          no_fault: beam_at_zero
+        safety: The X-ray tube sits in an interlocked lead-glass enclosure. Change the crystal only with the high voltage off, close the door before switching on, and never defeat or bridge the interlocks. Keep the emission current at its minimum while the detector looks into the direct beam.
+      bragg_rocking_curve:
+        name: Rock the crystal with the detector parked on a peak
+        minutes: 8
+        how: Park the detector on the second-order peak, then turn the crystal alone through ±1.5° about half the detector angle in 0.1° steps. With the coupling right the crystal peaks at half the detector angle.
+        adds: {feature: rocking_peak_off, from: rocking_peak_off, op: copy}
+        outcomes:
+          bragg_coupling_slipped: peak_off_half_angle
+          bragg_goniometer_zero: peak_at_half_angle
+          bragg_kbeta_peak: peak_at_half_angle
+          bragg_wrong_crystal: peak_at_half_angle
+          no_fault: peak_at_half_angle
+        safety: Run it with the enclosure door closed and the interlocks working; never defeat or bridge them, and switch the high voltage off before opening the door.
+      bragg_reference_crystal:
+        name: Repeat two orders on the reference NaCl crystal
+        minutes: 10
+        how: Measure the first two orders on the crystal used, then, with the high voltage off, swap in the lab's labelled reference NaCl crystal and measure the same two orders without touching the goniometer zero.
+        adds: {feature: crystals_differ, from: crystals_differ, op: copy}
+        outcomes:
+          bragg_wrong_crystal: spacings_differ
+          bragg_goniometer_zero: spacings_match
+          bragg_coupling_slipped: spacings_match
+          bragg_kbeta_peak: spacings_match
+          no_fault: spacings_match
+        safety: Switch the high voltage off and open the door only then; never defeat the interlocks. Hold crystals by their edges (NaCl is brittle and dissolves in sweat; LiF is toxic if swallowed), and wash your hands afterwards.
+      bragg_zr_filter_check:
+        name: Count at the odd peak with and without the zirconium filter
+        minutes: 4
+        how: Set the crystal and detector on the peak that sits off the line and count five times without the filter, then five times with the zirconium filter in the beam. Zr passes about half of the Mo Kα but only a few per cent of the Kβ.
+        adds: {feature: odd_peak_suppressed, from: odd_peak_suppressed, op: copy}
+        outcomes:
+          bragg_kbeta_peak: peak_vanishes
+          bragg_goniometer_zero: peak_stays
+          bragg_coupling_slipped: peak_stays
+          bragg_wrong_crystal: peak_stays
+          no_fault: peak_stays
+        safety: Fit the filter only with the high voltage off and the door open, close the door before switching on, and never defeat or bridge the interlocks.

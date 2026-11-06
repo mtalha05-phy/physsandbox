@@ -1,0 +1,146 @@
+# Fields and scattering bench: e/m of the electron, electron spin resonance, Rutherford
+# scattering, X-ray Bragg diffraction. Merged into catalog.yaml by app/pipeline.py; the
+# magnetism, nuclear and condensed areas already exist.
+experiments:
+  e_over_m:
+    label: e/m of the electron (fine-beam tube)
+    domain: magnetism
+    blurb: Radius of an electron beam's circle in a Helmholtz field against accelerating voltage and coil current, to measure e/m
+    columns: [accelerating_voltage_V, coil_current_A, beam_radius_cm]
+    model: "e/m = 2V/(B r)²,  B = (4/5)^(3/2) μ₀NI/R"
+    expected:
+      - [coil_radius_m, "Coil radius R (m)", 0.150]
+      - [coil_turns, "Turns per coil N", 130]
+      - [precision_cm, "Beam radius reading precision (cm)", 0.05]
+      - [e_over_m_C_per_kg, "Accepted e/m (C/kg)", 1.75882001076e+11]
+      - [probe_precision_mT, "Hall probe precision (mT)", 0.01]
+    samples:
+      - [em_parallax.csv, "e/m 11% high at every voltage"]
+      - [em_wehnelt.csv, "e/m high, worst at low voltage"]
+      - [em_clean.csv, "Healthy measurement"]
+    followups: {em_mirror_reread: em_parallax_mirror.csv}
+    questions: ["Fit the beam radii and report e/m", "Check whether e/m changes with the accelerating voltage"]
+
+  esr:
+    label: Electron spin resonance (DPPH)
+    level: graduate
+    domain: magnetism
+    blurb: Resonance field of a DPPH sample against radio frequency in Helmholtz coils, to measure the electron's g-factor
+    columns: [rf_frequency_MHz, resonance_field_mT]
+    model: "h f = g μ_B B"
+    expected:
+      - [g_factor, "g-factor of DPPH", 2.0036]
+      - [precision_mT, "Resonance field reading precision (mT)", 0.01]
+    samples:
+      - [esr_probe_offset.csv, "Line misses the origin"]
+      - [esr_field_scale.csv, "g comes out 4% low"]
+      - [esr_counter_misread.csv, "One point off the line"]
+      - [esr_clean.csv, "Healthy measurement"]
+    followups: {esr_field_reversal: esr_probe_offset_reversed.csv}
+    questions: ["Fit the resonance field against frequency and report g"]
+
+  rutherford:
+    label: Rutherford scattering (alphas on gold)
+    level: graduate
+    domain: nuclear
+    blurb: Count rate of Am-241 alphas scattered by a thin gold foil in vacuum against angle, to test the 1/sin⁴(θ/2) law
+    columns: [angle_deg, counts, live_time_s]
+    model: "N(θ) ∝ 1/sin⁴(θ/2)"
+    expected:
+      - [rate_at_20deg_per_s, "Count rate at 20° on the lab sheet (/s)", 1.2]
+    samples:
+      - [ruth_zero_offset.csv, "Small angles count too fast"]
+      - [ruth_leakage.csv, "Large angles level off"]
+      - [ruth_clean.csv, "Healthy measurement"]
+    followups: {ruth_both_sides: ruth_zero_offset_both_sides.csv}
+    questions: ["Fit the counts with 1/sin⁴(θ/2) using Poisson errors", "Report the exponent of sin(θ/2)"]
+
+  bragg_xray:
+    label: X-ray Bragg diffraction (NaCl)
+    level: graduate
+    domain: condensed
+    blurb: Angles of the Mo Kα Bragg peaks from an NaCl crystal, orders 1 to 4, to measure its lattice spacing
+    columns: [order_n, angle_deg]
+    model: "nλ = 2d sin θ"
+    expected:
+      - [wavelength_pm, "X-ray wavelength, Mo Kα (pm)", 71.07]
+      - [d_spacing_pm, "NaCl (200) spacing d (pm)", 282.0]
+      - [precision_deg, "Peak angle precision (°)", 0.05]
+      - [kbeta_wavelength_pm, "Mo Kβ wavelength (pm)", 63.26]
+    samples:
+      - [bragg_zero_offset.csv, "The orders disagree on d"]
+      - [bragg_kbeta.csv, "Third order off the curve"]
+      - [bragg_lif.csv, "d 29% small"]
+      - [bragg_clean.csv, "Healthy measurement"]
+    followups: {bragg_direct_beam_scan: bragg_zero_offset_direct_beam.csv}
+    questions: ["Fit nλ = 2d sin θ with a zero offset and report d"]
+
+sample_info:
+  em_clean.csv: ["A fine-beam tube in Helmholtz coils (R = 150 mm, 130 turns each), coil axis east–west: radius of the beam's circle at 100–300 V, three coil currents at each voltage.", "Nothing should look off: every reading gives e/m = 1.76 × 10¹¹ C/kg."]
+  em_parallax.csv: ["The same tube and coils, another group's run at the same voltages.", "e/m comes out about 11% high, by the same amount at every voltage and current."]
+  em_wehnelt.csv: ["The same tube and coils, set up afresh on another bench.", "e/m comes out high, by about a third at 100 V but much less at 300 V."]
+  em_parallax_mirror.csv: ["The same voltages and currents, with every diameter read again on the mirror scale, each edge of the beam lined up with its reflection.", "Does e/m come out right this time?"]
+  esr_clean.csv: ["A DPPH sample in the RF coil between Helmholtz coils, field modulated at 50 Hz and read on a Hall-probe gaussmeter; resonance field at twelve frequencies from 15 to 125 MHz.", "Nothing should look off: a straight line through the origin with g = 2.0036."]
+  esr_probe_offset.csv: ["The same sample, coils and gaussmeter.", "The slope gives the right g, but the line doesn't pass through the origin: every resonance sits about 0.1 mT high."]
+  esr_field_scale.csv: ["The same sample and coils, on another day.", "The line goes through the origin, but its slope gives g about 4% low."]
+  esr_counter_misread.csv: ["The same sample, coils and gaussmeter.", "Eleven points lie on the line with the right g, but the one at 68.4 MHz sits well below it."]
+  esr_probe_offset_reversed.csv: ["Six frequencies read with the field forward, then again with the coil leads swapped, fields recorded as magnitudes.", "Do the two directions give the same resonance field?"]
+  ruth_clean.csv: ["A sealed Am-241 alpha source, a 2 µm gold foil and a surface-barrier detector in an evacuated chamber: counts at eight angles from 10° to 50°, longer at larger angles (one minute to 100 minutes).", "Nothing should look off: the rate follows 1/sin⁴(θ/2), the exponent close to 4."]
+  ruth_zero_offset.csv: ["The same source, foil, detector and live times.", "The larger angles follow 1/sin⁴(θ/2), but at 10° and 15° the rate is well above that curve."]
+  ruth_leakage.csv: ["The same source, foil, detector and live times.", "The small angles follow 1/sin⁴(θ/2), but from about 35° on the rate falls more slowly and starts to level off."]
+  ruth_zero_offset_both_sides.csv: ["Counts at 10°, 15° and 20° read on both sides of the beam, one or two minutes each.", "Do the two sides count at the same rate?"]
+  bragg_clean.csv: ["A Mo-anode X-ray apparatus with an NaCl crystal in a coupled θ–2θ scan; the Kα peak of each order from 1 to 4, read from the scan.", "Nothing should look off: every order gives d = 282.0 pm."]
+  bragg_zero_offset.csv: ["The same tube, crystal and scan.", "d comes out small from the first order and closer to 282 pm from the fourth: the orders disagree."]
+  bragg_kbeta.csv: ["The same tube, crystal and scan.", "Three orders give d = 282.0 pm, but the third-order peak sits well below the curve through them."]
+  bragg_lif.csv: ["The same tube and scan, on another group's crystal.", "All four orders agree with one another, but on a d about 29% below 282.0 pm."]
+  bragg_zero_offset_direct_beam.csv: ["The crystal taken out and the detector scanned alone through the attenuated direct beam, −1.5° to +3° in 0.1° steps.", "Does the direct beam peak at 0°?"]
+
+labels:
+  electron_e_over_m_C_per_kg: ["e/m of the electron, fitted", "C/kg", 1]
+  accepted_e_over_m_C_per_kg: ["e/m, accepted", "C/kg", 1]
+  coil_constant_used_mT_per_A: ["Coil constant used, (4/5)^(3/2) μ₀N/R", "mT/A", 1]
+  accelerating_voltage_offset_V: ["Voltage read minus voltage on the electrons", "V", 1]
+  e_over_m_offset_corrected_C_per_kg: ["e/m with that voltage offset allowed for", "C/kg", 1]
+  coil_constant_measured_mT_per_A: ["Coil constant, Hall probe", "mT/A", 1]
+  probe_field_at_zero_current_mT: ["Probe field at zero current (from the line)", "mT", 1]
+  current_facing_first_way_A: ["Current, apparatus facing the first way", "A", 1]
+  current_turned_round_A: ["Current, apparatus turned round", "A", 1]
+  axial_field_from_turning_uT: ["Field along the coil axis from the change", "µT", 1]
+  voltage_as_wired_V: ["Voltmeter as wired for the run", "V", 1]
+  voltage_at_tube_sockets_V: ["Voltmeter on the anode and cathode sockets", "V", 1]
+  g_factor: ["g-factor, fitted", "", 1]
+  accepted_g_factor: ["g-factor of DPPH", "", 1]
+  esr_field_offset_mT: ["Resonance field at zero frequency (intercept)", "mT", 1]
+  odd_point_frequency_MHz: ["Frequency of the odd point (left out of the fit)", "MHz", 1]
+  field_shift_on_reversal_mT: ["Forward minus reversed resonance field", "mT", 1]
+  zero_offset_from_reversal_mT: ["Field zero offset (half the difference)", "mT", 1]
+  field_shift_after_phasing_mT: ["Resonance field before minus after setting the phase", "mT", 1]
+  probe_over_used_field: ["Calibrated probe ÷ field used", "", 1]
+  probe_minus_used_at_zero_mT: ["Calibrated probe minus field used, at zero", "mT", 1]
+  rate_at_20deg_per_s: ["Count rate at 20°, fitted", "/s", 1]
+  expected_rate_at_20deg_per_s: ["Count rate at 20°, lab sheet", "/s", 1]
+  scattering_angle_shift_deg: ["Shift of the angle scale (fitted)", "°", 1]
+  background_rate_per_s: ["Flat background under the curve", "/s", 1]
+  rutherford_exponent: ["Exponent n in 1/sinⁿ(θ/2), straight-line fit", "", 1]
+  zero_from_both_sides_deg: ["True zero, from both sides of the beam", "°", 1]
+  angle_shift_thin_foil_deg: ["Shift of the angle scale, thin foil", "°", 1]
+  rate_with_foil_out_per_s: ["Count rate with the foil removed", "/s", 1]
+  chamber_pressure_mbar: ["Chamber pressure", "mbar", 1]
+  d_spacing_fit_pm: ["Lattice spacing d, fitted with a zero offset", "pm", 1]
+  d_spacing_accepted_pm: ["d of NaCl (200)", "pm", 1]
+  goniometer_zero_offset_deg: ["Goniometer zero offset, fitted", "°", 1]
+  d_from_lowest_order_pm: ["d from the lowest order alone (as read)", "pm", 1]
+  d_from_highest_order_pm: ["d from the highest order alone (as read)", "pm", 1]
+  xray_wavelength_pm: ["X-ray wavelength used", "pm", 1]
+  odd_point_order: ["Order of the odd peak (left out of the fit)", "", 1]
+  odd_point_wavelength_pm: ["Wavelength the odd peak implies", "pm", 1]
+  direct_beam_centre_deg: ["Direct beam centre on the detector scale (2θ)", "°", 1]
+  goniometer_zero_from_beam_deg: ["Goniometer zero offset (θ), from the beam", "°", 1]
+  rocking_peak_crystal_deg: ["Crystal angle at the rocking-curve peak", "°", 1]
+  half_detector_angle_deg: ["Half the detector angle", "°", 1]
+  crystal_offset_deg: ["Crystal offset from the 2:1 position", "°", 1]
+  d_crystal_used_pm: ["d, crystal used in the run", "pm", 1]
+  d_reference_crystal_pm: ["d, reference NaCl crystal", "pm", 1]
+  peak_rate_without_filter: ["Odd peak, no filter", "/s", 1]
+  peak_rate_with_filter: ["Odd peak, zirconium filter in", "/s", 1]
+  filter_transmission: ["Fraction passed by the filter", "", 1]
