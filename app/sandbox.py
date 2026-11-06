@@ -200,7 +200,7 @@ def _clean_trace(t):
         return None
     n = lambda k: int(t[k]) if isinstance(t.get(k), int) and not isinstance(t.get(k), bool) and 0 <= t[k] < 10**7 else 0
     out = {k: n(k) for k in ("network", "network_reached", "loopback", "writes", "writes_succeeded",
-                             "reads_refused", "programs", "signals")}
+                             "reads_refused", "programs", "signals", "proc_fd_writes")}
     out.update({k: t.get(k) is True for k in ("tracer_killed", "tracer_signalled", "truncated", "timed_out")})
     ex = t.get("examples") if isinstance(t.get("examples"), list) else []
     out["examples"] = [str(e)[:160] for e in ex[:8]]
@@ -245,6 +245,10 @@ def _trace_events(t, verified, job_id):
     if t["programs"]:
         msg = f"started another program {_times(t['programs'])} ({by})"
         ev.append(log_event("note", detail(msg, "program"), job_id, "process", "tracer", public=msg))
+    if t["proc_fd_writes"]:
+        msg = (f"tried to write into another process's output through /proc {_times(t['proc_fd_writes'])} ({by}); "
+               "that output is read as the code's own, and the real probe was written before the code ran")
+        ev.append(log_event("tamper", detail(msg, "write"), job_id, "receipt", "tracer", public=msg))
     if t["tracer_killed"] or t["tracer_signalled"]:
         msg = "the code signalled or stopped the system-call tracer; anything after that was not recorded"
         ev.append(log_event("tamper", msg, job_id, "tracer", "tracer"))

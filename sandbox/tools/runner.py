@@ -183,7 +183,8 @@ def summarise_trace(text, self_exec, tracer_pid=None):
     the code's own choice, so they go only into `examples` (returned to the person
     who ran the job), never into the shared log or the public receipt."""
     out = {"network": 0, "network_reached": 0, "loopback": 0, "writes": 0, "writes_succeeded": 0,
-           "reads_refused": 0, "programs": 0, "signals": 0, "tracer_signalled": False, "examples": []}
+           "reads_refused": 0, "programs": 0, "signals": 0, "proc_fd_writes": 0, "tracer_signalled": False,
+           "examples": []}
     seen_first_exec = False
 
     def ex(s):
@@ -216,6 +217,16 @@ def summarise_trace(text, self_exec, tracer_pid=None):
             pm = re.search(r'"([^"]*)"', rest)
             path = pm.group(1) if pm else "?"
             writing = call == "creat" or re.search(r"O_WRONLY|O_RDWR|O_CREAT|O_TRUNC|O_APPEND", rest)
+            fd_path = re.match(r"^/proc/(\d+|self|thread-self)/fd/\d+$|^/dev/(stdout|stderr|tty|fd/\d+)$", path)
+            if writing and fd_path:
+                # Writing to an open file of a process in the box: its own output is fine;
+                # another process's (the tracer's, say) is an attempt to tamper with what
+                # the runner reads. Still inside the box, so not a write to the disk.
+                other = fd_path.group(1)
+                if other and other.isdigit() and int(other) != int(m.group(1)):
+                    out["proc_fd_writes"] += 1
+                    ex(f"write into process {other}'s output -> {err or 'opened'}")
+                continue
             if writing:
                 if path.startswith(SCRATCH) or not path.startswith("/"):
                     continue  # scratch space (relative paths are inside /tmp, the working directory)
