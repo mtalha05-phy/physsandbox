@@ -232,4 +232,118 @@ write("balmer_offset.csv", hdr, nn, balmer(nn, 2.0) + rng.normal(0, 0.05, nn.siz
 # follow-up: the same lines measured with a fresh hydrogen tube
 write("balmer_fresh_tube.csv", hdr, nn, balmer(nn) + rng.normal(0, 0.05, nn.size), fmt="{:.6g}")
 
+# =============================================================================
+# Partner cases for the classical bench: the lower-prior fault of each ambiguous
+# pair. In each demo above the first measurement can't tell two faults apart, and
+# the truth is the more common one. Here the truth is the other fault, generated
+# with the same physics so the first measurement looks the same; the follow-up is
+# what that fault really gives in the recommended test. Own random stream, so
+# every dataset above is unchanged.
+rng = np.random.default_rng(4301)
+
+# Helmholtz: the Hall probe was never zeroed and reads +30 µT on its own. The coil
+# axis runs east-west, so Earth's field adds only 1.5 µT along it.
+write("helmholtz_probe_zero.csv", ["current_A", "measured_B_uT"], I,
+      k * I + 31.5 + rng.normal(0, 1.5, I.size))
+# follow-up: at I = 0, in the open and then inside the zero-gauss chamber: the
+# 30 µT stays in the chamber, so it is the probe, not the surroundings
+groups("helmholtz_probe_zero_shield.csv", ["in_shield", "measured_B_uT"], 31.5, 30.0, noise=0.8)
+
+# Laser: the beam's pointing drifts as the laser warms up. Scanned 5 minutes after
+# switch-on, the centre is 0.40 mm out (200 µrad over the 2 m path).
+write("laser_drift.csv", ["position_mm", "detector_voltage_mV"], x,
+      g(0.40, 600) + rng.normal(0, 3, x.size), fmt="{:.2f}")
+# follow-up: repeat scan 15 minutes later; the centre has moved on to 0.62 mm
+write("laser_drift_rescan.csv", ["position_mm", "detector_voltage_mV"], x,
+      g(0.62, 600) + rng.normal(0, 3, x.size), fmt="{:.2f}")
+
+# Faraday: a 60 mV ground potential difference between the coil circuit and the
+# recorder (their shared return also carries another rig's current)
+hdr_f = ["time_s", "magnetic_flux_Wb", "induced_voltage_V"]
+write("faraday_ground.csv", hdr_f, t, phi, emf + 0.06 + rng.normal(0, 0.02, t.size))
+# follow-up: magnet still; the 60 mV is there with the coil connected and goes
+# when the amplifier input is shorted to its own ground
+groups("faraday_ground_shorted.csv", ["input_shorted", "voltage_V"], 0.06, 0.0, noise=0.01)
+
+# Beer-Lambert: the photodiode amplifier reads 0.07 with no light on it at all
+hdr_b = ["thickness_cm", "transmitted_intensity"]
+write("beer_dark_offset.csv", hdr_b, d, bl(0.5, 0.07) + rng.normal(0, 0.004, d.size))
+# follow-up: lid closed and room lights off; the dark level is still there
+write("beer_dark_offset_enclosed.csv", hdr_b, d, bl(0.5, 0.07) + rng.normal(0, 0.004, d.size))
+
+# Malus: a worn analyser with an extinction ratio of 14:1, I = (1 - 1/14) cos² + 1/14
+er = 14.0
+write("malus_leaky.csv", ["angle_deg", "intensity"], th,
+      (1 - 1 / er) * ml() + 1 / er + rng.normal(0, 0.005, th.size))
+# follow-up: crossed, the detector reads 0.071; with the laser blocked only the
+# 0.001 dark level is left, so the light came through the polariser
+groups("malus_leaky_blocked.csv", ["beam_blocked", "intensity"], 1 / er, 0.001, noise=0.003)
+
+# Cooling: the thermocouple reads true, but the room is at 23.0 °C on a sunny
+# afternoon, not the 21 °C assumed
+hdr_c = ["time_s", "temperature_C"]
+write("cooling_warm_room.csv", hdr_c, tc, 23.0 + (80 - 23.0) * np.exp(-tc / 420)
+      + rng.normal(0, 0.15, tc.size), fmt="{:.2f}")
+# follow-up: in ice water the thermocouple reads 0.05 °C, so the meter is right
+write("cooling_warm_room_ice_point.csv", hdr_c, ti, 0.05 + rng.normal(0, 0.1, ti.size), fmt="{:.2f}")
+
+# RC: the capacitor leaks through 3.3 MΩ (1 µA at 3.5 V, within an electrolytic's
+# rating), measured with a x10 (10 MΩ) probe from the start. Leak and probe in
+# parallel load the node: V_final and tau both scale by Rp / (R + Rp) = 0.71.
+rp = 1 / (1 / 3.3e6 + 1 / 10e6)
+fr = rp / (1e6 + rp)
+write("rc_leaky_cap.csv", ["time_s", "voltage_V"], tr, rc(5 * fr, 0.1 * fr)
+      + rng.normal(0, 0.01, tr.size), fmt="{:.4f}")
+# follow-up: re-recorded with the probe and channel checked at x10: no change,
+# because the load is inside the capacitor
+write("rc_leaky_cap_x10.csv", ["time_s", "voltage_V"], tr, rc(5 * fr, 0.1 * fr)
+      + rng.normal(0, 0.01, tr.size), fmt="{:.4f}")
+
+# Pendulum: a worn mechanical stopwatch gaining 1.5% (4.5 s in five minutes);
+# released from 5°, every period reads 1.5% long and g comes out 3% low
+write("pendulum_timer.csv", ["length_m", "period_s"], Lp, per(Lp, 5, 1.015)
+      + rng.normal(0, 0.003, Lp.size), fmt="{:.4f}")
+# follow-up: three lengths from 4° with the same stopwatch: g is still 3% low
+Ls = np.array([0.4, 0.8, 1.2])
+write("pendulum_timer_small.csv", ["length_m", "period_s"], Ls, per(Ls, 4, 1.015)
+      + rng.normal(0, 0.003, Ls.size), fmt="{:.4f}")
+
+# Hooke: zero read with the hanger on (right), but off the hook rather than the
+# pointer, 8 mm out: every extension is 8 mm long
+hdr_h = ["mass_kg", "extension_m"]
+write("hooke_ruler_zero.csv", hdr_h, mk, ext(mk + 0.05) - ext(0.05) + 0.008
+      + rng.normal(0, 0.0005, mk.size), fmt="{:.5f}")
+# follow-up: hanger weighed (50 g) and added to every load. The zero was taken
+# with the hanger on, so this only moves the offset: the line still misses the origin
+write("hooke_ruler_zero_hanger_included.csv", hdr_h, mk + 0.05, ext(mk + 0.05) - ext(0.05) + 0.008
+      + rng.normal(0, 0.0005, mk.size), fmt="{:.5f}")
+
+# Diode: an overheated diode with 5 Ω of bulk series resistance; the voltmeter is
+# already on its own legs
+hdr_d = ["voltage_V", "current_A"]
+write("diode_bulk_rs.csv", hdr_d, vd(Id, 5.0) + rng.normal(0, 5e-4, Id.size), Id)
+# follow-up: voltmeter leads checked on the diode's legs: the droop stays
+write("diode_bulk_rs_rewired.csv", hdr_d, vd(Id, 5.0) + rng.normal(0, 5e-4, Id.size), Id)
+
+# Grating: the green laser labelled 532 nm is a 515 nm direct diode, with the
+# right 600 lines/mm grating: the wavelength comes out 3% short
+write("grating_laser_label.csv", ["order_m", "angle_deg"], mo, ang(515)
+      + rng.normal(0, 0.05, mo.size), fmt="{:.3f}")
+# follow-up: HeNe (632.8 nm) on the same grating. Orders ±3 don't exist at
+# 600 lines/mm (3 λ/d > 1), so orders −2 to +2 are read; the line comes out right.
+m2 = np.arange(-2, 3, dtype=float)
+th2 = np.degrees(np.arcsin(m2 * 632.8e-9 * 600e3)) + rng.normal(0, 0.05, m2.size)
+(OUT / "grating_laser_label_ref.csv").write_text(
+    "\n".join(["order_m,angle_deg,reference_nm"] + [f"{m:.6g},{a:.3f},632.8" for m, a in zip(m2, th2)]) + "\n")
+
+# Hall: the electromagnet gives 0.255 T, not the 0.3 T set (its calibration chart
+# is for a narrower pole gap), so the carrier density reads 16% high. A 1%
+# misalignment voltage is always there and doesn't flip with the field.
+kl = kh * 0.255 / 0.3
+write("hall_field_low.csv", ["current_A", "hall_voltage_V"], Ih,
+      kl * Ih + 0.01 * kh * Ih + rng.normal(0, 2e-5, Ih.size))
+# follow-up: field forward, then reversed; the voltage flips almost exactly
+Vf = np.where(rev == 0, kl, -kl) * Ir + 0.01 * kh * Ir + rng.normal(0, 2e-5, Ir.size)
+write("hall_field_low_reversed.csv", ["current_A", "hall_voltage_V", "field_reversed"], Ir, Vf, rev)
+
 print(f"Wrote bench datasets to {OUT}")

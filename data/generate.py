@@ -88,6 +88,20 @@ for s, offset in ((0, V_THERMAL), (1, V_THERMAL)):    # the offset stays with th
         zero_lines.append(f"{s},{vv:.9f}")
 (OUT / "r_meter_zero_zero.csv").write_text("\n".join(zero_lines) + "\n")
 
+# Waveform partner: the hum is magnetic pickup, not a ground loop. A transformer's
+# stray field threads the loop the signal leads enclose and induces 50 Hz plus a
+# 150 Hz harmonic (the magnetising current isn't sinusoidal, and the EMF follows
+# dB/dt, which triples the harmonic), so the first trace looks like the
+# ground-loop one. Grounding everything at one point leaves it untouched.
+# Own random stream, so every dataset above is unchanged.
+rng = np.random.default_rng(4302)
+write_wave("scope_magnetic.csv",
+           0.12 * np.sin(2 * np.pi * 50 * t + 1.1) + 0.04 * np.sin(2 * np.pi * 150 * t + 0.4))
+# follow-up: re-recorded after single-point grounding; the hum is still there
+# (same coupling, a different mains phase at the trigger)
+write_wave("scope_magnetic_ground.csv",
+           0.12 * np.sin(2 * np.pi * 50 * t + 2.3) + 0.04 * np.sin(2 * np.pi * 150 * t + 0.9))
+
 print(f"Wrote seeded datasets to {OUT}")
 
 # Extended experiment bench
