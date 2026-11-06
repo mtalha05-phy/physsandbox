@@ -1,0 +1,19 @@
+datasets:
+  - {file: em_parallax.csv, experiment: e_over_m, truth: radius_parallax, status: investigating}
+  - {file: em_parallax_mirror.csv, after: em_parallax.csv, test: em_mirror_reread, experiment: e_over_m, truth: radius_parallax, status: confirmed}
+  - {file: em_wehnelt.csv, experiment: e_over_m, truth: wehnelt_in_voltage, status: confirmed}
+  - {file: em_clean.csv, experiment: e_over_m, truth: no_fault, status: clear}
+  - {file: esr_probe_offset.csv, experiment: esr, truth: esr_field_zero_offset, status: investigating}
+  - {file: esr_probe_offset_reversed.csv, after: esr_probe_offset.csv, test: esr_field_reversal, experiment: esr, truth: esr_field_zero_offset, status: confirmed}
+  - {file: esr_field_scale.csv, experiment: esr, truth: esr_field_scale, status: confirmed}
+  - {file: esr_counter_misread.csv, experiment: esr, truth: esr_counter_misread, status: confirmed}
+  - {file: esr_clean.csv, experiment: esr, truth: no_fault, status: clear}
+  - {file: ruth_zero_offset.csv, experiment: rutherford, truth: ruth_angle_zero, status: investigating}
+  - {file: ruth_zero_offset_both_sides.csv, after: ruth_zero_offset.csv, test: ruth_both_sides, experiment: rutherford, truth: ruth_angle_zero, status: confirmed}
+  - {file: ruth_leakage.csv, experiment: rutherford, truth: ruth_source_leakage, status: confirmed}
+  - {file: ruth_clean.csv, experiment: rutherford, truth: no_fault, status: clear}
+  - {file: bragg_zero_offset.csv, experiment: bragg_xray, truth: bragg_goniometer_zero, status: investigating}
+  - {file: bragg_zero_offset_direct_beam.csv, after: bragg_zero_offset.csv, test: bragg_direct_beam_scan, experiment: bragg_xray, truth: bragg_goniometer_zero, status: confirmed}
+  - {file: bragg_kbeta.csv, experiment: bragg_xray, truth: bragg_kbeta_peak, status: confirmed}
+  - {file: bragg_lif.csv, experiment: bragg_xray, truth: bragg_wrong_crystal, status: confirmed}
+  - {file: bragg_clean.csv, experiment: bragg_xray, truth: no_fault, status: clear}
