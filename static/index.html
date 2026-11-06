@@ -232,6 +232,8 @@ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid 
 .receipt .seq { color: var(--chamber-muted); }
 .receipt .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .receipt .oc { font-size: 12px; }
+.colmap { margin: 8px 0; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.colmap label { font-size: 13px; } .colmap select { margin-left: 4px; }
 .receipt .oc.clean { color: #4FD1A1; } .receipt .oc.contained { color: #FF8A80; }
 .receipt .h { grid-column: 2 / -1; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--chamber-muted); }
 .verify-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
@@ -478,6 +480,39 @@ function renderSamples() {
     || `<span class="file-name">Upload the CSV you recorded for this test.</span>`;
   renderSampleInfo();
 }
+
+/* Column mapping: a file whose columns have other names (Voltage (V), I_mA, ...) is
+   renamed in the browser to the names this experiment uses. Only the header changes;
+   the numbers are sent exactly as recorded. */
+const normCol = h => h.toLowerCase().replace(/[^a-z0-9]/g, "");
+function guessCol(c, header, taken) {
+  const n = normCol(c), stem = normCol(c.split("_")[0]);
+  return header.find(h => !taken.has(h) && normCol(h) === n)
+    || header.find(h => !taken.has(h) && normCol(h).startsWith(stem) && stem.length > 1)
+    || header.find(h => !taken.has(h));
+}
+function colMapper(need, header) {
+  const taken = new Set();
+  const rows = need.map(c => {
+    const g = guessCol(c, header, taken); if (g) taken.add(g);
+    return `<label>${esc(c)} <select data-map="${esc(c)}">${header.map(h => `<option${h === g ? " selected" : ""}>${esc(h)}</option>`).join("")}</select></label>`;
+  }).join("");
+  return `<div class="colmap"><p style="margin:0 0 6px">Your columns have other names. Say which is which (the units must match the names on the left):</p>${rows}
+    <button class="btn secondary small" id="colmap-go" type="button">Use these columns</button></div>`;
+}
+$("sample-info").addEventListener("click", async e => {
+  if (e.target.id !== "colmap-go" || !S.file) return;
+  const pick = {}; document.querySelectorAll("#sample-info [data-map]").forEach(sel => { pick[sel.value] = sel.dataset.map; });
+  if (Object.keys(pick).length !== document.querySelectorAll("#sample-info [data-map]").length)
+    return toast("Pick a different column for each one.");
+  const lines = (await S.file.text()).split(/\r?\n/);
+  const i = lines.findIndex(l => l.trim() && !l.startsWith("#"));
+  if (i < 0) return;
+  lines[i] = lines[i].split(",").map(h => pick[h.trim()] || h.trim()).join(",");
+  S.file = new Blob([lines.join("\n")], { type: "text/csv" });
+  toast("Columns renamed in your browser. The numbers are unchanged.");
+  renderSampleInfo();
+});
 let infoSeq = 0;
 async function renderSampleInfo() {
   const box = $("sample-info"), E = EX(), seq = ++infoSeq;
@@ -505,6 +540,7 @@ async function renderSampleInfo() {
     <div class="facts"><span>${Math.max(data.length - 1, 0)} readings</span><span>columns ${header.map(h => `<code>${esc(h)}</code>`).join(", ") || "none found"}</span>
       ${comments ? `<span class="bad">${comments} comment line${comments > 1 ? "s" : ""}: read ${comments > 1 ? "them" : "it"} before trusting the file</span>` : ""}
       ${fits ? `<span class="ok">✓ matches this experiment</span>` : `<span class="bad">✕ this experiment needs ${missing.map(c => `<code>${esc(c)}</code>`).join(", ")}</span>`}</div>
+    ${!fits && !S.pendingTest && header.length >= need.length ? colMapper(need, header) : ""}
     <pre aria-label="First lines of the file">${preview}</pre>
     ${info ? `<p style="margin:0">Press Analyse: the physics runs in the glovebox and PhysSandbox ranks the causes from the data alone. It isn't told the answer.</p>` : ""}`;
 }
