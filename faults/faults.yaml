@@ -443,20 +443,23 @@ experiments:
           no_fault: no_change
 
   beer_lambert:
+    # The fitted absorption coefficient scatters by about 1.4% (11 thicknesses at 0.4%
+    # noise, background fitted too), so "as expected" is within 6% (about 4 sigma)
+    # and an absorption fault needs more than 7% (5 sigma).
     faults:
       no_fault:
         name: No fault found
         prior: 0.30
         conditions:
           - {feature: background_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
-          - {feature: alpha_error_pct, op: abs_lt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: alpha_error_pct, op: abs_lt, value: 6, p_true: 0.95, p_false: 0.01}
         fix: Nothing to fix. Record the absorption coefficient with its uncertainty.
       stray_light:
         name: Room light leaking into the detector
         prior: 0.22
         conditions:
           - {feature: background_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
-          - {feature: alpha_error_pct, op: abs_lt, value: 5, p_true: 0.85, p_false: 0.3}
+          - {feature: alpha_error_pct, op: abs_lt, value: 6, p_true: 0.85, p_false: 0.3}
           - {feature: background_gone_enclosed, op: is, value: true, p_true: 0.95, p_false: 0.05}
         fix: Close the enclosure lid, switch off the room lights or shroud the detector, and rescan.
       detector_dark_offset:
@@ -464,21 +467,21 @@ experiments:
         prior: 0.14
         conditions:
           - {feature: background_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.03}
-          - {feature: alpha_error_pct, op: abs_lt, value: 5, p_true: 0.85, p_false: 0.3}
+          - {feature: alpha_error_pct, op: abs_lt, value: 6, p_true: 0.85, p_false: 0.3}
           - {feature: background_gone_enclosed, op: is, value: true, p_true: 0.05, p_false: 0.95}
         fix: Read the detector with the beam blocked and subtract that dark level from every point before fitting.
       concentration_error:
         name: Sample concentration higher than labelled
         prior: 0.14
         conditions:
-          - {feature: alpha_error_pct, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: alpha_error_pct, op: abs_gt, value: 7, p_true: 0.95, p_false: 0.02}
           - {feature: background_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.3}
         fix: Remake the solution by weighing the solute, or check it against a standard, and refit with the true concentration.
       path_length_error:
         name: Cuvette path length different from assumed
         prior: 0.10
         conditions:
-          - {feature: alpha_error_pct, op: abs_gt, value: 5, p_true: 0.9, p_false: 0.02}
+          - {feature: alpha_error_pct, op: abs_gt, value: 7, p_true: 0.9, p_false: 0.02}
           - {feature: background_sigma, op: "<", value: 4, p_true: 0.85, p_false: 0.3}
         fix: Measure the cuvette or slab thickness with calipers and refit with the measured path length.
       unknown_cause:
