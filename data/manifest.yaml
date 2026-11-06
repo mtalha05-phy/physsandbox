@@ -50,6 +50,18 @@ datasets:
     expected: {signal_hz: 1000, mains_hz: 50}
     truth: ground_loop
     status: confirmed
+  - file: scope_magnetic.csv
+    experiment: waveform
+    expected: {signal_hz: 1000, mains_hz: 50}
+    truth: magnetic_pickup
+    step1_top: ground_loop
+  - file: scope_magnetic_ground.csv
+    after: scope_magnetic.csv
+    test: single_point_ground
+    experiment: waveform
+    expected: {signal_hz: 1000, mains_hz: 50}
+    truth: magnetic_pickup
+    partner: true
   - file: scope_clean.csv
     experiment: waveform
     expected: {signal_hz: 1000, mains_hz: 50}
@@ -64,6 +76,16 @@ datasets:
     experiment: helmholtz
     truth: ambient_field
     status: confirmed
+  - file: helmholtz_probe_zero.csv
+    experiment: helmholtz
+    truth: probe_zero_offset
+    step1_top: ambient_field
+  - file: helmholtz_probe_zero_shield.csv
+    after: helmholtz_probe_zero.csv
+    test: zero_gauss_chamber
+    experiment: helmholtz
+    truth: probe_zero_offset
+    partner: true
   - file: helmholtz_gain.csv
     experiment: helmholtz
     truth: probe_gain_error
@@ -80,6 +102,16 @@ datasets:
     experiment: laser_alignment
     truth: misalignment
     status: confirmed
+  - file: laser_drift.csv
+    experiment: laser_alignment
+    truth: pointing_drift
+    step1_top: misalignment
+  - file: laser_drift_rescan.csv
+    after: laser_drift.csv
+    test: repeat_scan_after_warmup
+    experiment: laser_alignment
+    truth: pointing_drift
+    partner: true
   - file: laser_low_power.csv
     experiment: laser_alignment
     truth: low_power
@@ -96,6 +128,16 @@ datasets:
     experiment: faraday
     truth: amplifier_offset
     status: confirmed
+  - file: faraday_ground.csv
+    experiment: faraday
+    truth: ground_offset
+    step1_top: amplifier_offset
+  - file: faraday_ground_shorted.csv
+    after: faraday_ground.csv
+    test: short_amplifier_input
+    experiment: faraday
+    truth: ground_offset
+    partner: true
   - file: faraday_half_turns.csv
     experiment: faraday
     truth: turns_mismatch
@@ -112,6 +154,16 @@ datasets:
     experiment: beer_lambert
     truth: stray_light
     status: confirmed
+  - file: beer_dark_offset.csv
+    experiment: beer_lambert
+    truth: detector_dark_offset
+    step1_top: stray_light
+  - file: beer_dark_offset_enclosed.csv
+    after: beer_dark_offset.csv
+    test: enclosure_rescan
+    experiment: beer_lambert
+    truth: detector_dark_offset
+    partner: true
   - file: beer_high_alpha.csv
     experiment: beer_lambert
     truth: concentration_error
@@ -128,6 +180,16 @@ datasets:
     experiment: malus
     truth: room_light
     status: confirmed
+  - file: malus_leaky.csv
+    experiment: malus
+    truth: leaky_polariser
+    step1_top: room_light
+  - file: malus_leaky_blocked.csv
+    after: malus_leaky.csv
+    test: block_beam_reading
+    experiment: malus
+    truth: leaky_polariser
+    partner: true
   - file: malus_angle_offset.csv
     experiment: malus
     truth: analyser_zero_offset
@@ -144,6 +206,16 @@ datasets:
     experiment: cooling
     truth: cjc_offset
     status: confirmed
+  - file: cooling_warm_room.csv
+    experiment: cooling
+    truth: room_not_at_assumed
+    step1_top: cjc_offset
+  - file: cooling_warm_room_ice_point.csv
+    after: cooling_warm_room.csv
+    test: ice_point_check
+    experiment: cooling
+    truth: room_not_at_assumed
+    partner: true
   - file: cooling_slow_contact.csv
     experiment: cooling
     truth: poor_thermal_contact
@@ -160,6 +232,16 @@ datasets:
     experiment: rc_charging
     truth: probe_loading
     status: confirmed
+  - file: rc_leaky_cap.csv
+    experiment: rc_charging
+    truth: capacitor_leakage
+    step1_top: probe_loading
+  - file: rc_leaky_cap_x10.csv
+    after: rc_leaky_cap.csv
+    test: x10_probe_repeat
+    experiment: rc_charging
+    truth: capacitor_leakage
+    partner: true
   - file: rc_cap_tolerance.csv
     experiment: rc_charging
     truth: capacitor_tolerance
@@ -180,6 +262,16 @@ datasets:
     experiment: pendulum
     truth: large_amplitude
     status: confirmed
+  - file: pendulum_timer.csv
+    experiment: pendulum
+    truth: timer_scale
+    step1_top: large_amplitude
+  - file: pendulum_timer_small.csv
+    after: pendulum_timer.csv
+    test: small_amplitude_repeat
+    experiment: pendulum
+    truth: timer_scale
+    partner: true
   - file: pendulum_length_offset.csv
     experiment: pendulum
     truth: length_to_wrong_point
@@ -196,6 +288,16 @@ datasets:
     experiment: hooke
     truth: hanger_mass_omitted
     status: confirmed
+  - file: hooke_ruler_zero.csv
+    experiment: hooke
+    truth: ruler_zero_offset
+    step1_top: hanger_mass_omitted
+  - file: hooke_ruler_zero_hanger_included.csv
+    after: hooke_ruler_zero.csv
+    test: include_hanger_repeat
+    experiment: hooke
+    truth: ruler_zero_offset
+    partner: true
   - file: hooke_overstretched.csv
     experiment: hooke
     truth: past_elastic_limit
@@ -212,6 +314,16 @@ datasets:
     experiment: diode
     truth: meter_burden
     status: confirmed
+  - file: diode_bulk_rs.csv
+    experiment: diode
+    truth: bulk_series_resistance
+    step1_top: meter_burden
+  - file: diode_bulk_rs_rewired.csv
+    after: diode_bulk_rs.csv
+    test: voltmeter_on_diode
+    experiment: diode
+    truth: bulk_series_resistance
+    partner: true
   - file: diode_reversed.csv
     experiment: diode
     truth: reversed_diode
@@ -228,6 +340,16 @@ datasets:
     experiment: grating
     truth: grating_density_wrong
     status: confirmed
+  - file: grating_laser_label.csv
+    experiment: grating
+    truth: laser_not_stated_wavelength
+    step1_top: grating_density_wrong
+  - file: grating_laser_label_ref.csv
+    after: grating_laser_label.csv
+    test: reference_line_check
+    experiment: grating
+    truth: laser_not_stated_wavelength
+    partner: true
   - file: grating_zero_offset.csv
     experiment: grating
     truth: angle_zero_offset
@@ -244,6 +366,16 @@ datasets:
     experiment: hall
     truth: contact_misalignment
     status: confirmed
+  - file: hall_field_low.csv
+    experiment: hall
+    truth: field_lower_than_set
+    step1_top: contact_misalignment
+  - file: hall_field_low_reversed.csv
+    after: hall_field_low.csv
+    test: reverse_field
+    experiment: hall
+    truth: field_lower_than_set
+    partner: true
   - file: hall_thermal.csv
     experiment: hall
     truth: thermoelectric_contact_offset
