@@ -1,17 +1,25 @@
 datasets:
   - {file: planck_gain.csv, experiment: planck_led, truth: voltmeter_gain_error}
   - {file: planck_gain_refmeter.csv, after: planck_gain.csv, test: reference_meter_check, experiment: planck_led, truth: voltmeter_gain_error, status: confirmed}
+  - {file: planck_partner.csv, experiment: planck_led, truth: nominal_wavelengths, step1_top: voltmeter_gain_error}
+  - {file: planck_partner_refmeter.csv, after: planck_partner.csv, test: reference_meter_check, experiment: planck_led, truth: nominal_wavelengths, partner: true}
   - {file: planck_mislabelled.csv, experiment: planck_led, truth: mislabelled_led}
   - {file: planck_clean.csv, experiment: planck_led, truth: no_fault, status: clear}
   - {file: tunnel_mass.csv, experiment: tunnelling, truth: wrong_mass}
   - {file: tunnel_mass_two_energies.csv, after: tunnel_mass.csv, test: second_energy_run, experiment: tunnelling, truth: wrong_mass, status: confirmed}
+  - {file: tunnel_partner.csv, experiment: tunnelling, truth: energy_reference_wrong, step1_top: wrong_mass}
+  - {file: tunnel_partner_two_energies.csv, after: tunnel_partner.csv, test: second_energy_run, experiment: tunnelling, truth: energy_reference_wrong, partner: true}
   - {file: tunnel_floor.csv, experiment: tunnelling, truth: numerical_floor}
   - {file: tunnel_clean.csv, experiment: tunnelling, truth: no_fault, status: clear}
   - {file: blackbody_shift.csv, experiment: blackbody, truth: wavelength_scale_shift}
   - {file: blackbody_shift_hg.csv, after: blackbody_shift.csv, test: mercury_line_check, experiment: blackbody, truth: wavelength_scale_shift, status: confirmed}
+  - {file: blackbody_partner.csv, experiment: blackbody, truth: lamp_underpowered, step1_top: wavelength_scale_shift}
+  - {file: blackbody_partner_hg.csv, after: blackbody_partner.csv, test: mercury_line_check, experiment: blackbody, truth: lamp_underpowered, partner: true}
   - {file: blackbody_offset.csv, experiment: blackbody, truth: stray_light_background}
   - {file: blackbody_clean.csv, experiment: blackbody, truth: no_fault, status: clear}
   - {file: balmer_impurity.csv, experiment: spectral_lines, truth: impurity_line}
   - {file: balmer_fresh_tube.csv, after: balmer_impurity.csv, test: fresh_tube_repeat, experiment: spectral_lines, truth: impurity_line, status: confirmed}
+  - {file: balmer_partner.csv, experiment: spectral_lines, truth: misassigned_line, step1_top: impurity_line}
+  - {file: balmer_partner_fresh_tube.csv, after: balmer_partner.csv, test: fresh_tube_repeat, experiment: spectral_lines, truth: misassigned_line, partner: true}
   - {file: balmer_offset.csv, experiment: spectral_lines, truth: calibration_offset}
   - {file: balmer_clean.csv, experiment: spectral_lines, truth: no_fault, status: clear}

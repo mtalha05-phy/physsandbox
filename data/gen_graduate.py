@@ -92,4 +92,50 @@ g = [0] * 10 + [1] * 10
 cur = np.r_[0.5 + rng.normal(0, 0.0005, 10), 0.5 / 1.08 + rng.normal(0, 0.0005, 10)]
 write("rb_current_scale_refmeter.csv", ["ammeter", "coil_current_A"], g, cur, fmt="{:.5g}")
 
+# --- Partner cases: the lower-prior fault of each ambiguous pair -------------------
+# Each demo's first measurement can't tell two faults apart, and its truth is the
+# more common one. Here the truth is the other, at a realistic size, with the
+# recommended test's result as that fault really produces it. Own random stream,
+# so every dataset above is unchanged.
+rng = np.random.default_rng(4403)
+
+# NMR: the pulses are right, but the tube sits a centimetre high, so only about 60% of
+# the liquid is inside the RF coil; T2 is the sample's own
+hdr = ["echo_time_ms", "echo_amplitude_mV"]
+write("nmr_partner.csv", hdr, t, echo(0.60 * A0) + rng.normal(0, NOISE, t.size), fmt="{:.4g}")
+# follow-up: nutation sweep; the liquid inside the coil turns 90° at the set 10 µs, the signal is
+# just smaller. The RF field varies by about 12% across the liquid, so the 270° maximum at
+# 30 µs comes out lower than the 90° one (a Gaussian spread s damps sin θ by exp(−(θs)²/2)).
+pl_p = np.arange(2.0, 35.0, 2.0)
+th_p = np.pi / 2 * pl_p / 10.0
+write("nmr_partner_nutation.csv", ["pulse_length_us", "fid_amplitude_mV"], pl_p,
+      0.60 * A0 * np.abs(np.sin(th_p)) * np.exp(-(0.12 * th_p) ** 2 / 2) + rng.normal(0, NOISE, pl_p.size),
+      fmt="{:.4g}")
+
+# Superconducting transition: the thermometer is on the sample block, but the supply was
+# left at 500 mA instead of 100 mA. Near the critical current the transition moves 1.2 K
+# down and broadens. Five times the current also cuts the noise in mΩ fivefold.
+NR_HI = NR * 0.1 / 0.5
+hdr = ["temperature_K", "resistance_mOhm"]
+write("sc_partner.csv", hdr, TT, r_sc(TT, tc=90.8, w=0.5) + rng.normal(0, NR_HI, TT.size), fmt="{:.5g}")
+# follow-up: cooling then warming at the same current; no lag, so the two sweeps agree
+RW_P = r_sc(TW, tc=90.8, w=0.5) + rng.normal(0, NR_HI, TW.size)
+write("sc_partner_warming.csv", ["temperature_K", "resistance_mOhm", "warming"], TW, RW_P, wm, fmt="{:.5g}")
+
+# Compton: the MCA gain is right, but its zero has moved: every peak reads 20 keV low
+hdr = ["angle_deg", "energy_keV"]
+write("compton_partner.csv", hdr, ang, ep(ang) - 20.0 + rng.normal(0, EN, ang.size), fmt="{:.1f}")
+# follow-up: calibration lines on the same settings; the slope is 1, the intercept is -20 keV
+write("compton_partner_calibration.csv", ["reference_keV", "measured_keV"], ref,
+      ref - 20.0 + rng.normal(0, EN, ref.size), fmt="{:.1f}")
+
+# Optical pumping: the current reading is right, but the coils sit 10% further apart than
+# their radius, so the centre field is (1.25 / (1 + 0.55²))^1.5 = 0.940 of k·I
+spacing = ((1 + 0.25) / (1 + 0.55 ** 2)) ** 1.5
+hdr = ["coil_current_A", "frequency_kHz", "isotope"]
+write("rb_partner.csv", hdr, Ii, fr(Ii * spacing) + rng.normal(0, FN, Ii.size), iso, fmt="{:.5g}")
+# follow-up: 0.5 A on the lab reading, and the calibrated ammeter in series agrees
+write("rb_partner_refmeter.csv", ["ammeter", "coil_current_A"], [0] * 10 + [1] * 10,
+      0.5 + rng.normal(0, 0.0005, 20), fmt="{:.5g}")
+
 print(f"Wrote graduate datasets to {OUT}")

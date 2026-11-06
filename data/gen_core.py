@@ -101,4 +101,42 @@ write("decay_background_removed.csv", hdr + ["source_removed"], np.r_[t, tb],
       np.r_[raw, rng.poisson(BKG * DT, tb.size).astype(float)], np.r_[np.zeros(t.size), np.ones(tb.size)],
       fmt="{:.0f}")
 
+# --- Partner cases: the lower-prior fault of each ambiguous pair -------------------
+# Each demo's first measurement can't tell two faults apart, and its truth is the
+# more common one. Here the truth is the other, at a realistic size, with the
+# recommended test's result as that fault really produces it. Own random stream
+# (read, fh_current and the decay counts all draw from it), so every dataset above
+# is unchanged.
+rng = np.random.default_rng(4402)
+
+# Photoelectric: the anode is clean, but the stopping-voltage panel meter reads 10% low
+hdr = ["wavelength_nm", "stopping_voltage_V"]
+write("photo_partner.csv", hdr, hg, read(0.90 * vs(hg)), fmt="{:.4f}")
+# follow-up: every line read again, then with the anode masked; nothing changes
+write("photo_partner_masked.csv", hdr + ["anode_masked"], np.r_[hg, hg],
+      np.r_[read(0.90 * vs(hg)), read(0.90 * vs(hg))], np.r_[np.zeros(5), np.ones(5)], fmt="{:.4f}")
+
+# Franck-Hertz: the oven is at 180 °C, but the retarding voltage is 0.2 V, not 1.5 V, so
+# electrons slowed by a collision still reach the anode: the dips fill in and more current flows
+write("fh_partner.csv", ["accelerating_voltage_V", "anode_current_nA"], V, fh_current(0.33, gain=1.35), fmt="{:.4f}")
+# follow-up: the oven thermometer sits at its set point
+fh_mins = np.arange(0, 6, 1.0)
+write("fh_partner_oven_thermometer.csv", ["minute", "oven_temperature_C"], fh_mins,
+      179.6 + rng.normal(0, 0.4, fh_mins.size), fmt="{:.1f}")
+
+# Radioactive decay: the room background IS subtracted, but a little Cs-137 broke through
+# with the eluate. Its Ba-137m daughter stays in equilibrium with it, adding a steady
+# 0.6 counts per second that never decays on this timescale.
+CS_BREAKTHROUGH = 0.6
+td = np.arange(0, 1500, DT)
+n_src = 120 * np.exp(-np.log(2) / T_HALF * (td + DT / 2)) + CS_BREAKTHROUGH + BKG
+contaminated = rng.poisson(n_src / (1 + n_src * TAU) * DT).astype(float) - bkg_sub
+write("decay_partner.csv", ["time_s", "counts"], td, contaminated, fmt="{:.0f}")
+# follow-up: the eluate taken away, room background counted for 3 minutes; the log subtracts
+# the same 8 counts per interval from these too, so they sit near zero, well below the floor
+tbp = np.arange(1500, 1680, DT)
+write("decay_partner_removed.csv", ["time_s", "counts", "source_removed"], np.r_[td, tbp],
+      np.r_[contaminated, rng.poisson(BKG * DT, tbp.size).astype(float) - bkg_sub],
+      np.r_[np.zeros(td.size), np.ones(tbp.size)], fmt="{:.0f}")
+
 print(f"Wrote core-lab datasets to {OUT}")
