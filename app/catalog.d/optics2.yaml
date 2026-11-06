@@ -1,0 +1,148 @@
+# Optics, semiconductor and thermocouple bench: thin-lens focal length, Brewster's angle,
+# band gap of germanium, type K thermocouple calibration. Merged into catalog.yaml by
+# app/pipeline.py. The condensed domain comes from graduate.yaml.
+experiments:
+  thin_lens:
+    label: Focal length of a thin lens
+    domain: optics
+    blurb: Image distance against object distance for a converging lens on an optical bench, to measure its focal length
+    columns: [object_distance_cm, image_distance_cm]
+    model: "1/u + 1/v = 1/f"
+    expected:
+      - [focal_length_cm, "Focal length marked on the lens (cm)", 10.0]
+      - [precision_u_cm, "Object distance reading precision (cm)", 0.1]
+      - [precision_v_cm, "Image position precision, judging the focus (cm)", 0.2]
+    samples:
+      - [lens_holder_edge.csv, "Straight line, but its slope isn't −1"]
+      - [lens_wrong_lens.csv, "Focal length 25% long"]
+      - [lens_focus_by_eye.csv, "Points scattered about the line"]
+      - [lens_clean.csv, "Healthy measurement"]
+    followups: {lens_index_check: lens_holder_edge_index.csv}
+    questions: ["Fit 1/v against 1/u and report f from the two intercepts", "Check that the slope is −1"]
+
+  brewster:
+    label: Brewster's angle (Fresnel reflection)
+    domain: optics
+    blurb: Power of p-polarised laser light reflected from a glass plate against the angle of incidence, to find Brewster's angle and the glass's refractive index
+    columns: [incidence_angle_deg, reflected_power_uW]
+    model: "R_p = |r_p|²,  tan θ_B = n"
+    expected:
+      - [refractive_index, "Refractive index of the glass at the laser's wavelength", 1.515]
+      - [incident_power_uW, "Incident power, measured with the same meter (µW)", 1000]
+      - [precision_uW, "Power reading precision, absolute (µW)", 0.1]
+      - [precision_pct, "Power reading precision, relative (%)", 1.0]
+      - [precision_deg, "Angle reading precision (°)", 0.2]
+    samples:
+      - [brewster_polariser.csv, "Minimum doesn't reach zero"]
+      - [brewster_stage_zero.csv, "Minimum 2° too high"]
+      - [brewster_ghost.csv, "Nearly twice the reflection expected"]
+      - [brewster_clean.csv, "Healthy measurement"]
+    followups: {brewster_rotate_polariser: brewster_polariser_rotate.csv}
+    questions: ["Find Brewster's angle and n = tan θ_B", "Compare the reflected power with Fresnel's equations"]
+
+  band_gap:
+    label: Band gap of germanium
+    level: graduate
+    domain: condensed
+    blurb: Resistance of an undoped germanium bar against temperature in its intrinsic range, to measure the band gap
+    columns: [temperature_K, resistance_ohm]
+    model: "R ∝ T^(−3/2) e^(Eg/2kT)"
+    expected:
+      - [band_gap_eV, "Expected band gap (eV): Ge 0.67, Si 1.12", 0.67]
+      - [precision_pct, "Resistance reading precision (%)", 0.5]
+      - [precision_K, "Temperature reading precision (K)", 0.5]
+    samples:
+      - [bandgap_lag.csv, "Band gap 9% high"]
+      - [bandgap_contacts.csv, "Line bends over at the hot end"]
+      - [bandgap_clean.csv, "Healthy measurement"]
+    followups: {bandgap_cooling_run: bandgap_lag_cooling.csv}
+    questions: ["Fit ln(R·T^3/2) against 1/T and report Eg", "Check the plot for curvature at either end"]
+
+  thermocouple:
+    label: Thermocouple calibration (type K)
+    domain: heat
+    blurb: Emf of a type K thermocouple against its hot junction's temperature, reference junction in ice, to measure its Seebeck coefficient
+    columns: [hot_junction_C, emf_mV]
+    model: "emf = S(T − T_ref) + q(T − T_ref)²,  S ≈ 41 µV/K"
+    expected:
+      - [reference_junction_C, "Reference junction temperature (°C)", 0.0]
+      - [precision_mV, "Emf reading precision (mV)", 0.01]
+      - [precision_C, "Bath thermometer precision (°C)", 0.2]
+    samples:
+      - [thermocouple_ice_melted.csv, "Every emf 0.3 mV low"]
+      - [thermocouple_type_j.csv, "Seebeck coefficient 30% high"]
+      - [thermocouple_clean.csv, "Healthy calibration"]
+    followups: {tc_ice_bath_check: thermocouple_ice_melted_bath.csv}
+    questions: ["Fit the emf against temperature and report S", "Compare the emf with the type K reference table"]
+
+sample_info:
+  lens_clean.csv: ["A +10 cm converging lens on a 1 m optical bench with an illuminated cross-wire as the object and a white screen; u read at the lens holder's index mark from 13 to 50 cm, v where the image looks sharpest.", "Nothing should look off: 1/v against 1/u is a straight line of slope −1, both intercepts at 1/f = 10 m⁻¹."]
+  lens_holder_edge.csv: ["The same lens, bench and screen, u read at the lens holder's index mark.", "The points lie on a good straight line, but its slope is about −1.25 instead of −1."]
+  lens_holder_edge_index.csv: ["The lens holder at five places along the bench, with the bench scale read at the holder's index mark and at the lens's own mid-plane.", "Does the index mark sit at the lens?"]
+  lens_wrong_lens.csv: ["A lens from the box marked +10 cm on the same bench; no sharp image would fit on the bench below u = 16 cm, so the run starts there.", "A good straight line of slope −1, but its intercepts give a focal length about 25% longer than 10 cm."]
+  lens_focus_by_eye.csv: ["The same lens, bench and screen, read by another group.", "The slope and focal length are about right, but the points scatter about the line far more than the precision entered."]
+  brewster_clean.csv: ["A 1 mW HeNe laser (633 nm) through a polariser set for p, onto a crown-glass plate (n = 1.515) on a rotation stage, with a photodiode power meter on the arm behind an iris; 10° to 85°, room lights off.", "Nothing should look off: the reflected power follows Fresnel's equations and falls to almost nothing at Brewster's angle, 56.6°."]
+  brewster_polariser.csv: ["The same laser, polariser, plate and detector.", "The minimum is at 56.6° as expected, but it bottoms out at about 1.2 µW instead of almost nothing."]
+  brewster_polariser_rotate.csv: ["With the stage left at the minimum (56.5°), the polariser turned from −10° to +10° about its setting in the run, in 2° steps.", "Is the deepest minimum at the setting that was used?"]
+  brewster_stage_zero.csv: ["The same laser, polariser, plate and detector.", "The curve has the expected shape and depth, but its minimum is near 58.6°, which would make n = tan θ_B about 1.64."]
+  brewster_ghost.csv: ["The same laser, polariser, plate and detector.", "The minimum is at 56.6° and reaches almost nothing, but away from it the reflected power is well above Fresnel's equations, nearly twice at small angles."]
+  bandgap_clean.csv: ["An undoped germanium bar (20 × 10 × 1 mm) with 1 mA through it in a small oven; R from the voltage across it, T on the oven's thermometer, 340 to 450 K while heating.", "Nothing should look off: ln(R·T^3/2) against 1/T is a straight line whose slope gives Eg of about 0.66 eV."]
+  bandgap_lag.csv: ["The same bar, current and oven, 340 to 450 K while heating.", "The plot is a straight line, but its slope gives a band gap about 9% above 0.67 eV."]
+  bandgap_lag_cooling.csv: ["The same heating sweep, then the oven ramped back down at 5 K per minute with R read on the way down (cooling = 1).", "Do the heating and cooling sweeps lie on one line?"]
+  bandgap_contacts.csv: ["The same bar, current and oven, 340 to 450 K while heating.", "The cold end looks right, but the line bends over towards the hot end and its slope gives a band gap about 13% low."]
+  thermocouple_clean.csv: ["A type K thermocouple with its hot junction in a stirred silicone-oil bath on a hot plate and its reference junction in an ice-water flask; emf on a 4½-digit meter, 25 to 200 °C on a calibrated thermometer.", "Nothing should look off: the emf follows the type K table, about 41 µV/K."]
+  thermocouple_ice_melted.csv: ["The same thermocouple, bath, meter and reference flask.", "The slope matches type K, but every emf sits about 0.3 mV below the table."]
+  thermocouple_ice_melted_bath.csv: ["A thermometer held in the reference flask beside the junction, six readings a few seconds apart.", "Is the reference bath at 0 °C?"]
+  thermocouple_type_j.csv: ["Another thermocouple on the same bath, meter and reference flask, read as type K.", "The emf rises about 54 µV/K instead of 41, some 30% above the type K table, and doesn't quite follow its shape."]
+
+labels:
+  focal_length_fit_cm: ["Focal length, from the two intercepts", "cm", 1]
+  focal_length_stated_cm: ["Focal length entered", "cm", 1]
+  line_slope: ["Slope of 1/v against 1/u", "", 1]
+  reference_offset_from_slope_cm: ["Lens reference offset implied by the slope", "cm", 1]
+  scatter_over_precision: ["Scatter ÷ stated precision", "", 1]
+  index_mark_minus_lens_centre_cm: ["Index mark − lens mid-plane", "cm", 1]
+  focal_length_distant_object_cm: ["Focal length from a distant object", "cm", 1]
+  line_slope_as_before: ["Slope, lens as in the run", "", 1]
+  line_slope_lens_reversed: ["Slope, lens turned round", "", 1]
+  brewster_angle_fit_deg: ["Brewster's angle, fitted", "°", 1]
+  brewster_angle_expected_deg: ["Brewster's angle for the n entered", "°", 1]
+  refractive_index_from_brewster: ["Refractive index n = tan θ_B", "", 1]
+  s_polarised_fraction: ["s-polarised share of the beam", "", 1]
+  reflectance_low_angles_over_fresnel: ["Reflectance ÷ Fresnel, 40° and below", "", 1]
+  reflectance_high_angles_over_fresnel: ["Reflectance ÷ Fresnel, 75° and above", "", 1]
+  polariser_turn_to_deepest_minimum_deg: ["Polariser turn to the deepest minimum", "°", 1]
+  power_at_deepest_minimum_uW: ["Power at the deepest minimum", "µW", 1]
+  power_at_set_polariser_angle_uW: ["Power at the polariser's setting", "µW", 1]
+  transmitted_parallel_uW: ["Through both, analyser parallel", "µW", 1]
+  transmitted_crossed_uW: ["Through both, analyser crossed", "µW", 1]
+  extinction_ratio: ["Extinction ratio (crossed ÷ parallel)", "", 1]
+  stage_reading_at_normal_incidence_deg: ["Stage reading at normal incidence", "°", 1]
+  filter_ratio_faintest_angle: ["With ÷ without the filter, faintest angle", "", 1]
+  filter_ratio_brightest_angle: ["With ÷ without the filter, brightest angle", "", 1]
+  brightest_over_faintest_ratio: ["Brightest ÷ faintest of those ratios", "", 1]
+  iris_closed_over_open: ["Iris closed ÷ iris open", "", 1]
+  band_gap_fit_eV: ["Band gap Eg, fitted", "eV", 1]
+  band_gap_expected_eV: ["Expected Eg", "eV", 1]
+  band_gap_hot_end_eV: ["Local Eg at the hot end", "eV", 1]
+  band_gap_cold_end_eV: ["Local Eg at the cold end", "eV", 1]
+  band_gap_heating_eV: ["Eg from the heating sweep", "eV", 1]
+  band_gap_cooling_eV: ["Eg from the cooling sweep", "eV", 1]
+  heating_minus_cooling_K: ["Heating − cooling, at the same resistance", "K", 1]
+  oven_minus_reference_K: ["Oven thermometer − reference thermometer", "K", 1]
+  resistance_low_over_high_current: ["R at the lower current ÷ R at the run's current", "", 1]
+  contact_resistance_ohm: ["Contact resistance (two- minus four-terminal)", "Ω", 1]
+  contact_share_of_reading_pct: ["Contacts' share of the two-terminal reading", "%", 1]
+  seebeck_fit_mid_range_uV_per_K: ["Seebeck coefficient S, mid-range", "µV/K", 1]
+  seebeck_type_k_mid_range_uV_per_K: ["Type K at mid-range", "µV/K", 1]
+  mean_seebeck_type_k_uV_per_K: ["Type K, averaged over the range", "µV/K", 1]
+  emf_over_type_k_table: ["Emf ÷ type K table", "", 1]
+  emf_offset_at_reference_uV: ["Emf offset at T = T_ref", "µV", 1]
+  offset_as_temperature_K: ["Offset ÷ S, as a temperature", "K", 1]
+  reference_bath_temperature_C: ["Reference bath temperature", "°C", 1]
+  reference_temperature_entered_C: ["Reference temperature entered", "°C", 1]
+  meter_reading_input_shorted_mV: ["Meter reading, input shorted", "mV", 1]
+  positive_leg_magnetic_fraction: ["Leg on the + terminal: share of tests pulled", "", 1]
+  negative_leg_magnetic_fraction: ["Leg on the − terminal: share of tests pulled", "", 1]
+  emf_gain_when_deeper_mV: ["Emf gained with the junction deeper", "mV", 1]
+  emf_gain_when_deeper_pct: ["Emf gained with the junction deeper", "%", 1]

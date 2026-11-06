@@ -1,0 +1,19 @@
+datasets:
+  - {file: lens_holder_edge.csv, experiment: thin_lens, truth: lens_holder_offset, status: investigating}
+  - {file: lens_holder_edge_index.csv, after: lens_holder_edge.csv, test: lens_index_check, experiment: thin_lens, truth: lens_holder_offset, status: confirmed}
+  - {file: lens_wrong_lens.csv, experiment: thin_lens, truth: lens_wrong_focal_length, status: confirmed}
+  - {file: lens_focus_by_eye.csv, experiment: thin_lens, truth: lens_focus_by_eye, status: confirmed}
+  - {file: lens_clean.csv, experiment: thin_lens, truth: no_fault, status: clear}
+  - {file: brewster_polariser.csv, experiment: brewster, truth: brewster_polariser_misset, status: investigating}
+  - {file: brewster_polariser_rotate.csv, after: brewster_polariser.csv, test: brewster_rotate_polariser, experiment: brewster, truth: brewster_polariser_misset, status: confirmed}
+  - {file: brewster_stage_zero.csv, experiment: brewster, truth: brewster_stage_zero, status: confirmed}
+  - {file: brewster_ghost.csv, experiment: brewster, truth: brewster_back_reflection, status: confirmed}
+  - {file: brewster_clean.csv, experiment: brewster, truth: no_fault, status: clear}
+  - {file: bandgap_lag.csv, experiment: band_gap, truth: bandgap_thermometer_lag, status: investigating}
+  - {file: bandgap_lag_cooling.csv, after: bandgap_lag.csv, test: bandgap_cooling_run, experiment: band_gap, truth: bandgap_thermometer_lag, status: confirmed}
+  - {file: bandgap_contacts.csv, experiment: band_gap, truth: bandgap_contact_resistance, status: confirmed}
+  - {file: bandgap_clean.csv, experiment: band_gap, truth: no_fault, status: clear}
+  - {file: thermocouple_ice_melted.csv, experiment: thermocouple, truth: tc_reference_not_at_ice, status: investigating}
+  - {file: thermocouple_ice_melted_bath.csv, after: thermocouple_ice_melted.csv, test: tc_ice_bath_check, experiment: thermocouple, truth: tc_reference_not_at_ice, status: confirmed}
+  - {file: thermocouple_type_j.csv, experiment: thermocouple, truth: tc_wrong_type, status: confirmed}
+  - {file: thermocouple_clean.csv, experiment: thermocouple, truth: no_fault, status: clear}
