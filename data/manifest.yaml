@@ -13,6 +13,18 @@ datasets:
     expected: {resistance_ohm: 0.010}
     truth: thermoelectric_offset
     status: confirmed
+  - file: r_meter_zero.csv
+    experiment: resistance_4wire
+    expected: {resistance_ohm: 0.010}
+    truth: meter_zero_offset
+    step1_top: thermoelectric_offset
+  - file: r_meter_zero_zero.csv
+    after: r_meter_zero.csv
+    test: zero_current_reading
+    experiment: resistance_4wire
+    expected: {resistance_ohm: 0.010}
+    truth: meter_zero_offset
+    partner: true
   - file: r_offset_1_followup.csv
     experiment: resistance_4wire
     expected: {resistance_ohm: 0.010}

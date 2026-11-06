@@ -75,6 +75,19 @@ write_wave("scope_hum_1.csv", hum)
 write_wave("scope_hum_1_followup.csv", 0.0 * t)  # after single-point grounding
 write_wave("scope_clean.csv", 0.0 * t)
 
+# --- Partner cases: the lower-prior fault of an ambiguous pair ---------------
+# The first measurement can't tell a thermoelectric offset from a voltmeter zero
+# offset (both add the same constant), so the data alone favour the more common
+# one. Here the truth is the other: the zero-current test must find it.
+# Own random stream, so every dataset above is unchanged.
+rng = np.random.default_rng(4242)
+write_resistance("r_meter_zero.csv", currents, V_THERMAL)
+zero_lines = ["shorted,voltage_V"]
+for s, offset in ((0, V_THERMAL), (1, V_THERMAL)):    # the offset stays with the meter shorted
+    for vv in offset + rng.normal(0, NOISE_V / 2, 10):
+        zero_lines.append(f"{s},{vv:.9f}")
+(OUT / "r_meter_zero_zero.csv").write_text("\n".join(zero_lines) + "\n")
+
 print(f"Wrote seeded datasets to {OUT}")
 
 # Extended experiment bench
