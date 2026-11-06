@@ -196,12 +196,12 @@ Browser ──upload──▶ FastAPI app (Vultr VM)
 
 ## Evaluation on seeded faults
 
-`python eval/run_eval.py` replays the whole troubleshooting loop on 212 cases with known faults (`data/manifest.yaml` and `data/manifest.d/`): for every experiment, a healthy run, its common faults, and the follow-up result of the recommended test. It reports the first measurement and the follow-ups separately:
+`python eval/run_eval.py` replays the whole troubleshooting loop on 288 cases with known faults (`data/manifest.yaml` and `data/manifest.d/`): for every experiment, a healthy run, its common faults, and the follow-up result of the recommended test. It reports the first measurement and the follow-ups separately:
 
 - **First measurement, fault cases: 108/108** name the true cause first, across all 51 experiments.
 - **After the recommended test: 51/51** confirm the true cause (above 90%).
 - **No false alarms: 51/51** healthy datasets come back "no fault found", with no test suggested.
-- **When the odds point the wrong way**: in the ambiguous demos the data alone favour the more common of two faults. Partner cases seed the *less* common one instead; the tool must rank it second, recommend the test that separates the two, and put it first once the test result is in.
+- **When the odds point the wrong way: 39/39.** In the ambiguous demos the data alone favour the more common of two faults. Partner cases seed the *less* common one instead (one for each of the first 39 experiments): the tool must rank it second, recommend the test that separates the two, and put it first once the test result is in. All 39 do; 29 are already confirmed above 90%, and the other 10 lead and get a second test.
 - **Not tuned to one lucky dataset**: `eval/run_seeds.sh` regenerates every dataset with ten other random seeds and replays the whole evaluation for each. On the 39-experiment bench all ten passed (1,570 of 1,570); each of the three newest groups passed seeds +11, +33 and +66.
 - **The diagnosis can't be steered by the file**: the physics parser skips comment lines and the model plays no part in the diagnosis, so the poisoned file gets the same result as its clean twin. An injected instruction can only reach the agent box, where the glovebox contains whatever the model writes.
 
