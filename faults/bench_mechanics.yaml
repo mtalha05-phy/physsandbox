@@ -1,0 +1,431 @@
+# Mechanics fault library: Kater's reversible pendulum, the Cavendish torsion
+# balance, a driven damped oscillator, Boyle's law in a syringe. Same format as
+# faults.yaml; `fix` is what to do once a cause is confirmed (PDF report). Test ids
+# are global, so each carries its experiment's prefix.
+experiments:
+
+  kater_pendulum:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: g_shift_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: scatter_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record g with its uncertainty, the knife-edge separation and the amplitude the periods were corrected for.
+      kater_large_amplitude:
+        name: Swung from a larger angle than the amplitude entered
+        prior: 0.20
+        typical_size: "Every period grows by about θ²/16: from 15° instead of 2° that is 0.42%, so g comes out 0.84% low"
+        conditions:
+          - {feature: g_shift_sigma, op: "<", value: -5, p_true: 0.95, p_false: 0.02}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: scatter_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: amplitude_above_stated, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: separation_differs, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Release from 3° or less (about 6 cm of travel at the bar's lower end), or enter the amplitude you measured so the correction θ²/16 is applied, and retime at the crossing.
+      kater_separation_wrong:
+        name: Knife-edge separation L measured wrongly
+        prior: 0.17
+        typical_size: "g ∝ L: measuring to the back of a knife-edge block instead of its edge puts L, and g, out by several mm in a metre (0.5% or more)"
+        conditions:
+          - {feature: g_shift_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: outlier_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: scatter_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: amplitude_above_stated, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: separation_differs, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Measure L again from edge to edge (a beam compass or a steel rule and a lens on the edges themselves), enter it and recompute g; the periods don't need retiming.
+      kater_swing_miscount:
+        name: Swings miscounted at one slider position
+        prior: 0.15
+        typical_size: "Counting 50 swings when 49 or 51 went by puts that period out by 2% (40 ms), far off its curve"
+        conditions:
+          - {feature: outlier_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: scatter_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.05}
+          - {feature: outlier_swings, op: abs_dev1_lt, value: 0.3, p_true: 0.9, p_false: 0.05}
+          - {feature: light_gate_curves_clean, op: is, value: true, p_true: 0.95, p_false: 0.1}
+        fix: Retime that position with a light gate (or with a partner counting aloud from zero), and keep the crossing from the curves through the other points.
+      kater_blunt_edge:
+        name: One knife edge blunt or slipping on its plate
+        prior: 0.12
+        typical_size: "A rounded or chipped edge rolls instead of pivoting: the periods about that edge scatter by several ms from swing to swing, the other edge's don't"
+        conditions:
+          - {feature: scatter_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: scatter_min_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: light_gate_curves_clean, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Look at both edges and their agate plates under a lens; clean or regrind the edge, seat it squarely, check the plate is level, and retime the scattered side.
+      kater_too_few_swings:
+        name: Too few swings timed for the precision entered
+        prior: 0.08
+        typical_size: "Starting and stopping a stopwatch is good to about 0.05 s however long the run: over 10 swings that is 5 ms a period, against 1 ms over 50"
+        conditions:
+          - {feature: scatter_min_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: light_gate_curves_clean, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Time at least 50 swings for each period (or use a light gate), enter the precision that gives, and retime.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the bar is rigid and the masses are clamped tight, that the support doesn't sway, and retime two positions on both edges.
+    tests:
+      kater_read_amplitude:
+        name: Read the swing amplitude on a protractor behind the bar
+        minutes: 2
+        how: Fix a protractor or an angle scale behind the bar's lower end, release the pendulum exactly as you did for the timings, and read the amplitude on the first swing, five times.
+        adds: {feature: amplitude_above_stated, from: amplitude_above_stated, op: copy}
+        outcomes:
+          kater_large_amplitude: amplitude_above_entered
+          kater_separation_wrong: amplitude_as_entered
+          kater_swing_miscount: amplitude_as_entered
+          kater_blunt_edge: amplitude_as_entered
+          kater_too_few_swings: amplitude_as_entered
+          no_fault: amplitude_as_entered
+        safety: The bar with its brass bob weighs over 5 kg and swings with real momentum; stand clear of its path, keep your fingers away from the knife edges and the support, and stop it by hand only near the end of a swing.
+      kater_measure_separation:
+        name: Measure the knife-edge separation again, edge to edge
+        minutes: 5
+        how: Lift the pendulum off, lay it flat on the bench and measure from one knife edge to the other with a beam compass or a steel rule and a lens, five times.
+        adds: {feature: separation_differs, from: separation_differs, op: copy}
+        outcomes:
+          kater_separation_wrong: separation_differs
+          kater_large_amplitude: separation_as_entered
+          kater_swing_miscount: separation_as_entered
+          kater_blunt_edge: separation_as_entered
+          kater_too_few_swings: separation_as_entered
+          no_fault: separation_as_entered
+        safety: Lift the pendulum with two people, one at each end, and lay it on a padded bench; the brass bob is heavy enough to crush fingers, and dropping it can chip a knife edge.
+      kater_light_gate_retime:
+        name: Retime every slider position with a light gate
+        minutes: 25
+        how: Put a light gate at the bottom of the swing, set it to time 50 periods, and repeat the whole sweep about both edges. Add a light_gate column (1) to the file.
+        adds: {feature: light_gate_curves_clean, from: light_gate_curves_clean, op: copy}
+        outcomes:
+          kater_swing_miscount: curves_clean
+          kater_blunt_edge: still_scattered
+          kater_too_few_swings: curves_clean
+          kater_large_amplitude: curves_clean
+          kater_separation_wrong: curves_clean
+          no_fault: curves_clean
+        safety: Stand clear of the swinging bar while the gate runs, and move the slider only with the pendulum at rest and supported; clamp it before letting go, as a loose 1.25 kg slider can slide off the bar.
+
+  cavendish:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: G_shift_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: drift_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record G with its uncertainty, the period and the equilibrium shift it came from.
+      cav_scale_distance_wrong:
+        name: Mirror-to-scale distance D not what was entered
+        prior: 0.20
+        typical_size: "The spot moves 4θD, so G ∝ 1/D: D taken from a lab sheet after the balance was moved 30 cm puts G out by 8%"
+        conditions:
+          - {feature: G_shift_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: drift_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: scale_distance_differs, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: spheres_off_position, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Measure D with a steel tape along the beam's path, from the mirror (not the case front) to the scale, enter it and recompute G; the run itself is fine.
+      cav_spheres_off_position:
+        name: Large spheres not against the case (centre distance r larger than assumed)
+        prior: 0.17
+        typical_size: "The pull falls as 1/r²: spheres 2 mm short of the case make G come out about 8% low"
+        conditions:
+          - {feature: G_shift_sigma, op: "<", value: -5, p_true: 0.95, p_false: 0.02}
+          - {feature: drift_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: scale_distance_differs, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: spheres_off_position, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Turn the swivel arm until both spheres just touch the case in each position (check with a feeler gauge), or measure the real centre distance and enter it, then repeat the swing.
+      cav_equilibrium_drift:
+        name: Equilibrium drifting (room temperature or fibre creep)
+        prior: 0.15
+        typical_size: "Half a millimetre a minute on the scale is common when the room warms or the fibre has just been loaded; it biases the shift unless it is fitted"
+        conditions:
+          - {feature: drift_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: drift_without_masses, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Let the balance settle for several hours (overnight after loading the fibre), keep it away from radiators, sun and the door, and record a run with the spheres removed to check that the drift is steady; quote G from the fit with the drift term.
+      cav_air_currents:
+        name: Air currents in the case (spot jittering more than the reading precision)
+        prior: 0.15
+        typical_size: "A draught or a warm hand near the case makes the spot wander by several mm over a minute"
+        conditions:
+          - {feature: misfit_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: drift_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.1}
+          - {feature: drift_without_masses, op: is, value: true, p_true: 0.1, p_false: 0.9}
+        fix: Close the case (check its glass windows are sealed), shield it from draughts and the heating, keep people away during the run, and repeat the swing.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the small spheres hang free of the case walls, the beam is level, and the fibre isn't kinked, then repeat the swing.
+    tests:
+      cav_tape_scale_distance:
+        name: Measure the mirror-to-scale distance with a steel tape
+        minutes: 3
+        how: Run a steel tape along the laser's path from the balance's mirror to the scale and read it five times, keeping the tape straight and level.
+        adds: {feature: scale_distance_differs, from: scale_distance_differs, op: copy}
+        outcomes:
+          cav_scale_distance_wrong: distance_differs
+          cav_spheres_off_position: distance_as_entered
+          cav_equilibrium_drift: distance_as_entered
+          cav_air_currents: distance_as_entered
+          no_fault: distance_as_entered
+        safety: The pointer laser is class 2; don't look into the beam or its reflection off the mirror, and keep the tape's shiny blade out of the beam. Don't lean on the bench, as a knock sets the balance swinging for an hour.
+      cav_sphere_gap_check:
+        name: Check that the large spheres touch the case in both positions
+        minutes: 5
+        how: In each position, slide a feeler gauge between each large sphere and the case wall and record the gap (it should be zero), two spheres in two positions.
+        adds: {feature: spheres_off_position, from: spheres_off_position, op: copy}
+        outcomes:
+          cav_spheres_off_position: gap_found
+          cav_scale_distance_wrong: spheres_touch
+          cav_equilibrium_drift: spheres_touch
+          cav_air_currents: spheres_touch
+          no_fault: spheres_touch
+        safety: Each lead sphere weighs 1.5 kg; swing the arm slowly and keep fingers out from between the sphere and the case. Wash your hands after touching the lead.
+      cav_masses_removed_run:
+        name: Log the spot for 40 minutes with the large spheres removed
+        minutes: 40
+        how: Lift the large spheres off their arm and set them well away, then read the settled spot every 30 s for 40 minutes; with nothing pulling, any steady change is drift.
+        adds: {feature: drift_without_masses, from: drift_without_masses, op: copy}
+        outcomes:
+          cav_equilibrium_drift: spot_drifts
+          cav_air_currents: no_steady_drift
+          cav_scale_distance_wrong: no_steady_drift
+          cav_spheres_off_position: no_steady_drift
+          no_fault: no_steady_drift
+        safety: Lift each 1.5 kg lead sphere with both hands, set it down where it can't roll off the bench, and wash your hands afterwards. Don't look into the laser beam.
+
+  driven_oscillator:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: f0_shift_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: gamma_shift_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: clip_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record f₀, the damping and Q with their uncertainties, and the brake current they belong to.
+      osc_dial_frequency:
+        name: Drive frequency read from the motor's dial, which is off
+        prior: 0.20
+        typical_size: "Motor dials are often 3–5% out (they depend on the supply and the load), which moves the whole curve along the frequency axis"
+        conditions:
+          - {feature: f0_shift_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: gamma_shift_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: drive_dial_off, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: natural_frequency_differs, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Measure the drive frequency itself (time 20 crank turns, or a light gate on the crank) at every point, or correct every dial reading by the measured ratio, and refit.
+      osc_mass_changed:
+        name: Oscillating mass not the one f₀ was timed with (vane or slotted mass added)
+        prior: 0.15
+        typical_size: "f₀ ∝ 1/√m: adding 8% to the moving mass (a vane and its clamp) lowers f₀ by about 4%"
+        conditions:
+          - {feature: f0_shift_sigma, op: "<", value: -5, p_true: 0.95, p_false: 0.01}
+          - {feature: gamma_shift_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: drive_dial_off, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: natural_frequency_differs, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Time the free oscillations again with everything that moves in place (vane, clamp, any slotted masses), enter that f₀ and the decay rate measured the same way, and compare.
+      osc_brake_current:
+        name: Eddy-current brake current not the one the damping was measured at
+        prior: 0.17
+        typical_size: "Eddy damping goes as the current squared: 0.52 A instead of 0.40 A raises γ by about 60%, so the peak comes out lower and broader"
+        conditions:
+          - {feature: gamma_shift_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: f0_shift_sigma, op: abs_lt, value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: brake_current_differs, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Set the brake current on an ammeter in series with the magnet (not the supply's knob), leave it untouched through the sweep, and measure the free decay at that same current.
+      osc_transient:
+        name: Amplitudes read before the transient had died away
+        prior: 0.15
+        typical_size: "The start-up motion decays as e^(−γt/2); near resonance, reading after one or two time constants leaves the amplitude 10–40% off and the points scattered"
+        conditions:
+          - {feature: misfit_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: clip_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: settled_readings_higher, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: After each change of frequency wait at least five time constants (5 × 2/γ, about 17 s at γ = 0.6 /s) before reading, and reread the points near the peak.
+      osc_end_stop:
+        name: Amplitude limited by an end stop at the top of the curve
+        prior: 0.12
+        typical_size: "Readings near resonance sit level at the stop (here the vane meeting the pole piece) while the curve through the rest rises above it"
+        conditions:
+          - {feature: clip_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: settled_readings_higher, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Halve the crank's throw (the curve scales with it) or move the stop out of the way, and repeat the points near resonance; until then quote f₀ and γ from the fit with the ceiling.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the spring isn't rubbing the guide, the vane is centred in the gap, and the crank's throw stays fixed, then repeat the sweep.
+    tests:
+      osc_time_drive:
+        name: Time 20 crank turns with a stopwatch at three dial settings
+        minutes: 2
+        how: At three dial settings across the sweep, time 20 turns of the motor's crank with a stopwatch and compare 20/time with what the dial says.
+        adds: {feature: drive_dial_off, from: drive_dial_off, op: copy}
+        outcomes:
+          osc_dial_frequency: dial_off
+          osc_mass_changed: dial_right
+          osc_brake_current: dial_right
+          osc_transient: dial_right
+          osc_end_stop: dial_right
+          no_fault: dial_right
+        safety: Keep fingers, ties and hair clear of the motor's crank and the drive rod while it turns, and stop the motor before reaching near it.
+      osc_time_free:
+        name: Time the free oscillations with the motor stopped
+        minutes: 3
+        how: Stop the motor with the crank at the middle of its throw, displace the mass by about 20 mm and time 20 free oscillations, three times, with the brake at its set current.
+        adds: {feature: natural_frequency_differs, from: natural_frequency_differs, op: copy}
+        outcomes:
+          osc_mass_changed: frequency_differs
+          osc_dial_frequency: frequency_as_entered
+          osc_brake_current: frequency_as_entered
+          osc_transient: frequency_as_entered
+          osc_end_stop: frequency_as_entered
+          no_fault: frequency_as_entered
+        safety: Switch the motor off at its supply before touching the mass; don't stretch the spring past the end of its scale, as an overstretched spring can let the mass fall.
+      osc_brake_ammeter:
+        name: Read the brake magnet's current on a separate ammeter
+        minutes: 1
+        how: Put a multimeter on its 10 A range in series with the electromagnet and take five readings with the supply as it was for the sweep.
+        adds: {feature: brake_current_differs, from: brake_current_differs, op: copy}
+        outcomes:
+          osc_brake_current: current_differs
+          osc_dial_frequency: current_as_entered
+          osc_mass_changed: current_as_entered
+          osc_transient: current_as_entered
+          osc_end_stop: current_as_entered
+          no_fault: current_as_entered
+        safety: Turn the magnet's supply to zero before breaking its circuit; the coil is inductive and sparks if disconnected live, and its pole pieces get warm.
+      osc_settled_reread:
+        name: Reread the points nearest the peak after five time constants
+        minutes: 5
+        how: At the four frequencies nearest the peak, read the amplitude once at the time you did before, then again after waiting at least 20 s more without touching anything. Columns drive_frequency_Hz, early_mm, settled_mm.
+        adds: {feature: settled_readings_higher, from: settled_readings_higher, op: copy}
+        outcomes:
+          osc_transient: settled_higher
+          osc_end_stop: unchanged
+          osc_brake_current: unchanged
+          osc_dial_frequency: unchanged
+          osc_mass_changed: unchanged
+          no_fault: unchanged
+        safety: Near resonance the mass moves fast and far; keep your face and hands clear of it and of the crank while you read the scale.
+
+  boyle_gas:
+    faults:
+      no_fault:
+        name: No fault found
+        prior: 0.30
+        conditions:
+          - {feature: dead_volume_excess_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: start_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.01}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.95, p_false: 0.01}
+        fix: Nothing to fix. Record nRT (pV) with its uncertainty and the dead volume included.
+      boyle_dead_volume:
+        name: Tubing volume left out of the dead volume
+        prior: 0.20
+        typical_size: "40 cm of 3 mm bore tube holds 2.8 ml; left out, pV appears to fall by 8% between 60 ml and 20 ml"
+        conditions:
+          - {feature: dead_volume_excess_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: start_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: tubing_not_counted, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: pressure_falls_when_held, op: is, value: true, p_true: 0.05, p_false: 0.95}
+        fix: Add the tubing's volume (π × bore² / 4 × length) and the sensor's own to the dead volume, or shorten the tube, and refit; the readings themselves are fine.
+      boyle_seal_leak:
+        name: Air leaking out at the plunger seal or a joint
+        prior: 0.17
+        typical_size: "A leak loses gas fastest at the highest pressure; losing 7% over a compression to 20 ml looks just like 2–3 ml of extra dead volume"
+        conditions:
+          - {feature: dead_volume_excess_sigma, op: ">", value: 5, p_true: 0.95, p_false: 0.02}
+          - {feature: start_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: misfit_sigma, op: "<", value: 4, p_true: 0.9, p_false: 0.2}
+          - {feature: tubing_not_counted, op: is, value: true, p_true: 0.05, p_false: 0.95}
+          - {feature: pressure_falls_when_held, op: is, value: true, p_true: 0.95, p_false: 0.05}
+          - {feature: pressure_relaxes, op: is, value: true, p_true: 0.8, p_false: 0.1}
+        fix: Push the tubing fully onto the Luer fittings (a short sleeve of silicone tube helps), lightly grease the plunger seal or use a new syringe, check that the pressure holds at 20 ml, and repeat.
+      boyle_not_isothermal:
+        name: Compressed too fast, so the gas is warm when read
+        prior: 0.15
+        typical_size: "A quick push warms the air by several kelvin, a few per cent in p; read at once, the small volumes read high and pV appears to rise"
+        conditions:
+          - {feature: dead_volume_excess_sigma, op: "<", value: -5, p_true: 0.95, p_false: 0.01}
+          - {feature: start_offset_sigma, op: abs_lt, value: 4, p_true: 0.95, p_false: 0.02}
+          - {feature: pressure_relaxes, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Move the plunger slowly and wait 30 s at each volume before reading, so the gas returns to room temperature.
+      boyle_sensor_offset:
+        name: Pressure sensor zero offset
+        prior: 0.15
+        typical_size: "Absolute sensors drift by a few kPa between calibrations: the first reading, at room pressure, is off by the same amount as every other"
+        conditions:
+          - {feature: start_offset_sigma, op: abs_gt, value: 5, p_true: 0.95, p_false: 0.01}
+          - {feature: sensor_offset_found, op: is, value: true, p_true: 0.95, p_false: 0.05}
+        fix: Read the sensor with its port open beside the lab barometer, subtract the difference from every reading (or recalibrate the sensor), and refit.
+      unknown_cause:
+        name: Unknown cause (none of the above fits well)
+        prior: 0.05
+        conditions: []
+        flat_likelihood: 0.01
+        fix: Check the volume scale is read at the plunger seal's front edge, the sensor is set to absolute pressure, and the room temperature is steady, then repeat.
+    tests:
+      boyle_measure_tubing:
+        name: Measure the connecting tube's length and bore
+        minutes: 3
+        how: Pull the tube off, measure its length with a rule and its bore with the inside jaws of a calliper (or from the label), four times each.
+        adds: {feature: tubing_not_counted, from: tubing_not_counted, op: copy}
+        outcomes:
+          boyle_dead_volume: tubing_holds_more
+          boyle_seal_leak: tubing_counted
+          boyle_not_isothermal: tubing_counted
+          boyle_sensor_offset: tubing_counted
+          no_fault: tubing_counted
+        safety: Release the pressure (pull the tube off at atmospheric volume) before disconnecting; a syringe pushed to 20 ml holds three atmospheres and can fire the tube or plunger off.
+      boyle_hold_volume:
+        name: Hold the plunger at 20 ml and watch the pressure for three minutes
+        minutes: 4
+        how: Push to 20 ml, clamp or hold the plunger still, wait 30 s, then log the pressure every 10 s for three minutes. Columns time_s, held_pressure_kPa.
+        adds: {feature: pressure_falls_when_held, from: pressure_falls_when_held, op: copy}
+        outcomes:
+          boyle_seal_leak: pressure_falls
+          boyle_dead_volume: pressure_steady
+          boyle_not_isothermal: pressure_steady
+          boyle_sensor_offset: pressure_steady
+          no_fault: pressure_steady
+        safety: Wear eye protection and point the syringe away from people; at three atmospheres the plunger can shoot out if your grip slips. Don't go beyond the sensor's rated pressure.
+      boyle_slow_reread:
+        name: Reread each volume after 30 s at rest
+        minutes: 6
+        how: Repeat the compression, reading the pressure as soon as the plunger stops and again after 30 s, at every volume. Columns volume_ml, pressure_at_once_kPa, pressure_after_30s_kPa.
+        adds: {feature: pressure_relaxes, from: pressure_relaxes, op: copy}
+        outcomes:
+          boyle_not_isothermal: pressure_drops
+          boyle_seal_leak: pressure_drops
+          boyle_dead_volume: pressure_holds
+          boyle_sensor_offset: pressure_holds
+          no_fault: pressure_holds
+        safety: Wear eye protection and point the syringe away from people while it is compressed; don't exceed the sensor's rated pressure.
+      boyle_open_port:
+        name: Read the sensor with its port open, beside the barometer
+        minutes: 1
+        how: Disconnect the syringe so the sensor's port is open to the room, take five readings and read the lab barometer.
+        adds: {feature: sensor_offset_found, from: sensor_offset_found, op: copy}
+        outcomes:
+          boyle_sensor_offset: reads_off
+          boyle_dead_volume: reads_atmospheric
+          boyle_seal_leak: reads_atmospheric
+          boyle_not_isothermal: reads_atmospheric
+          no_fault: reads_atmospheric
+        safety: Let the syringe back to its starting volume before pulling it off, so it doesn't spring back or spray anything left in the tube.

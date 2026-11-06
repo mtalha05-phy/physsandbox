@@ -1,0 +1,18 @@
+datasets:
+  - {file: kater_amplitude.csv, experiment: kater_pendulum, truth: kater_large_amplitude}
+  - {file: kater_amplitude_protractor.csv, after: kater_amplitude.csv, test: kater_read_amplitude, experiment: kater_pendulum, truth: kater_large_amplitude, status: confirmed}
+  - {file: kater_miscount.csv, experiment: kater_pendulum, truth: kater_swing_miscount, status: confirmed}
+  - {file: kater_clean.csv, experiment: kater_pendulum, truth: no_fault, status: clear}
+  - {file: cavendish_scale_distance.csv, experiment: cavendish, truth: cav_scale_distance_wrong}
+  - {file: cavendish_scale_distance_tape.csv, after: cavendish_scale_distance.csv, test: cav_tape_scale_distance, experiment: cavendish, truth: cav_scale_distance_wrong, status: confirmed}
+  - {file: cavendish_drift.csv, experiment: cavendish, truth: cav_equilibrium_drift, status: confirmed}
+  - {file: cavendish_clean.csv, experiment: cavendish, truth: no_fault, status: clear}
+  - {file: oscillator_dial.csv, experiment: driven_oscillator, truth: osc_dial_frequency}
+  - {file: oscillator_dial_stopwatch.csv, after: oscillator_dial.csv, test: osc_time_drive, experiment: driven_oscillator, truth: osc_dial_frequency, status: confirmed}
+  - {file: oscillator_end_stop.csv, experiment: driven_oscillator, truth: osc_end_stop, status: confirmed}
+  - {file: oscillator_brake.csv, experiment: driven_oscillator, truth: osc_brake_current, status: confirmed}
+  - {file: oscillator_clean.csv, experiment: driven_oscillator, truth: no_fault, status: clear}
+  - {file: boyle_dead_volume.csv, experiment: boyle_gas, truth: boyle_dead_volume}
+  - {file: boyle_dead_volume_tube.csv, after: boyle_dead_volume.csv, test: boyle_measure_tubing, experiment: boyle_gas, truth: boyle_dead_volume, status: confirmed}
+  - {file: boyle_sensor_offset.csv, experiment: boyle_gas, truth: boyle_sensor_offset, status: confirmed}
+  - {file: boyle_clean.csv, experiment: boyle_gas, truth: no_fault, status: clear}
