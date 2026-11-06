@@ -1,0 +1,137 @@
+# Mechanics benches. Merged into catalog.yaml by app/pipeline.py.
+experiments:
+  kater_pendulum:
+    label: Kater's reversible pendulum
+    domain: mechanics
+    blurb: Periods about two knife edges as a slider moves along the bar; where they are equal, g follows from the edges' separation alone
+    columns: [knife_edge_mass_position_cm, period_1_s, period_2_s]
+    model: "T₁ = T₂ = T at the crossing,  g = 4π² L / T²"
+    expected: [[separation_mm, "Knife-edge separation L (mm)", 995.0], [g_local_m_s2, "Local g, from a gravity survey (m/s²)", 9.812], [amplitude_deg, "Release amplitude the periods are corrected for (°)", 2.0], [swings_timed, "Swings timed for each period", 50], [precision_ms, "Period precision (ms)", 1.0], [separation_precision_mm, "Separation reading precision (mm)", 0.3]]
+    samples:
+      - [kater_amplitude.csv, "g 0.8% low, smooth curves"]
+      - [kater_miscount.csv, "One period far off its curve"]
+      - [kater_clean.csv, "Healthy measurement"]
+    followups: {kater_read_amplitude: kater_amplitude_protractor.csv}
+    questions: ["Find where the two period curves cross and report g"]
+
+  cavendish:
+    label: Cavendish torsion balance
+    level: graduate
+    domain: mechanics
+    blurb: Laser spot on a scale after the large lead spheres are swung across; the damped swing's shift and period give the gravitational constant
+    columns: [time_s, beam_position_mm]
+    model: "G = 2π² L r² θ / (M T²) ÷ (1 − β),  θ = ΔS / 4D"
+    expected: [[large_mass_kg, "Mass of each large sphere M (kg)", 1.500], [arm_mm, "Fibre axis to small sphere centre d (mm); L = 2d", 50.0], [centre_distance_mm, "Large to small sphere, centre to centre r (mm)", 46.5], [scale_distance_m, "Mirror-to-scale distance D (m)", 4.20], [precision_mm, "Spot reading precision (mm)", 1.0], [geometry_precision_mm, "Precision of r and d (mm)", 0.2]]
+    samples:
+      - [cavendish_scale_distance.csv, "G 8% low, clean swing"]
+      - [cavendish_drift.csv, "Equilibrium creeping along the scale"]
+      - [cavendish_clean.csv, "Healthy measurement"]
+    followups: {cav_tape_scale_distance: cavendish_scale_distance_tape.csv}
+    questions: ["Fit the damped swing and report G with its uncertainty"]
+
+  driven_oscillator:
+    label: Driven damped oscillator (resonance)
+    domain: mechanics
+    blurb: Steady amplitude of a mass on a spring, driven by a motor and braked by eddy currents, against drive frequency
+    columns: [drive_frequency_Hz, amplitude_mm]
+    model: "A = a ω₀² / √((ω₀² − ω²)² + (γω)²)"
+    expected: [[natural_frequency_Hz, "Natural frequency f₀ from free oscillations (Hz)", 0.800], [damping_per_s, "Damping γ from the free decay at the set current (1/s)", 0.60], [brake_current_A, "Brake magnet current set (A)", 0.40], [precision_mm, "Amplitude reading precision (mm)", 0.4]]
+    samples:
+      - [oscillator_dial.csv, "Resonance 4% low, shape right"]
+      - [oscillator_end_stop.csv, "Top of the peak flat"]
+      - [oscillator_brake.csv, "Peak low and broad"]
+      - [oscillator_clean.csv, "Healthy measurement"]
+    followups: {osc_time_drive: oscillator_dial_stopwatch.csv}
+    questions: ["Fit the resonance curve and report f0, the damping and Q"]
+
+  boyle_gas:
+    label: Boyle's law (syringe and pressure sensor)
+    domain: mechanics
+    blurb: Pressure of the air in a sealed syringe as the plunger is pushed in, with the tubing's dead volume included
+    columns: [volume_ml, pressure_kPa]
+    model: "p (V + V₀) = nRT"
+    expected: [[dead_volume_ml, "Dead volume outside the syringe scale V₀ (ml)", 0.5], [atmospheric_kPa, "Room pressure from the lab barometer (kPa)", 101.3], [precision_ml, "Volume reading precision (ml)", 0.3], [precision_kPa, "Pressure reading precision (kPa)", 0.2]]
+    samples:
+      - [boyle_dead_volume.csv, "pV falls as the gas is squeezed"]
+      - [boyle_sensor_offset.csv, "First reading above room pressure"]
+      - [boyle_clean.csv, "Healthy measurement"]
+    followups: {boyle_measure_tubing: boyle_dead_volume_tube.csv}
+    questions: ["Fit volume against 1/p and report nRT and the dead volume"]
+
+sample_info:
+  kater_clean.csv: ["A Kater's pendulum: knife edges 995.0 mm apart, a brass bob beyond edge 2 and a 1.25 kg slider between the edges; 50 swings about each edge timed on a stopwatch at nine slider positions, released from 2°.", "Nothing should look off: the curves cross at the period that gives local g."]
+  kater_amplitude.csv: ["The same pendulum and stopwatch, nine slider positions, with the release amplitude entered as 2°.", "Both curves are smooth and cross cleanly, but the crossing period gives g about 0.8% below the local value."]
+  kater_miscount.csv: ["The same pendulum and stopwatch, nine slider positions, released from 2°.", "Eight of the periods about edge 1 lie on a smooth curve; the one at 72.5 cm sits about 40 ms below it."]
+  kater_amplitude_protractor.csv: ["The swing amplitude read five times on a protractor behind the bar's lower end, released exactly as for the timings.", "Is the amplitude the 2° that was entered?"]
+  cavendish_clean.csv: ["A torsion balance with 1.5 kg lead spheres (r = 46.5 mm, d = 50.0 mm) and a laser spot on a scale 4.20 m from its mirror; the spot read every 20 s for 50 minutes after the spheres were swung across.", "Nothing should look off: the swing settles 107 mm along the scale with a 9 minute period, giving G within its uncertainty."]
+  cavendish_scale_distance.csv: ["The same balance and scale, with D entered as 4.20 m from the lab sheet.", "The swing is clean and damps normally, but the shift and period give G about 8% below 6.674 × 10⁻¹¹."]
+  cavendish_drift.csv: ["The same balance, scale and spheres, recorded on a morning when the heating had just come on.", "The swing looks normal, but the level it settles to keeps moving along the scale through the whole run."]
+  cavendish_scale_distance_tape.csv: ["A steel tape run five times along the beam from the balance's mirror to the scale.", "Is the distance the 4.20 m that was entered?"]
+  oscillator_clean.csv: ["A 200 g mass on a spring, driven by a motor and crank with a 3 mm throw and braked by an aluminium vane in an electromagnet at 0.40 A; amplitude on a mirror scale at sixteen dial frequencies, 0.5 to 1.15 Hz.", "Nothing should look off: the peak sits at the free-oscillation f₀ of 0.800 Hz with γ = 0.60 /s."]
+  oscillator_dial.csv: ["The same oscillator and brake, frequencies read from the motor's speed dial.", "The curve has the right shape and width, but it peaks about 4% below the 0.800 Hz the free oscillations gave."]
+  oscillator_end_stop.csv: ["The same oscillator and brake, sixteen dial frequencies from 0.5 to 1.15 Hz.", "Away from the peak the readings follow a resonance curve, but the readings around the peak are all level at about 16 mm."]
+  oscillator_brake.csv: ["The same oscillator, with the brake meant to be at 0.40 A.", "The curve is a clean resonance at the right frequency, but the peak is lower and broader than the damping entered allows."]
+  oscillator_dial_stopwatch.csv: ["Twenty turns of the motor's crank timed with a stopwatch at three dial settings.", "Does the drive run at the frequency the dial says?"]
+  boyle_clean.csv: ["A 60 ml syringe pushed straight onto an absolute pressure sensor (0.5 ml inside it), connected at 60 ml and pushed in 4 ml steps to 20 ml, reading after each step settled.", "Nothing should look off: p(V + 0.5 ml) stays constant within the readings."]
+  boyle_dead_volume.csv: ["The same syringe and sensor, now joined by a length of tubing, with the dead volume entered as 0.5 ml.", "The points are smooth, but p(V + V₀) falls steadily as the gas is squeezed, by about 8% at 20 ml."]
+  boyle_sensor_offset.csv: ["The same syringe pushed straight onto the sensor, from 60 ml to 20 ml, barometer at 101.3 kPa.", "pV is nearly constant, but the first reading, taken with the gas at room pressure, is about 3.5 kPa above the barometer."]
+  boyle_dead_volume_tube.csv: ["The connecting tube's length on a rule and its bore with callipers, four times each.", "Does the tube hold more than the dead volume entered?"]
+
+labels:
+  g_kater_m_s2: ["g from the crossing", "m/s²", 1]
+  g_local_m_s2: ["Local g, entered", "m/s²", 1]
+  crossing_period_s: ["Period where the curves cross", "s", 1]
+  crossing_position_cm: ["Slider position at the crossing", "cm", 1]
+  amplitude_correction_pct: ["Amplitude correction taken out of the periods", "%", 1]
+  scatter_edge_1_ms: ["Scatter about the edge 1 curve (rms)", "ms", 1]
+  scatter_edge_2_ms: ["Scatter about the edge 2 curve (rms)", "ms", 1]
+  odd_point_position_cm: ["Slider position of the odd period", "cm", 1]
+  odd_point_period_ratio: ["Odd period ÷ the curve there", "", 1]
+  amplitude_measured_deg: ["Swing amplitude, measured", "°", 1]
+  amplitude_entered_deg: ["Swing amplitude, entered", "°", 1]
+  period_excess_at_measured_amplitude_pct: ["Extra period at the measured amplitude", "%", 1]
+  g_shortfall_at_measured_amplitude_pct: ["g low by, at the measured amplitude", "%", 1]
+  separation_measured_mm: ["Knife-edge separation, measured", "mm", 1]
+  separation_entered_mm: ["Knife-edge separation, entered", "mm", 1]
+  g_with_measured_separation_change_pct: ["Change in g with the measured separation", "%", 1]
+  G_fit: ["Gravitational constant G", "N·m²/kg²", 1]
+  G_accepted: ["G, accepted value (CODATA)", "N·m²/kg²", 1]
+  equilibrium_shift_mm: ["Equilibrium shift of the spot ΔS", "mm", 1]
+  free_period_s: ["Undamped period T", "s", 1]
+  damping_time_s: ["Amplitude decay time", "s", 1]
+  drift_mm_per_min: ["Drift of the equilibrium", "mm/min", 1]
+  beam_twist_mrad: ["Twist of the beam in each position θ", "mrad", 1]
+  far_sphere_correction_pct: ["Far-sphere correction, 1/(1 − β) − 1", "%", 1]
+  scale_distance_measured_m: ["Mirror-to-scale distance, tape", "m", 1]
+  scale_distance_entered_m: ["Mirror-to-scale distance, entered", "m", 1]
+  G_change_with_measured_distance_pct: ["Change in G with the measured distance", "%", 1]
+  sphere_gap_mean_mm: ["Gap between sphere and case, mean", "mm", 1]
+  sphere_gap_largest_mm: ["Gap between sphere and case, largest", "mm", 1]
+  drift_without_spheres_mm_per_min: ["Drift with the spheres removed", "mm/min", 1]
+  scatter_without_spheres_mm: ["Spot scatter with the spheres removed (rms)", "mm", 1]
+  natural_frequency_fit_Hz: ["Natural frequency f₀, fitted", "Hz", 1]
+  natural_frequency_entered_Hz: ["Natural frequency f₀, entered", "Hz", 1]
+  damping_fit_per_s: ["Damping γ, fitted", "/s", 1]
+  damping_entered_per_s: ["Damping γ, entered", "/s", 1]
+  oscillator_quality_factor: ["Quality factor Q = ω₀/γ", "", 1]
+  low_frequency_amplitude_mm: ["Amplitude far below resonance", "mm", 1]
+  peak_amplitude_fit_mm: ["Peak amplitude of the fitted curve", "mm", 1]
+  end_stop_level_mm: ["Level the readings are stopped at", "mm", 1]
+  dial_over_measured_frequency: ["Dial frequency ÷ timed frequency", "", 1]
+  drive_frequency_measured_Hz: ["Drive frequency timed, at the top setting", "Hz", 1]
+  drive_frequency_dial_Hz: ["Dial reading, top setting", "Hz", 1]
+  natural_frequency_measured_Hz: ["Natural frequency f₀, from free oscillations", "Hz", 1]
+  brake_current_measured_A: ["Brake current, measured", "A", 1]
+  brake_current_entered_A: ["Brake current, entered", "A", 1]
+  settled_minus_early_mm: ["Settled reading − early reading", "mm", 1]
+  dead_volume_fit_ml: ["Dead volume V₀, fitted", "ml", 1]
+  dead_volume_entered_ml: ["Dead volume V₀, entered", "ml", 1]
+  nRT_mJ: ["nRT = p(V + V₀)", "mJ", 1]
+  pV_change_over_run_pct: ["Change in p(V + V₀ entered) over the run", "%", 1]
+  first_reading_kPa: ["First reading (gas at room pressure)", "kPa", 1]
+  atmospheric_entered_kPa: ["Room pressure, barometer", "kPa", 1]
+  tubing_volume_ml: ["Volume of the connecting tube", "ml", 1]
+  held_pressure_change_kPa_per_min: ["Pressure change with the plunger held", "kPa/min", 1]
+  held_pressure_start_kPa: ["Pressure at the start of the hold", "kPa", 1]
+  pressure_drop_after_30s_kPa: ["Pressure drop after 30 s at rest", "kPa", 1]
+  open_port_reading_kPa: ["Sensor reading, port open", "kPa", 1]
