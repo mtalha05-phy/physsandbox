@@ -232,7 +232,7 @@ write("balmer_offset.csv", hdr, nn, balmer(nn, 2.0) + rng.normal(0, 0.05, nn.siz
 # follow-up: the same lines measured with a fresh hydrogen tube
 write("balmer_fresh_tube.csv", hdr, nn, balmer(nn) + rng.normal(0, 0.05, nn.size), fmt="{:.6g}")
 
-# ======================================================================
+# =============================================================================
 # Partner cases for the classical bench: the lower-prior fault of each ambiguous
 # pair. In each demo above the first measurement can't tell two faults apart, and
 # the truth is the more common one. Here the truth is the other fault, generated
@@ -345,7 +345,7 @@ write("hall_field_low.csv", ["current_A", "hall_voltage_V"], Ih,
 # follow-up: field forward, then reversed; the voltage flips almost exactly
 Vf = np.where(rev == 0, kl, -kl) * Ir + 0.01 * kh * Ir + rng.normal(0, 2e-5, Ir.size)
 write("hall_field_low_reversed.csv", ["current_A", "hall_voltage_V", "field_reversed"], Ir, Vf, rev)
-=======
+
 # --- Quantum partner cases: the lower-prior fault of each ambiguous pair ---------
 # Each demo's first measurement can't tell two faults apart, and its truth is the
 # more common one. Here the truth is the other, at a realistic size, with the
