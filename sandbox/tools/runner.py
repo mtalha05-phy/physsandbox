@@ -23,11 +23,15 @@ import contextlib
 import io
 import json
 import os
+import re
 import resource
 import runpy
+import shutil
+import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 import traceback
 
@@ -132,6 +136,165 @@ def child():
     print(json.dumps({"result": payload, "stdout": stdout, "error": error, "error_line": ERROR_LINE}, default=float))
 
 
+# --- System-call tracer ---------------------------------------------------------
+# Agent code and attack demos run under strace, started by this runner before the
+# untrusted code exists. What the code TRIED (reach the network, write outside
+# scratch space, read files it may not, start programs, signal other processes)
+# is then taken from the kernel-level record of its system calls, not from the
+# code's own error messages, so wrapping an attempt in try/except hides nothing.
+# The code runs as the same user as the tracer, so it could kill it: that kill is
+# itself recorded, and a tracer that dies early is reported as tampering.
+TRACE_CALLS = ("socket,connect,sendto,sendmsg,bind,listen,open,openat,creat,mkdir,mkdirat,"
+               "unlink,unlinkat,rename,renameat,renameat2,chmod,fchmodat,symlink,symlinkat,link,linkat,"
+               "execve,ptrace,kill,tkill,tgkill")
+TRACE_CAP = 2_000_000          # bytes of trace kept; the rest is drained and counted
+SCRATCH = ("/tmp/", "/dev/null", "/dev/shm/")
+_LINE = re.compile(r"^(\d+)\s+(?:<\.\.\.\s+)?(\w+)(?:\s+resumed>)?\(?(.*)$")
+_RESULT = re.compile(r"\)\s+=\s+(-?\d+|\?)(?:\s+(E[A-Z0-9]+))?")
+
+
+def tracer():
+    """Path of a working strace, or None (then attempts fall back to the code's own output)."""
+    st = shutil.which("strace")
+    if not st:
+        return None
+    try:
+        r = subprocess.run([st, "-qq", "-e", "trace=none", "/bin/true"], capture_output=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return st if r.returncode == 0 else None
+
+
+def _inet_target(args):
+    m = re.search(r'inet_addr\("([0-9.]+)"\)|inet_pton\(AF_INET6,\s*"([0-9a-fA-F:.]+)"', args)
+    if not m:
+        return None
+    addr = m.group(1) or m.group(2)
+    port = re.search(r"htons\((\d+)\)", args)
+    return addr, int(port.group(1)) if port else None
+
+
+def _loopback(addr):
+    return addr.startswith("127.") or addr in ("::1", "0.0.0.0", "::")
+
+
+def summarise_trace(text, self_exec, tracer_pid=None):
+    """Turn strace output into counts per kind of attempt. Paths and addresses are
+    the code's own choice, so they go only into `examples` (returned to the person
+    who ran the job), never into the shared log or the public receipt."""
+    out = {"network": 0, "network_reached": 0, "loopback": 0, "writes": 0, "writes_succeeded": 0,
+           "reads_refused": 0, "programs": 0, "signals": 0, "tracer_signalled": False, "examples": []}
+    seen_first_exec = False
+
+    def ex(s):
+        if len(out["examples"]) < 8:
+            out["examples"].append(s[:160])
+
+    for line in text.splitlines():
+        m = _LINE.match(line)
+        if not m:
+            continue
+        call, rest = m.group(2), m.group(3)
+        r = _RESULT.search(rest)
+        ret, err = (r.group(1), r.group(2)) if r else ("?", None)
+        failed = ret.startswith("-") or err is not None
+        if call in ("socket",) and ("AF_INET" in rest):
+            continue  # making a socket is harmless; using it is what counts
+        if call in ("connect", "sendto", "sendmsg", "bind", "listen"):
+            tgt = _inet_target(rest)
+            if not tgt:
+                continue  # local (unix) sockets: not a way out of the box
+            addr, port = tgt
+            if _loopback(addr):
+                out["loopback"] += 1
+                continue
+            out["network"] += 1
+            if not failed or err == "EINPROGRESS":
+                out["network_reached"] += 1
+            ex(f"{call} to {addr}:{port} -> {err or ret}")
+        elif call in ("open", "openat", "creat"):
+            pm = re.search(r'"([^"]*)"', rest)
+            path = pm.group(1) if pm else "?"
+            writing = call == "creat" or re.search(r"O_WRONLY|O_RDWR|O_CREAT|O_TRUNC|O_APPEND", rest)
+            if writing:
+                if path.startswith(SCRATCH) or not path.startswith("/"):
+                    continue  # scratch space (relative paths are inside /tmp, the working directory)
+                out["writes"] += 1
+                out["writes_succeeded"] += 0 if failed else 1
+                ex(f"write {path} -> {err or 'opened'}")
+            elif err in ("EACCES", "EPERM"):
+                out["reads_refused"] += 1
+                ex(f"read {path} -> {err}")
+        elif call in ("mkdir", "mkdirat", "unlink", "unlinkat", "rename", "renameat", "renameat2",
+                      "chmod", "fchmodat", "symlink", "symlinkat", "link", "linkat"):
+            pm = re.search(r'"([^"]*)"', rest)
+            path = pm.group(1) if pm else "?"
+            if path.startswith(SCRATCH) or not path.startswith("/"):
+                continue
+            out["writes"] += 1
+            out["writes_succeeded"] += 0 if failed else 1
+            ex(f"{call} {path} -> {err or 'done'}")
+        elif call == "execve":
+            if not seen_first_exec and self_exec in rest:
+                seen_first_exec = True   # the tracer starting the job itself
+                continue
+            out["programs"] += 1
+            pm = re.search(r'"([^"]*)"', rest)
+            ex(f"start {pm.group(1) if pm else '?'} -> {err or 'started'}")
+        elif call in ("kill", "tkill", "tgkill", "ptrace"):
+            tm = re.match(r"\s*(-?\d+)", rest)
+            target = int(tm.group(1)) if tm else None
+            if call == "ptrace" or (target is not None and target != int(m.group(1))):
+                out["signals"] += 1
+                if tracer_pid is not None and target == tracer_pid:
+                    out["tracer_signalled"] = True
+                ex(f"{call} {target} -> {err or ret}")
+    return out
+
+
+def run_traced(st, argv, timeout):
+    """Run argv under strace. Returns (proc-like result, trace summary)."""
+    r, w = os.pipe()
+    cmd = [st, "-f", "-qq", "-s", "120", "-e", f"trace={TRACE_CALLS}", "-e", "signal=none",
+           "-o", f"/dev/fd/{w}", *argv]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
+                            pass_fds=(w,), start_new_session=True, text=True)
+    os.close(w)
+    chunks, size = [], [0, 0]
+
+    def drain():
+        while True:
+            b = os.read(r, 65536)
+            if not b:
+                break
+            if size[0] < TRACE_CAP:
+                chunks.append(b[:TRACE_CAP - size[0]])
+            size[0] += len(b)
+    t = threading.Thread(target=drain, daemon=True)
+    t.start()
+    timed_out = False
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(proc.pid, signal.SIGKILL)
+        out, err = proc.communicate()
+    t.join(timeout=5)
+    os.close(r)
+    summary = summarise_trace(b"".join(chunks).decode("utf-8", "replace"), argv[0], tracer_pid=proc.pid)
+    # strace exits with the tracee's status; killed by a signal means someone stopped it.
+    summary["tracer_killed"] = proc.returncode is not None and proc.returncode < 0 and not timed_out \
+        and (summary["tracer_signalled"] or -proc.returncode == signal.SIGKILL)
+    summary["truncated"] = size[0] > TRACE_CAP
+    summary["tracer"] = "strace"
+    if timed_out:
+        exc = subprocess.TimeoutExpired(cmd, timeout, output=out, stderr=err)
+        exc.trace = summary
+        raise exc
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err), summary
+
+
 def main():
     if sys.argv[1] == "_child":
         return child()
@@ -139,7 +302,7 @@ def main():
     started = time.time()
     # Line 1: the walls, measured before any untrusted code is in the box.
     print(json.dumps({"probe": probe()}), flush=True)
-    forged, error_line = False, None
+    forged, error_line, trace = False, None, None
     if kind == "analyze":
         # Our own physics code reading the uploaded file.
         payload, stdout, error = run_target(kind, args)
@@ -152,9 +315,15 @@ def main():
             ctypes.CDLL(None).prctl(4, 0, 0, 0, 0)  # PR_SET_DUMPABLE = 4
         except (OSError, AttributeError):
             pass
+        st = tracer()
+        child_argv = [sys.executable, "-I", "-B", os.path.abspath(__file__), "_child", kind, *args]
         try:
-            proc = subprocess.run([sys.executable, "-I", os.path.abspath(__file__), "_child", kind, *args],
-                                  capture_output=True, text=True, timeout=25, stdin=subprocess.DEVNULL)
+            if st:
+                proc, trace = run_traced(st, child_argv, timeout=25)
+            else:
+                trace = {"tracer": None}
+                proc = subprocess.run(child_argv, capture_output=True, text=True, timeout=25,
+                                      stdin=subprocess.DEVNULL)
             lines = proc.stdout.strip().splitlines()
             try:
                 rep = json.loads(lines[-1][:20000])
@@ -170,8 +339,9 @@ def main():
             forged = _has_probe(proc.stdout)
             if proc.returncode < 0 or proc.returncode == 137:
                 error = error or f"killed (signal {-proc.returncode if proc.returncode < 0 else 9})"
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
             payload, stdout, error, forged, error_line = None, "", "timed out", False, None
+            trace = {**(getattr(e, "trace", None) or {"tracer": "strace" if st else None}), "timed_out": True}
         rss = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
     # Line 2: what the job produced (untrusted for agent code: it is the code's own output).
     print(json.dumps({
@@ -180,6 +350,7 @@ def main():
         "error": error,
         "forged_probe": forged,
         "error_line": error_line,
+        "trace": trace,
         "usage": {"seconds": round(time.time() - started, 3), "max_rss_mb": round(rss / 1024, 1)},
     }, default=float))
 

@@ -792,7 +792,7 @@ async function refreshSide() {
     `<div class="ev"><span class="t">${esc(e.time)}</span><span class="${esc(e.kind)}">${esc(e.detail)}</span></div>`).join("") || `<p class="empty">No jobs yet. Run an analysis or try to break out.</p>`;
   $("receipts").innerHTML = led.receipts.slice().reverse().map(r => {
     const contained = r.outcome.some(o => ["blocked", "killed", "denied", "tamper"].includes(o));
-    return `<div class="receipt"><span class="seq">#${r.seq}</span><span class="lab">${esc(r.label)}</span><span class="oc ${contained ? "contained" : "clean"}">${contained ? "contained" : r.outcome.includes("clean") ? "clean" : esc(r.outcome.join(", "))}</span><span class="h">${esc(r.hash.slice(0, 16))} ← ${esc(r.prev.slice(0, 8))}</span></div>`;
+    return `<div class="receipt"><span class="seq">#${r.seq}</span><span class="lab">${esc(r.label)}</span><span class="oc ${contained ? "contained" : "clean"}">${contained ? "contained" : r.outcome.includes("clean") ? "clean" : r.outcome.includes("no attempt seen") ? "no attempt seen" : esc(r.outcome.join(", "))}</span><span class="h">${esc(r.hash.slice(0, 16))} ← ${esc(r.prev.slice(0, 8))}</span></div>`;
   }).join("") || `<p class="empty" style="color:var(--chamber-muted)">No receipts yet.</p>`;
   ledgerPill(led.verify);
 }

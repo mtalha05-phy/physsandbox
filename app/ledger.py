@@ -322,7 +322,7 @@ def tamper_demo():
     contained = [e for e in items if set(e.get("outcome") or []) & {"blocked", "killed", "denied", "tamper"}]
     target = contained[-1] if contained else items[len(items) // 2]
     before = list(target.get("outcome") or [])
-    after = ["clean"] if contained else ["blocked"]
+    after = ["no attempt seen"] if contained else ["blocked"]
     target["outcome"] = after
     target["label"] = str(target.get("label", "")) + " (edited)"
     i = next(k for k, r in enumerate(records) if r is target)

@@ -15,6 +15,7 @@ column label can come from an uploaded file), and nothing is used as a URL or
 a file path.
 """
 import io
+import json
 import math
 import os
 import re
@@ -298,7 +299,10 @@ def load(payload, owner):
             "receipt": _receipt(e),
         })
     return {"experiment": exp, "cat": CATALOG["experiments"][exp], "lib": lib,
-            "expected": expected, "steps": steps}
+            "expected": expected, "steps": steps,
+            # Embedded in the PDF: each step's signed receipt and the exact stored result
+            # whose SHA-256 that receipt seals, so anyone can check it offline.
+            "evidence": [{"receipt": e, "result": r} for e, r in recs]}
 
 
 # ---------------------------------------------------------------- numbers
@@ -717,11 +721,33 @@ def build(payload, owner=None):
     if not _busy.acquire(timeout=30):
         raise ReportError("The server is busy building other reports. Try again in a moment.", 503)
     try:
-        return _render(inv)
+        pdf, filename = _render(inv)
+        return _attach_evidence(pdf, inv["evidence"]), filename
     except LayoutError as e:
         raise ReportError("The investigation is too large to lay out as a PDF.") from e
     finally:
         _busy.release()
+
+
+EVIDENCE_NAME = "physsandbox-evidence.json"
+
+
+def _attach_evidence(pdf, evidence):
+    """Embed the evidence as a PDF file attachment. tools/verify_report.py checks it
+    with the published public key: every receipt's hash and Ed25519 signature, every
+    result against the SHA-256 sealed in its receipt, the order of the steps, and
+    that the page text matches the signed result."""
+    from pypdf import PdfReader, PdfWriter
+    key = ledger.public_key()
+    doc = {"format": "physsandbox-report-evidence/1",
+           "check": "python tools/verify_report.py THIS.pdf notebook/ed25519-public-key.pem",
+           "public_key": {k: key[k] for k in ("alg", "key_id", "sha256", "pem")},
+           "steps": evidence}
+    w = PdfWriter(clone_from=PdfReader(io.BytesIO(pdf)))
+    w.add_attachment(EVIDENCE_NAME, json.dumps(doc, indent=1, sort_keys=True, allow_nan=False).encode())
+    out = io.BytesIO()
+    w.write(out)
+    return out.getvalue()
 
 
 def _render(inv):
@@ -932,6 +958,11 @@ def _render(inv):
                 "lab notebook.")
         blocks += [Spacer(1, 4), P(note, "small")]
     flow += [KeepTogether(blocks), Spacer(1, 10),
+             P(f"This PDF carries its own evidence as an attached file, {EVIDENCE_NAME}: each step's signed "
+               "receipt and the exact result the step's pages were built from. Anyone can check it offline, "
+               "without this server: tools/verify_report.py checks every signature against the published key "
+               "(notebook/ed25519-public-key.pem in the repository), every result against the hash sealed in "
+               "its receipt, and that the page text matches the signed result.", "small"),
              P("To check these receipts later, compare the hashes above with the lab notebook on the server "
                "(GET /api/ledger) and check its Ed25519 signatures yourself with the public key "
                "(GET /api/ledger/public-key) and tools/verify_receipts.py. Keep this report as an independent copy of the "

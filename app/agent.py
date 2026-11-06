@@ -13,6 +13,8 @@ import ast
 
 import re
 
+from app.sandbox import error_kind as _sandbox_error_kind
+
 from . import llm
 
 MODEL = llm.MODEL
@@ -196,8 +198,7 @@ def error_kind(error):
     """Only the exception's type, e.g. 'ValueError'. Never its message: a message can
     quote the data (a failed parse echoes the offending line), and the data may carry
     an instruction aimed at the model."""
-    head = (error or "").split(":", 1)[0].strip()
-    return head if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,60}", head) else "Error"
+    return _sandbox_error_kind(error)
 
 
 def fix_code(question, experiment, summary, code, error, line=None):
