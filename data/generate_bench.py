@@ -232,7 +232,7 @@ write("balmer_offset.csv", hdr, nn, balmer(nn, 2.0) + rng.normal(0, 0.05, nn.siz
 # follow-up: the same lines measured with a fresh hydrogen tube
 write("balmer_fresh_tube.csv", hdr, nn, balmer(nn) + rng.normal(0, 0.05, nn.size), fmt="{:.6g}")
 
-# =============================================================================
+# ======================================================================
 # Partner cases for the classical bench: the lower-prior fault of each ambiguous
 # pair. In each demo above the first measurement can't tell two faults apart, and
 # the truth is the more common one. Here the truth is the other fault, generated
@@ -345,5 +345,53 @@ write("hall_field_low.csv", ["current_A", "hall_voltage_V"], Ih,
 # follow-up: field forward, then reversed; the voltage flips almost exactly
 Vf = np.where(rev == 0, kl, -kl) * Ir + 0.01 * kh * Ir + rng.normal(0, 2e-5, Ir.size)
 write("hall_field_low_reversed.csv", ["current_A", "hall_voltage_V", "field_reversed"], Ir, Vf, rev)
+=======
+# --- Quantum partner cases: the lower-prior fault of each ambiguous pair ---------
+# Each demo's first measurement can't tell two faults apart, and its truth is the
+# more common one. Here the truth is the other, at a realistic size, with the
+# recommended test's result as that fault really produces it. Own random stream,
+# so every dataset above is unchanged.
+rng = np.random.default_rng(4401)
+
+# Planck: the meter is fine, but the wavelengths are the datasheet's. Measured on a
+# fibre spectrometer these LEDs peak 7-18 nm away from their labels, the blue and
+# violet ones long and the infrared ones short, which flattens the line by ~9%.
+q_nominal = np.array([940, 850, 660, 590, 525, 470, 405], dtype=float)
+q_peak = np.array([922, 843, 670, 603, 541, 487, 423], dtype=float)
+write("planck_partner.csv", ["wavelength_nm", "turn_on_voltage_V"], q_nominal,
+      von(q_peak) + rng.normal(0, 0.01, q_nominal.size), fmt="{:.4g}")
+# follow-up: the "590 nm" LED (peak 603 nm) on the lab meter, then a reference meter: they agree
+groups("planck_partner_refmeter.csv", ["meter", "voltage_V"], float(von(603.0)), float(von(603.0)), noise=0.003)
+
+# Tunnelling: the mass is right, but the barrier height was entered from the wrong zero
+# (0.13 eV above the leads' band edge), so the simulated barrier is 0.87 eV, not 1 eV
+q_aw = np.round(np.arange(0.1, 1.21, 0.1), 2)
+write("tunnel_partner.csv", ["barrier_width_nm", "transmission"], q_aw,
+      noisy(t_exact(q_aw, V0=0.87)), fmt="{:.6g}")
+# follow-up: the same simulation at 0.5 and 0.25 eV; V0 - E changes by a different ratio
+q_e = np.r_[np.full(q_aw.size, 0.5), np.full(q_aw.size, 0.25)]
+q_a = np.r_[q_aw, q_aw]
+write("tunnel_partner_two_energies.csv", ["barrier_width_nm", "transmission", "energy_eV"], q_a,
+      noisy(t_exact(q_a, E=q_e, V0=0.87)), q_e, fmt="{:.6g}")
+
+# Blackbody: the wavelength scale is right, but the 12 V lamp is run at 11.0 V; a
+# tungsten filament's temperature goes roughly as V^0.42, so it sits near 2700 K
+q_lb = np.arange(400, 1701, 50, dtype=float)
+write("blackbody_partner.csv", ["wavelength_nm", "spectral_radiance"], q_lb,
+      bb(q_lb, T=2700.0) + rng.normal(0, 0.005, q_lb.size), fmt="{:.5g}")
+# follow-up: mercury calibration lines land where they should
+q_hg = np.array([404.66, 435.83, 546.07, 576.96, 579.07])
+write("blackbody_partner_hg.csv", ["reference_nm", "measured_nm"], q_hg,
+      q_hg + rng.normal(0, 0.2, q_hg.size), fmt="{:.2f}")
+
+# Balmer: the tube is clean, but the faint 397.0 nm line (n = 7) was missed and the next
+# one, 388.9 nm (n = 8), was logged as n = 7
+q_n = np.arange(3, 8, dtype=float)
+q_true_n = np.array([3, 4, 5, 6, 8], dtype=float)
+write("balmer_partner.csv", ["n_upper", "wavelength_nm"], q_n,
+      balmer(q_true_n) + rng.normal(0, 0.05, q_n.size), fmt="{:.6g}")
+# follow-up: a fresh hydrogen tube shows the same lines, so the odd one stays put
+write("balmer_partner_fresh_tube.csv", ["n_upper", "wavelength_nm"], q_n,
+      balmer(q_true_n) + rng.normal(0, 0.05, q_n.size), fmt="{:.6g}")
 
 print(f"Wrote bench datasets to {OUT}")
